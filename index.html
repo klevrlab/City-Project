@@ -2,9 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <title>San Jose XR Portal – Stadium Demo</title>
+    <title>San Jose XR Portal – Stadium Pop-Up</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="Web AR demo using AR.js and A-Frame for SJSU logo and stadium model.">
+    <meta name="description" content="Web AR demo using AR.js and A-Frame for SJSU logo and pop-up stadium model.">
 
     <!-- A-Frame (3D / VR framework in the browser) -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
@@ -40,10 +40,10 @@
   </head>
 
   <body>
-    <!-- Simple instructions overlay -->
+    <!-- Instructions overlay -->
     <div id="info">
       Point your camera at a <strong>Hiro marker</strong> (cube) or the <strong>SJSU marker</strong> (stadium).<br>
-      For best demo: use the SJSU logo marker to summon the stadium.
+      On SJSU, the stadium will rise up and pop into place.
     </div>
 
     <!-- AR.js + A-Frame scene -->
@@ -59,7 +59,7 @@
         <a-asset-item id="stadiumModel" src="assets/stadium.glb"></a-asset-item>
       </a-assets>
 
-      <!-- 1) Hiro marker (keep as a simple baseline/debug marker) -->
+      <!-- 1) Hiro marker (simple baseline/debug marker) -->
       <a-marker preset="hiro">
         <!-- “Portal pad” ring -->
         <a-ring
@@ -92,8 +92,7 @@
         ></a-text>
       </a-marker>
 
-      <!-- 2) SJSU custom pattern marker: show stadium model -->
-      <!-- Make sure markers/sjsu-logo.patt exists in your repo -->
+      <!-- 2) SJSU custom pattern marker: stadium portal -->
       <a-marker
         type="pattern"
         url="markers/sjsu-logo.patt"
@@ -109,13 +108,34 @@
           animation__pulse="property: scale; from: 1 1 1; to: 1.1 1.1 1.1; dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"
         ></a-ring>
 
-        <!-- Stadium model -->
+        <!-- Stadium model with pop-up + rise animation -->
         <a-entity
+          id="stadium"
           gltf-model="#stadiumModel"
-          position="0 0 0"
+          position="0 -0.2 0"  <!-- start slightly below marker plane -->
           rotation="0 45 0"
-          scale="0.03 0.03 0.03"
-          animation__rotate="property: rotation; to: 0 405 0; loop: true; dur: 15000; easing: linear"
+          scale="0.001 0.001 0.001"  <!-- start almost invisible -->
+          animation__popin="
+            property: scale;
+            to: 0.03 0.03 0.03;
+            dur: 800;
+            easing: easeOutBack;
+            startEvents: popin;
+          "
+          animation__rise="
+            property: position;
+            to: 0 0 0;
+            dur: 800;
+            easing: easeOutCubic;
+            startEvents: popin;
+          "
+          animation__rotate="
+            property: rotation;
+            to: 0 405 0;
+            loop: true;
+            dur: 15000;
+            easing: linear;
+          "
         ></a-entity>
 
         <!-- Label for SJSU stadium portal -->
@@ -133,11 +153,12 @@
       <a-entity camera></a-entity>
     </a-scene>
 
-    <!-- Optional: simple console logs to confirm markers are working -->
+    <!-- Marker debug + animation trigger -->
     <script>
       document.addEventListener('DOMContentLoaded', () => {
         const hiro = document.querySelector('a-marker[preset="hiro"]');
         const sjsu = document.querySelector('a-marker[type="pattern"]');
+        const stadium = document.querySelector('#stadium');
 
         if (hiro) {
           hiro.addEventListener('markerFound', () =>
@@ -149,15 +170,23 @@
         }
 
         if (sjsu) {
-          sjsu.addEventListener('markerFound', () =>
-            console.log('%cSJSU (stadium) FOUND', 'color: #00FFAA; font-weight: bold;')
-          );
+          sjsu.addEventListener('markerFound', () => {
+            console.log('%cSJSU (stadium) FOUND', 'color: #00FFAA; font-weight: bold;');
+
+            // Reset stadium before each pop-in
+            if (stadium) {
+              stadium.setAttribute('scale', '0.001 0.001 0.001');
+              stadium.setAttribute('position', '0 -0.2 0');
+              stadium.emit('popin');
+            }
+          });
+
           sjsu.addEventListener('markerLost', () =>
             console.log('%cSJSU (stadium) LOST', 'color: #00FFAA; font-weight: normal;')
           );
         }
 
-        console.log('San Jose XR Stadium demo initialized.');
+        console.log('San Jose XR Stadium pop-up demo initialized.');
       });
     </script>
   </body>
