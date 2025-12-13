@@ -2,9 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <title>San Jose XR Portal – AR.js Debug Demo</title>
+    <title>San Jose XR Portal – Stadium Demo</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="Web AR demo using AR.js and A-Frame for SJSU and Hiro markers with debug tools.">
+    <meta name="description" content="Web AR demo using AR.js and A-Frame for SJSU logo and stadium model.">
 
     <!-- A-Frame (3D / VR framework in the browser) -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
@@ -40,11 +40,10 @@
   </head>
 
   <body>
-    <!-- Instructions overlay -->
+    <!-- Simple instructions overlay -->
     <div id="info">
-      Debug mode ON.<br>
-      Cube = <strong>Hiro</strong>, Sphere = <strong>SJSU</strong>.<br>
-      Open DevTools → Console to see marker logs.
+      Point your camera at a <strong>Hiro marker</strong> (cube) or the <strong>SJSU marker</strong> (stadium).<br>
+      For best demo: use the SJSU logo marker to summon the stadium.
     </div>
 
     <!-- AR.js + A-Frame scene -->
@@ -52,9 +51,15 @@
       vr-mode-ui="enabled: false"
       embedded
       renderer="antialias: true; alpha: true;"
-      arjs="sourceType: webcam; patternRatio: 0.50; debugUIEnabled: true;"
+      arjs="sourceType: webcam; patternRatio: 0.50; debugUIEnabled: false;"
     >
-      <!-- 1) Hiro marker (baseline) -->
+      <!-- Preload assets -->
+      <a-assets>
+        <!-- Stadium model (put stadium.glb in /assets) -->
+        <a-asset-item id="stadiumModel" src="assets/stadium.glb"></a-asset-item>
+      </a-assets>
+
+      <!-- 1) Hiro marker (keep as a simple baseline/debug marker) -->
       <a-marker preset="hiro">
         <!-- “Portal pad” ring -->
         <a-ring
@@ -79,15 +84,15 @@
         ></a-box>
 
         <a-text
-          value="Hiro marker"
-          position="-0.9 1.2 0"
+          value="Hiro marker (debug)"
+          position="-1.1 1.2 0"
           color="#ffff66"
           side="double"
-          wrap-count="20"
+          wrap-count="22"
         ></a-text>
       </a-marker>
 
-      <!-- 2) SJSU custom pattern marker -->
+      <!-- 2) SJSU custom pattern marker: show stadium model -->
       <!-- Make sure markers/sjsu-logo.patt exists in your repo -->
       <a-marker
         type="pattern"
@@ -101,25 +106,26 @@
           radius-outer="0.8"
           color="#00ffaa"
           opacity="0.8"
-          animation__pulse="property: scale; from: 1 1 1; to: 1.12 1.12 1.12; dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"
+          animation__pulse="property: scale; from: 1 1 1; to: 1.1 1.1 1.1; dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"
         ></a-ring>
 
-        <!-- Floating sphere for SJSU marker -->
-        <a-sphere
-          position="0 0.55 0"
-          radius="0.45"
-          color="#FFC107"
-          animation__rotate="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear"
-        ></a-sphere>
+        <!-- Stadium model -->
+        <a-entity
+          gltf-model="#stadiumModel"
+          position="0 0 0"
+          rotation="0 45 0"
+          scale="0.03 0.03 0.03"
+          animation__rotate="property: rotation; to: 0 405 0; loop: true; dur: 15000; easing: linear"
+        ></a-entity>
 
-        <!-- Label for SJSU marker -->
+        <!-- Label for SJSU stadium portal -->
         <a-text
-          value="SJSU marker"
-          position="-1.0 1.3 0"
+          value="San Jose Stadium Portal"
+          position="-1.4 1.3 0"
           color="#00FFAA"
           side="double"
-          wrap-count="20"
-          animation__float="property: position; from: -1 1.2 0; to: -1 1.4 0; dir: alternate; loop: true; dur: 1600; easing: easeInOutSine"
+          wrap-count="28"
+          animation__float="property: position; from: -1.4 1.2 0; to: -1.4 1.4 0; dir: alternate; loop: true; dur: 1600; easing: easeInOutSine"
         ></a-text>
       </a-marker>
 
@@ -127,27 +133,31 @@
       <a-entity camera></a-entity>
     </a-scene>
 
-    <!-- Debug logging for markers -->
+    <!-- Optional: simple console logs to confirm markers are working -->
     <script>
       document.addEventListener('DOMContentLoaded', () => {
         const hiro = document.querySelector('a-marker[preset="hiro"]');
         const sjsu = document.querySelector('a-marker[type="pattern"]');
 
         if (hiro) {
-          hiro.addEventListener('markerFound', () => console.log('%cHiro FOUND', 'color: #4CC3D9; font-weight: bold;'));
-          hiro.addEventListener('markerLost', () => console.log('%cHiro LOST', 'color: #4CC3D9; font-weight: normal;'));
-        } else {
-          console.warn('Hiro marker element not found in DOM.');
+          hiro.addEventListener('markerFound', () =>
+            console.log('%cHiro FOUND', 'color: #4CC3D9; font-weight: bold;')
+          );
+          hiro.addEventListener('markerLost', () =>
+            console.log('%cHiro LOST', 'color: #4CC3D9; font-weight: normal;')
+          );
         }
 
         if (sjsu) {
-          sjsu.addEventListener('markerFound', () => console.log('%cSJSU FOUND', 'color: #00FFAA; font-weight: bold;'));
-          sjsu.addEventListener('markerLost', () => console.log('%cSJSU LOST', 'color: #00FFAA; font-weight: normal;'));
-        } else {
-          console.warn('SJSU marker element not found in DOM.');
+          sjsu.addEventListener('markerFound', () =>
+            console.log('%cSJSU (stadium) FOUND', 'color: #00FFAA; font-weight: bold;')
+          );
+          sjsu.addEventListener('markerLost', () =>
+            console.log('%cSJSU (stadium) LOST', 'color: #00FFAA; font-weight: normal;')
+          );
         }
 
-        console.log('AR.js debug scene initialized. Point at Hiro or SJSU markers.');
+        console.log('San Jose XR Stadium demo initialized.');
       });
     </script>
   </body>
