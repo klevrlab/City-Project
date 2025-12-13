@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>San Jose XR Portal – AR.js Debug Demo</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="Web AR demo using AR.js and A-Frame for SJSU and Hiro markers.">
+    <meta name="description" content="Web AR demo using AR.js and A-Frame for SJSU and Hiro markers with debug tools.">
 
     <!-- A-Frame (3D / VR framework in the browser) -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
@@ -40,10 +40,11 @@
   </head>
 
   <body>
-    <!-- Simple instructions overlay -->
+    <!-- Instructions overlay -->
     <div id="info">
-      Point your camera at a <strong>Hiro marker</strong> or the <strong>SJSU marker</strong>.<br>
-      Cube = Hiro, Sphere = SJSU. If you see nothing, check camera permissions in Safari.
+      Debug mode ON.<br>
+      Cube = <strong>Hiro</strong>, Sphere = <strong>SJSU</strong>.<br>
+      Open DevTools → Console to see marker logs.
     </div>
 
     <!-- AR.js + A-Frame scene -->
@@ -51,9 +52,9 @@
       vr-mode-ui="enabled: false"
       embedded
       renderer="antialias: true; alpha: true;"
-      arjs="sourceType: webcam; patternRatio: 0.50; debugUIEnabled: false;"
+      arjs="sourceType: webcam; patternRatio: 0.50; debugUIEnabled: true;"
     >
-      <!-- 1) Original Hiro marker (for baseline debugging) -->
+      <!-- 1) Hiro marker (baseline) -->
       <a-marker preset="hiro">
         <!-- “Portal pad” ring -->
         <a-ring
@@ -92,7 +93,7 @@
         type="pattern"
         url="markers/sjsu-logo.patt"
       >
-        <!-- “Portal pad” ring (different color so it’s clear) -->
+        <!-- “Portal pad” ring for SJSU -->
         <a-ring
           position="0 0.01 0"
           rotation="-90 0 0"
@@ -125,5 +126,29 @@
       <!-- Camera -->
       <a-entity camera></a-entity>
     </a-scene>
+
+    <!-- Debug logging for markers -->
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const hiro = document.querySelector('a-marker[preset="hiro"]');
+        const sjsu = document.querySelector('a-marker[type="pattern"]');
+
+        if (hiro) {
+          hiro.addEventListener('markerFound', () => console.log('%cHiro FOUND', 'color: #4CC3D9; font-weight: bold;'));
+          hiro.addEventListener('markerLost', () => console.log('%cHiro LOST', 'color: #4CC3D9; font-weight: normal;'));
+        } else {
+          console.warn('Hiro marker element not found in DOM.');
+        }
+
+        if (sjsu) {
+          sjsu.addEventListener('markerFound', () => console.log('%cSJSU FOUND', 'color: #00FFAA; font-weight: bold;'));
+          sjsu.addEventListener('markerLost', () => console.log('%cSJSU LOST', 'color: #00FFAA; font-weight: normal;'));
+        } else {
+          console.warn('SJSU marker element not found in DOM.');
+        }
+
+        console.log('AR.js debug scene initialized. Point at Hiro or SJSU markers.');
+      });
+    </script>
   </body>
 </html>
