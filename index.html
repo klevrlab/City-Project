@@ -1,34 +1,237 @@
-<!doctype html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <style>
-    body { margin:0; font-family: system-ui; background:#000; color:#fff; }
-    #hud { position:fixed; top:0; left:0; right:0; padding:12px; background:rgba(0,0,0,.7); z-index:10; }
-    video { width:100vw; height:100vh; object-fit:cover; }
-    button { font-size:16px; padding:10px 12px; }
-  </style>
-</head>
-<body>
-  <div id="hud">
-    <button id="start">Start camera</button>
-    <div id="msg">—</div>
-  </div>
-  <video id="v" playsinline muted></video>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Geo Shark Spawn (Scene After Tap) – AR.js</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
-  <script>
-    const msg = document.getElementById('msg');
-    document.getElementById('start').onclick = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
-        const v = document.getElementById('v');
-        v.srcObject = stream;
-        await v.play();
-        msg.textContent = `OK: ${v.videoWidth}x${v.videoHeight}`;
-      } catch (e) {
-        msg.textContent = `ERROR: ${e.name} — ${e.message}`;
+    <!-- A-Frame + AR.js -->
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.0/aframe/build/aframe-ar.js"></script>
+
+    <style>
+      html, body {
+        margin: 0; padding: 0; width: 100%; height: 100%;
+        overflow: hidden; background: #000; color: #fff;
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
       }
-    };
-  </script>
-</body>
+
+      #hud {
+        position: fixed;
+        top: env(safe-area-inset-top, 0px);
+        left: env(safe-area-inset-left, 0px);
+        padding: 0.65rem 0.85rem;
+        font-size: 0.85rem;
+        background: rgba(0,0,0,0.65);
+        z-index: 99998;
+        line-height: 1.25rem;
+        border-bottom-right-radius: 14px;
+        pointer-events: none;
+        max-width: 92vw;
+      }
+      #hud strong { color: #ffd54f; }
+      .ok { color: #00ff9a; font-weight: 700; }
+      .warn { color: #ffcc66; font-weight: 700; }
+      .bad { color: #ff6b6b; font-weight: 700; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+
+      #overlay {
+        position: fixed; inset: 0; z-index: 99999;
+        display: flex; align-items: center; justify-content: center;
+        padding: 24px;
+        background: rgba(0,0,0,0.88);
+        text-align: center;
+        touch-action: manipulation;
+      }
+      #card {
+        max-width: 36rem; width: 100%;
+        background: rgba(20,20,20,0.75);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 16px;
+        padding: 18px 16px;
+        box-sizing: border-box;
+      }
+      #card h2 { margin: 0 0 10px 0; font-size: 1.2rem; }
+      #card p { margin: 0 0 10px 0; opacity: 0.9; line-height: 1.35rem; }
+      #tap {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: rgba(255, 213, 79, 0.18);
+        border: 1px solid rgba(255, 213, 79, 0.35);
+        font-weight: 750;
+      }
+
+      /* Where we will inject the scene after tap */
+      #sceneMount {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="hud">
+      <div><strong>Geo Shark Spawn</strong></div>
+      <div id="status" class="warn">Tap to start, then allow Camera + Location.</div>
+      <div id="coords" class="mono">Lat: — | Lon: — | Acc: —</div>
+      <div id="distance" class="mono">Dist: —</div>
+      <div id="camdiag" class="mono">Cam: —</div>
+    </div>
+
+    <div id="overlay" role="button" aria-label="Tap to start">
+      <div id="card">
+        <h2>Tap anywhere to start</h2>
+        <p>This creates the AR scene <strong>after</strong> your tap (fixes the “black camera” AR.js bug).</p>
+        <div id="tap">Tap anywhere</div>
+      </div>
+    </div>
+
+    <div id="sceneMount"></div>
+
+    <script>
+      // ========= CONFIG =========
+      const TARGET_LAT = 37.3028;
+      const TARGET_LON = -121.9982;
+      const RADIUS_METERS = 35; // start generous
+
+      // ========= HUD =========
+      const statusEl = document.getElementById("status");
+      const coordsEl = document.getElementById("coords");
+      const distanceEl = document.getElementById("distance");
+      const camdiagEl = document.getElementById("camdiag");
+
+      function setStatus(text, cls) {
+        statusEl.className = cls || "";
+        statusEl.textContent = text;
+      }
+
+      // ========= GEO HELPERS =========
+      function toRad(deg) { return (deg * Math.PI) / 180; }
+      function distanceMeters(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a =
+          Math.sin(dLat/2)**2 +
+          Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+        return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+      }
+
+      // ========= MAIN: build scene AFTER TAP =========
+      function buildScene() {
+        const mount = document.getElementById("sceneMount");
+
+        // Build a-scene dynamically only after user gesture
+        const scene = document.createElement("a-scene");
+        scene.setAttribute("embedded", "");
+        scene.setAttribute("vr-mode-ui", "enabled: false");
+        scene.setAttribute("renderer", "antialias: true; alpha: true;");
+        scene.setAttribute("arjs", "sourceType: webcam; videoTexture: true; debugUIEnabled: false;");
+
+        // NOTE: Keep content simple for geo test
+        scene.innerHTML = `
+          <a-entity id="sharkRoot" visible="false">
+            <a-entity id="shark"
+              position="0 -0.2 -4"
+              scale="0.001 0.001 0.001"
+              animation__popin="property: scale; to: 1 1 1; dur: 800; easing: easeOutBack; startEvents: popin;"
+              animation__rise="property: position; to: 0 0 -4; dur: 800; easing: easeOutCubic; startEvents: popin;"
+            >
+              <a-cone position="0 0.08 0" rotation="90 0 0" radius-bottom="0.14" radius-top="0.02" height="0.45"
+                      material="color: #2aa9b6; roughness: 0.85"></a-cone>
+              <a-text value="Shark spawned!" position="0 0.45 0" align="center" color="#ffffff" side="double"></a-text>
+            </a-entity>
+          </a-entity>
+
+          <a-camera gps-camera></a-camera>
+        `;
+
+        mount.appendChild(scene);
+
+        return scene;
+      }
+
+      // Force the AR.js video element to actually play (often needed)
+      async function nudgeArVideoPlayback() {
+        const video = document.querySelector("video");
+        if (!video) {
+          camdiagEl.textContent = "Cam: video not found yet";
+          return;
+        }
+
+        // inline video hints
+        video.setAttribute("playsinline", "");
+        video.setAttribute("webkit-playsinline", "");
+        video.muted = true;
+        video.autoplay = true;
+
+        try { await video.play(); } catch (_) {}
+
+        const rs = video.readyState;
+        camdiagEl.textContent = `Cam: readyState ${rs}, paused=${video.paused}, size=${video.videoWidth}x${video.videoHeight}`;
+      }
+
+      function startCameraDiagLoop() {
+        nudgeArVideoPlayback();
+        setInterval(nudgeArVideoPlayback, 1200);
+      }
+
+      function startGeoWatch() {
+        if (!navigator.geolocation) {
+          setStatus("Geolocation not supported.", "bad");
+          return;
+        }
+
+        setStatus("Getting GPS…", "warn");
+
+        const sharkRoot = document.querySelector("#sharkRoot");
+        const shark = document.querySelector("#shark");
+        let spawned = false;
+
+        navigator.geolocation.watchPosition(
+          (pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            const acc = pos.coords.accuracy;
+
+            coordsEl.textContent = `Lat: ${lat.toFixed(6)} | Lon: ${lon.toFixed(6)} | Acc: ~${acc ? acc.toFixed(0) : "?"}m`;
+
+            const d = distanceMeters(lat, lon, TARGET_LAT, TARGET_LON);
+            distanceEl.textContent = `Dist: ${d.toFixed(1)} m (radius ${RADIUS_METERS}m)`;
+
+            if (d <= RADIUS_METERS) {
+              setStatus(`✅ In range (≤ ${RADIUS_METERS}m).`, "ok");
+
+              if (!spawned && sharkRoot && shark) {
+                spawned = true;
+                sharkRoot.setAttribute("visible", "true");
+                shark.setAttribute("scale", "0.001 0.001 0.001");
+                shark.setAttribute("position", "0 -0.2 -4");
+                shark.emit("popin");
+              }
+            } else {
+              setStatus("⏳ Not in range. Walk closer to the target point.", "warn");
+            }
+          },
+          (err) => setStatus(`GPS error: ${err.message}`, "bad"),
+          { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
+        );
+      }
+
+      // ========= TAP TO START =========
+      document.getElementById("overlay").addEventListener("click", () => {
+        document.getElementById("overlay").style.display = "none";
+
+        // Create scene only now
+        buildScene();
+
+        // Start both loops
+        startCameraDiagLoop();
+        startGeoWatch();
+      }, { passive: true });
+    </script>
+  </body>
 </html>
