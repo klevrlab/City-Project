@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Sharks Way AR - Location Tour</title>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="https://unpkg.com/aframe-look-at-component@1.0.0/dist/aframe-look-at-component.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        #ui-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        #header {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 109, 117, 0.15);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            color: white;
+            padding: 18px 16px;
+            border-radius: 20px;
+            width: 140px;
+            border: 1px solid rgba(0, 169, 224, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+        #header h2 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            font-weight: 700;
+            color: #00A9E0;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            letter-spacing: 0.3px;
+            line-height: 1.3;
+            word-wrap: break-word;
+        }
+        #gps-status {
+            font-size: 11px;
+            opacity: 0.8;
+            margin: 8px 0 0 0;
+            line-height: 1.4;
+        }
+        #event-icon-header {
+            width: 45px;
+            height: 45px;
+            margin: 0 auto 10px;
+            display: block;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+            object-fit: contain;
+        }
+        .icon {
+            width: 16px;
+            height: 16px;
+            vertical-align: middle;
+            margin-right: 6px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+        }
+        #map-container {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 160px;
+            height: 160px;
+            background: rgba(0, 109, 117, 0.15);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-radius: 20px;
+            border: 1px solid rgba(0, 169, 224, 0.3);
+            pointer-events: auto;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+        #map-container.expanded {
+            width: 300px;
+            height: 300px;
+        }
+        #mini-map {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        .map-dot {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .map-dot.user {
+            background: #00A9E0;
+            border: 3px solid white;
+            z-index: 10;
+            box-shadow: 0 0 15px rgba(0, 169, 224, 0.8);
+            animation: userPulse 2s ease-in-out infinite;
+        }
+        .map-dot.stop {
+            background: #F4901E;
+            border: 2px solid white;
+            box-shadow: 0 0 10px rgba(244, 144, 30, 0.6);
+        }
+        .map-dot.stop.visited {
+            background: #00D084;
+            box-shadow: 0 0 10px rgba(0, 208, 132, 0.8);
+        }
+        .map-dot.stop.current {
+            animation: targetPulse 1.5s ease-in-out infinite;
+        }
+        @keyframes userPulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.2); }
+        }
+        @keyframes targetPulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 10px rgba(244, 144, 30, 0.6); }
+            50% { transform: translate(-50%, -50%) scale(1.3); box-shadow: 0 0 20px rgba(244, 144, 30, 1); }
+        }
+        #route-info {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 109, 117, 0.15);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            color: white;
+            padding: 25px;
+            border-radius: 20px;
+            max-width: 200px;
+            border: 1px solid rgba(0, 169, 224, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+        #route-info h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+        #distance {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #FFD700;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+        #distance.close {
+            animation: distancePulse 1s ease-in-out infinite;
+        }
+        @keyframes distancePulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); color: #00FF00; }
+        }
+        #next-stop {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        #toggle-map {
+            position: absolute;
+            bottom: 190px;
+            left: 20px;
+            background: rgba(0, 169, 224, 0.25);
+            backdrop-filter: blur(15px) saturate(180%);
+            -webkit-backdrop-filter: blur(15px) saturate(180%);
+            color: white;
+            border: 1px solid rgba(0, 169, 224, 0.4);
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-size: 13px;
+            font-weight: 600;
+            pointer-events: auto;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(0, 109, 117, 0.3),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        #toggle-map:active {
+            transform: scale(0.95);
+            background: rgba(0, 169, 224, 0.4);
+        }
+        #calibration-warning {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 109, 117, 0.2);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            color: white;
+            padding: 10px 14px;
+            border-radius: 12px;
+            max-width: 200px;
+            font-size: 11px;
+            border: 1px solid rgba(0, 169, 224, 0.4);
+            box-shadow: 0 4px 16px rgba(0, 109, 117, 0.4),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            display: none;
+        }
+        #calibration-warning.show {
+            display: block;
+        }
+        #calibration-warning p {
+            margin: 4px 0;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        #calibration-warning strong {
+            color: #00A9E0;
+            font-size: 12px;
+        }
+        #dismiss-calibration {
+            background: rgba(0, 169, 224, 0.3);
+            border: 1px solid rgba(0, 169, 224, 0.5);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 10px;
+            margin-top: 8px;
+            cursor: pointer;
+            width: 100%;
+        }
+        #dismiss-calibration:active {
+            background: rgba(0, 169, 224, 0.5);
+        }
+        #arrival-celebration {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: rgba(0, 169, 224, 0.2);
+            backdrop-filter: blur(25px) saturate(200%);
+            -webkit-backdrop-filter: blur(25px) saturate(200%);
+            color: white;
+            padding: 45px;
+            border-radius: 24px;
+            z-index: 2000;
+            text-align: center;
+            border: 1px solid rgba(0, 208, 132, 0.5);
+            box-shadow: 0 16px 64px rgba(0, 109, 117, 0.6),
+                        inset 0 2px 0 rgba(255, 255, 255, 0.3);
+            transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+        #arrival-celebration.show {
+            transform: translate(-50%, -50%) scale(1);
+        }
+        #arrival-celebration h2 {
+            font-size: 28px;
+            margin: 0 0 15px 0;
+        }
+        #arrival-celebration p {
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background: #FFD700;
+            position: absolute;
+            animation: confettiFall 3s ease-out forwards;
+        }
+        @keyframes confettiFall {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="ui-overlay">
+        <div id="header">
+            <img id="event-icon-header" src="./the-big-game.svg" alt="Event" onerror="this.style.display='none'">
+            <h2>Sharks Way Tour</h2>
+            <p id="gps-status">
+                <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>
+                Acquiring GPS...
+            </p>
+        </div>
+
+        <div id="calibration-warning">
+            <p><strong>
+                <svg class="icon" style="width: 14px; height: 14px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4m0 4h.01"/></svg>
+                Calibrate Compass
+            </strong></p>
+            <p>Wave phone in figure-8</p>
+            <button id="dismiss-calibration">Got it</button>
+        </div>
+
+        <div id="arrival-celebration">
+            <h2 id="celebration-title">
+                <svg class="icon" style="width: 24px; height: 24px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="m9 16 2 2 4-4"/></svg>
+                You've Arrived!
+            </h2>
+            <p id="celebration-message"></p>
+            <p id="celebration-sharkey"></p>
+        </div>
+
+        <button id="toggle-map">
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+            Map View
+        </button>
+
+        <div id="map-container">
+            <div id="mini-map">
+                <div class="map-dot user" id="user-dot"></div>
+            </div>
+        </div>
+
+        <div id="route-info">
+            <h3>
+                <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                Next Stop
+            </h3>
+            <div id="distance">--m</div>
+            <div id="next-stop">Calculating...</div>
+        </div>
+    </div>
+
+    <a-scene
+        vr-mode-ui="enabled: false"
+        arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
+        renderer="logarithmicDepthBuffer: true; precision: medium;">
+
+        <!-- Tour Stop 1: SAP Center -->
+        <a-entity id="stop1" gps-entity-place="latitude: 37.3326; longitude: -121.9010;" look-at="[gps-camera]">
+            <!-- Sharkey mascot -->
+            <a-sphere 
+                position="0 1.5 0" 
+                radius="0.4" 
+                color="#006D75"
+                animation="property: position; to: 0 1.7 0; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine">
+            </a-sphere>
+            <a-cone 
+                position="-0.45 1.5 0" 
+                radius-bottom="0.2" 
+                radius-top="0" 
+                height="0.4" 
+                color="#006D75"
+                rotation="0 0 90">
+            </a-cone>
+            <a-cone 
+                position="0 1.75 0" 
+                radius-bottom="0.15" 
+                radius-top="0" 
+                height="0.35" 
+                color="#00A9E0">
+            </a-cone>
+            
+            <!-- Platform with rings -->
+            <a-cylinder 
+                position="0 0 0" 
+                radius="0.8" 
+                height="0.15" 
+                color="#F4901E"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear">
+            </a-cylinder>
+            
+            <a-torus 
+                position="0 0.8 0" 
+                radius="0.6" 
+                radius-tubular="0.04" 
+                color="#00A9E0"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear">
+            </a-torus>
+            
+            <a-text
+                value="SAP Center\nThe Big Game"
+                align="center"
+                color="#FFFFFF"
+                scale="20 20 20"
+                position="0 2.5 0"
+                animation="property: position; to: 0 2.7 0; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine">
+            </a-text>
+        </a-entity>
+
+        <!-- Tour Stop 2: Downtown SJ -->
+        <a-entity id="stop2" gps-entity-place="latitude: 37.3382; longitude: -121.8863;" look-at="[gps-camera]">
+            <a-sphere 
+                position="0 1.5 0" 
+                radius="0.4" 
+                color="#006D75"
+                animation="property: position; to: 0 1.7 0; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine">
+            </a-sphere>
+            <a-cone 
+                position="-0.45 1.5 0" 
+                radius-bottom="0.2" 
+                radius-top="0" 
+                height="0.4" 
+                color="#006D75"
+                rotation="0 0 90">
+            </a-cone>
+            <a-cone 
+                position="0 1.75 0" 
+                radius-bottom="0.15" 
+                radius-top="0" 
+                height="0.35" 
+                color="#00A9E0">
+            </a-cone>
+            
+            <a-cylinder 
+                position="0 0 0" 
+                radius="0.8" 
+                height="0.15" 
+                color="#F4901E"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear">
+            </a-cylinder>
+            
+            <a-torus 
+                position="0 0.8 0" 
+                radius="0.6" 
+                radius-tubular="0.04" 
+                color="#00A9E0"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear">
+            </a-torus>
+            
+            <a-text
+                value="Downtown SJ\nMarch Madness"
+                align="center"
+                color="#FFFFFF"
+                scale="20 20 20"
+                position="0 2.5 0"
+                animation="property: position; to: 0 2.7 0; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine">
+            </a-text>
+        </a-entity>
+
+        <!-- Tour Stop 3: San Pedro Square -->
+        <a-entity id="stop3" gps-entity-place="latitude: 37.3369; longitude: -121.8936;" look-at="[gps-camera]">
+            <a-sphere 
+                position="0 1.5 0" 
+                radius="0.4" 
+                color="#006D75"
+                animation="property: position; to: 0 1.7 0; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine">
+            </a-sphere>
+            <a-cone 
+                position="-0.45 1.5 0" 
+                radius-bottom="0.2" 
+                radius-top="0" 
+                height="0.4" 
+                color="#006D75"
+                rotation="0 0 90">
+            </a-cone>
+            <a-cone 
+                position="0 1.75 0" 
+                radius-bottom="0.15" 
+                radius-top="0" 
+                height="0.35" 
+                color="#00A9E0">
+            </a-cone>
+            
+            <a-cylinder 
+                position="0 0 0" 
+                radius="0.8" 
+                height="0.15" 
+                color="#F4901E"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear">
+            </a-cylinder>
+            
+            <a-torus 
+                position="0 0.8 0" 
+                radius="0.6" 
+                radius-tubular="0.04" 
+                color="#00A9E0"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear">
+            </a-torus>
+            
+            <a-text
+                value="San Pedro Sq\nWorld Cup"
+                align="center"
+                color="#FFFFFF"
+                scale="20 20 20"
+                position="0 2.5 0"
+                animation="property: position; to: 0 2.7 0; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine">
+            </a-text>
+        </a-entity>
+
+        <!-- AR Direction Arrow (points to next stop) -->
+        <a-cone
+            id="direction-arrow"
+            position="0 -0.5 -2"
+            rotation="-90 0 0"
+            radius-bottom="0.2"
+            radius-top="0"
+            height="0.5"
+            color="#00A9E0"
+            animation="property: position; to: 0 -0.3 -2; dir: alternate; loop: true; dur: 800; easing: easeInOutSine">
+        </a-cone>
+
+        <a-camera gps-camera rotation-reader></a-camera>
+    </a-scene>
+
+    <script>
+        const tourStops = [
+            {
+                name: "SAP Center",
+                event: "The Big Game",
+                lat: 37.3326,
+                lng: -121.9010
+            },
+            {
+                name: "Downtown SJ",
+                event: "March Madness",
+                lat: 37.3382,
+                lng: -121.8863
+            },
+            {
+                name: "San Pedro Square",
+                event: "World Cup",
+                lat: 37.3369,
+                lng: -121.8936
+            }
+        ];
+
+        let userLat = null;
+        let userLng = null;
+        let currentStopIndex = 0;
+        let mapExpanded = false;
+        let visitedStops = new Set();
+        let lastDistance = null;
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c;
+        }
+
+        function updateRouteInfo() {
+            if (!userLat || !userLng) return;
+
+            const nextStop = tourStops[currentStopIndex];
+            const distance = calculateDistance(userLat, userLng, nextStop.lat, nextStop.lng);
+
+            const distanceEl = document.getElementById('distance');
+            distanceEl.textContent = 
+                distance > 1000 
+                    ? `${(distance / 1000).toFixed(1)}km` 
+                    : `${Math.round(distance)}m`;
+            
+            if (distance < 100) {
+                distanceEl.classList.add('close');
+            } else {
+                distanceEl.classList.remove('close');
+            }
+            
+            document.getElementById('next-stop').textContent = 
+                `${nextStop.name}\n${nextStop.event}`;
+
+            if (distance < 30 && !visitedStops.has(currentStopIndex)) {
+                celebrateArrival(nextStop);
+                visitedStops.add(currentStopIndex);
+                currentStopIndex = (currentStopIndex + 1) % tourStops.length;
+            }
+            
+            lastDistance = distance;
+        }
+
+        function celebrateArrival(stop) {
+            const celebration = document.getElementById('arrival-celebration');
+            document.getElementById('celebration-title').innerHTML = `<svg class="icon" style="width: 24px; height: 24px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="m9 16 2 2 4-4"/></svg>You've Arrived at ${stop.name}!`;
+            document.getElementById('celebration-message').textContent = `Welcome to ${stop.event}`;
+            document.getElementById('celebration-sharkey').textContent = `Sharkey says: Great job finding this stop! Enjoy the experience!`;
+            
+            celebration.classList.add('show');
+            
+            createConfetti();
+            
+            if ('vibrate' in navigator) {
+                navigator.vibrate([200, 100, 200]);
+            }
+            
+            setTimeout(() => {
+                celebration.classList.remove('show');
+            }, 4000);
+        }
+
+        function createConfetti() {
+            const colors = ['#FFD700', '#00A9E0', '#F4901E', '#00D084', '#FF6B9D'];
+            for (let i = 0; i < 30; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.left = Math.random() * 100 + '%';
+                    confetti.style.top = '-10px';
+                    confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.animationDelay = Math.random() * 0.5 + 's';
+                    document.body.appendChild(confetti);
+                    
+                    setTimeout(() => confetti.remove(), 3000);
+                }, i * 50);
+            }
+        }
+
+        function updateMiniMap() {
+            if (!userLat || !userLng) return;
+
+            const mapContainer = document.getElementById('mini-map');
+            const userDot = document.getElementById('user-dot');
+
+            const existingStops = mapContainer.querySelectorAll('.map-dot.stop');
+            existingStops.forEach(dot => dot.remove());
+
+            const centerLat = userLat;
+            const centerLng = userLng;
+            const scale = mapExpanded ? 1500 : 3000;
+            const mapSize = mapExpanded ? 280 : 150;
+            const center = mapSize / 2;
+
+            userDot.style.left = '50%';
+            userDot.style.top = '50%';
+
+            tourStops.forEach((stop, index) => {
+                const dx = (stop.lng - centerLng) * scale * Math.cos(centerLat * Math.PI / 180);
+                const dy = (centerLat - stop.lat) * scale;
+
+                const x = center + dx;
+                const y = center + dy;
+
+                if (x >= 0 && x <= mapSize && y >= 0 && y <= mapSize) {
+                    const stopDot = document.createElement('div');
+                    stopDot.className = 'map-dot stop';
+                    if (visitedStops.has(index)) {
+                        stopDot.classList.add('visited');
+                    }
+                    if (index === currentStopIndex) {
+                        stopDot.classList.add('current');
+                    }
+                    stopDot.style.left = `${x}px`;
+                    stopDot.style.top = `${y}px`;
+                    stopDot.title = stop.name;
+                    mapContainer.appendChild(stopDot);
+                }
+            });
+        }
+
+        window.addEventListener('gps-camera-update-position', (e) => {
+            userLat = e.detail.position.latitude;
+            userLng = e.detail.position.longitude;
+            
+            document.getElementById('gps-status').innerHTML = 
+                `<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>${userLat.toFixed(4)}, ${userLng.toFixed(4)}`;
+            
+            updateRouteInfo();
+            updateMiniMap();
+        });
+
+        document.getElementById('toggle-map').addEventListener('click', () => {
+            const mapContainer = document.getElementById('map-container');
+            const toggleBtn = document.getElementById('toggle-map');
+            mapExpanded = !mapExpanded;
+            
+            if (mapExpanded) {
+                mapContainer.classList.add('expanded');
+                toggleBtn.innerHTML = '<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Collapse';
+            } else {
+                mapContainer.classList.remove('expanded');
+                toggleBtn.innerHTML = '<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Expand Map';
+            }
+            
+            updateMiniMap();
+        });
+
+        document.getElementById('dismiss-calibration').addEventListener('click', () => {
+            document.getElementById('calibration-warning').classList.remove('show');
+            localStorage.setItem('calibrationDismissed', 'true');
+        });
+
+        window.addEventListener('load', () => {
+            console.log('Sharks Way Location Tour loaded');
+            
+            const calibrationDismissed = localStorage.getItem('calibrationDismissed');
+            if (!calibrationDismissed) {
+                setTimeout(() => {
+                    document.getElementById('calibration-warning').classList.add('show');
+                }, 2000);
+            }
+
+            setInterval(updateRouteInfo, 1000);
+        });
+
+        if ('geolocation' in navigator) {
+            navigator.geolocation.watchPosition(
+                (position) => {
+                    userLat = position.coords.latitude;
+                    userLng = position.coords.longitude;
+                },
+                (error) => {
+                    console.error('Geolocation error:', error);
+                    document.getElementById('gps-status').textContent = '⚠️ GPS unavailable';
+                },
+                {
+                    enableHighAccuracy: true,
+                    maximumAge: 0,
+                    timeout: 27000
+                }
+            );
+        }
+    </script>
+</body>
+</html>
