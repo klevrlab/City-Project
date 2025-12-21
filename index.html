@@ -4,131 +4,99 @@
     <meta charset="UTF-8" />
     <title>Geo Shark Spawn Test – AR.js</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="description" content="Location-based WebAR demo: spawn a shark when within range of a target coordinate." />
 
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
-    <!-- AR.js for A-Frame (includes location-based components) -->
+    <!-- AR.js for A-Frame -->
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.0/aframe/build/aframe-ar.js"></script>
 
     <style>
-      body {
-        margin: 0;
-        overflow: hidden;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #000;
-        color: #fff;
-      }
+      body { margin: 0; overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, sans-serif; background:#000; color:#fff; }
       #hud {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        padding: 0.65rem 0.85rem;
-        font-size: 0.85rem;
-        background: rgba(0, 0, 0, 0.65);
-        z-index: 10;
-        line-height: 1.25rem;
+        position: fixed; top: 0; left: 0; right: 0;
+        padding: 0.65rem 0.85rem; font-size: 0.85rem;
+        background: rgba(0,0,0,0.65); z-index: 10; line-height: 1.25rem;
       }
       #hud strong { color: #ffd54f; }
       #hud .ok { color: #00ff9a; font-weight: 600; }
       #hud .warn { color: #ffcc66; font-weight: 600; }
       #hud .bad { color: #ff6b6b; font-weight: 600; }
+
+      /* Tap-to-start overlay */
+      #startOverlay {
+        position: fixed; inset: 0;
+        display: flex; align-items: center; justify-content: center; flex-direction: column;
+        background: rgba(0,0,0,0.85);
+        z-index: 9999;
+        text-align: center;
+        padding: 1.2rem;
+        gap: 0.75rem;
+      }
+      #startOverlay button {
+        font-size: 1rem;
+        padding: 0.8rem 1rem;
+        border-radius: 12px;
+        border: 0;
+        cursor: pointer;
+      }
+      #startOverlay p { max-width: 34rem; opacity: 0.9; margin: 0; }
+      #startOverlay small { opacity: 0.75; }
     </style>
   </head>
 
   <body>
     <div id="hud">
       <div><strong>Geo Shark Spawn Test</strong></div>
-      <div id="status">Waiting for GPS…</div>
+      <div id="status" class="warn">Tap “Start Camera” then allow Camera + Location.</div>
       <div id="distance">Distance: —</div>
       <div style="opacity:0.85; font-size:0.8rem;">
-        Tips: use phone + HTTPS + allow Camera + Location. Outdoors works best.
+        Must be HTTPS (GitHub Pages). Outdoors works best.
       </div>
     </div>
 
+    <div id="startOverlay">
+      <h2 style="margin:0;">Start Geo AR</h2>
+      <p>This demo needs <strong>Camera</strong> + <strong>Location</strong> permissions. If the camera is black, this button often fixes it.</p>
+      <button id="startBtn">Start Camera</button>
+      <small>If prompted, choose “Allow”. Make sure you’re on HTTPS, not file://</small>
+    </div>
+
     <a-scene
+      id="scene"
       vr-mode-ui="enabled: false"
       embedded
       renderer="antialias: true; alpha: true;"
       arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
     >
-      <!-- This entity will be shown/hidden by our geo logic -->
+      <!-- Shark object shown when in range -->
       <a-entity id="sharkRoot" visible="false">
-        <!-- “Shark” placeholder geometry (you can swap to a GLB later) -->
         <a-entity id="shark"
           position="0 -0.2 -4"
-          rotation="0 0 0"
           scale="0.001 0.001 0.001"
           animation__popin="property: scale; to: 1 1 1; dur: 800; easing: easeOutBack; startEvents: popin;"
           animation__rise="property: position; to: 0 0 -4; dur: 800; easing: easeOutCubic; startEvents: popin;"
         >
-          <!-- Body -->
-          <a-cone
-            position="0 0.08 0"
-            rotation="90 0 0"
-            radius-bottom="0.14"
-            radius-top="0.02"
-            height="0.45"
-            material="color: #2aa9b6; roughness: 0.85"
-          ></a-cone>
+          <a-cone position="0 0.08 0" rotation="90 0 0" radius-bottom="0.14" radius-top="0.02" height="0.45"
+                  material="color: #2aa9b6; roughness: 0.85"></a-cone>
+          <a-cone position="0 0.18 -0.05" radius-bottom="0.05" radius-top="0.0" height="0.12"
+                  material="color: #1b6f77; roughness: 0.9"></a-cone>
+          <a-box position="0.11 0.10 0.03" rotation="0 0 20" width="0.12" height="0.02" depth="0.10"
+                 material="color: #1b6f77"></a-box>
+          <a-box position="-0.11 0.10 0.03" rotation="0 0 -20" width="0.12" height="0.02" depth="0.10"
+                 material="color: #1b6f77"></a-box>
+          <a-box position="0 0.08 0.22" width="0.18" height="0.03" depth="0.14"
+                 material="color: #1b6f77"></a-box>
 
-          <!-- Top fin -->
-          <a-cone
-            position="0 0.18 -0.05"
-            rotation="0 0 0"
-            radius-bottom="0.05"
-            radius-top="0.0"
-            height="0.12"
-            material="color: #1b6f77; roughness: 0.9"
-          ></a-cone>
-
-          <!-- Side fins -->
-          <a-box
-            position="0.11 0.10 0.03"
-            rotation="0 0 20"
-            width="0.12"
-            height="0.02"
-            depth="0.10"
-            material="color: #1b6f77"
-          ></a-box>
-          <a-box
-            position="-0.11 0.10 0.03"
-            rotation="0 0 -20"
-            width="0.12"
-            height="0.02"
-            depth="0.10"
-            material="color: #1b6f77"
-          ></a-box>
-
-          <!-- Tail -->
-          <a-box
-            position="0 0.08 0.22"
-            rotation="0 0 0"
-            width="0.18"
-            height="0.03"
-            depth="0.14"
-            material="color: #1b6f77"
-          ></a-box>
-
-          <a-text
-            value="Shark spawned!"
-            position="0 0.45 0"
-            align="center"
-            color="#ffffff"
-            side="double"
-            wrap-count="18"
-          ></a-text>
+          <a-text value="Shark spawned!" position="0 0.45 0" align="center" color="#ffffff" side="double"></a-text>
         </a-entity>
       </a-entity>
 
-      <!-- GPS camera (required for location-based AR.js) -->
       <a-camera gps-camera rotation-reader></a-camera>
     </a-scene>
 
     <script>
-      // Helps keep camera orientation in sync (often used with AR.js geo demos)
+      // Keep camera rotation synced
       AFRAME.registerComponent("rotation-reader", {
         tick: function () {
           const rot = this.el.getAttribute("rotation");
@@ -141,40 +109,31 @@
         }
       });
 
-      // Geo spawn logic: show shark when within radius meters of target
       (function () {
-        // Your target coordinate:
-        const TARGET_LAT = 37.800331;
-        const TARGET_LON = -121.323543;
+        // NEW target coordinate:
+        const TARGET_LAT = 37.3028;
+        const TARGET_LON = -121.9982;
 
-        // Tune this. GPS is noisy, so start generous.
+        // Start generous; tighten later.
         const RADIUS_METERS = 35;
 
         const statusEl = document.getElementById("status");
         const distanceEl = document.getElementById("distance");
-
         const sharkRoot = document.querySelector("#sharkRoot");
         const shark = document.querySelector("#shark");
 
         let spawned = false;
 
-        function toRad(deg) {
-          return (deg * Math.PI) / 180;
-        }
+        function toRad(deg) { return (deg * Math.PI) / 180; }
 
-        // Haversine distance in meters
         function distanceMeters(lat1, lon1, lat2, lon2) {
-          const R = 6371000; // meters
+          const R = 6371000;
           const dLat = toRad(lat2 - lat1);
           const dLon = toRad(lon2 - lon1);
-
           const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-          return R * c;
+            Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+          return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
         }
 
         function setStatus(text, cls) {
@@ -182,62 +141,55 @@
           statusEl.textContent = text;
         }
 
-        // Use browser Geolocation for "are we within radius?"
         function startGeoWatch() {
           if (!navigator.geolocation) {
             setStatus("Geolocation not supported in this browser.", "bad");
             return;
           }
 
-          setStatus("Requesting GPS… (allow Location)", "warn");
+          setStatus("Getting GPS… (allow Location)", "warn");
 
           navigator.geolocation.watchPosition(
             (pos) => {
               const lat = pos.coords.latitude;
               const lon = pos.coords.longitude;
-              const acc = pos.coords.accuracy; // meters (rough)
+              const acc = pos.coords.accuracy;
 
               const d = distanceMeters(lat, lon, TARGET_LAT, TARGET_LON);
               distanceEl.textContent = `Distance: ${d.toFixed(1)} m (accuracy ~ ${acc ? acc.toFixed(0) : "?"} m)`;
 
-              // Spawn logic:
               if (d <= RADIUS_METERS) {
-                setStatus(`✅ In range (≤ ${RADIUS_METERS}m). Spawning shark.`, "ok");
+                setStatus(`✅ In range (≤ ${RADIUS_METERS}m). Shark spawned.`, "ok");
 
                 if (!spawned) {
                   spawned = true;
                   sharkRoot.setAttribute("visible", "true");
-
-                  // Reset + pop in animation
                   shark.setAttribute("scale", "0.001 0.001 0.001");
                   shark.setAttribute("position", "0 -0.2 -4");
                   shark.emit("popin");
                 }
               } else {
                 setStatus(`⏳ Not in range. Walk closer to the target point.`, "warn");
-
-                // For a mockup, we keep it visible once spawned.
-                // If you want it to hide when you walk away, uncomment:
-                /*
-                if (spawned) {
-                  spawned = false;
-                  sharkRoot.setAttribute("visible", "false");
-                }
-                */
               }
             },
-            (err) => {
-              setStatus(`GPS error: ${err.message}`, "bad");
-            },
-            {
-              enableHighAccuracy: true,
-              maximumAge: 1000,
-              timeout: 15000
-            }
+            (err) => setStatus(`GPS error: ${err.message}`, "bad"),
+            { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
           );
         }
 
-        document.addEventListener("DOMContentLoaded", startGeoWatch);
+        // Tap-to-start: triggers permissions on iOS/Safari more reliably
+        document.getElementById("startBtn").addEventListener("click", async () => {
+          try {
+            // Prime camera permission (helps some browsers)
+            await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+          } catch (e) {
+            // If this fails, AR.js may still request it; we show a hint either way.
+            console.warn("getUserMedia preflight failed:", e);
+          }
+
+          document.getElementById("startOverlay").style.display = "none";
+          startGeoWatch();
+        });
       })();
     </script>
   </body>
