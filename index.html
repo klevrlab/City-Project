@@ -2,26 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Geo Shark Spawn Test – AR.js</title>
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
-    />
+    <title>Geo Shark Spawn Test (Debug) – AR.js</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
-    <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-
-    <!-- AR.js for A-Frame (location-based components included) -->
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.0/aframe/build/aframe-ar.js"></script>
 
     <style>
-      html, body {
-        margin: 0; padding: 0; width: 100%; height: 100%;
-        overflow: hidden; background: #000;
-        font-family: system-ui, -apple-system, Segoe UI, sans-serif; color: #fff;
-      }
-
-      /* HUD */
+      html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#000; color:#fff;
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
       #hud {
         position: fixed;
         top: env(safe-area-inset-top, 0px);
@@ -39,17 +28,12 @@
       .ok { color: #00ff9a; font-weight: 700; }
       .warn { color: #ffcc66; font-weight: 700; }
       .bad { color: #ff6b6b; font-weight: 700; }
-      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 
-      /* Tap overlay */
       #startOverlay {
         position: fixed; inset: 0; z-index: 99999;
         display: flex; align-items: center; justify-content: center;
-        padding:
-          calc(24px + env(safe-area-inset-top, 0px))
-          calc(24px + env(safe-area-inset-right, 0px))
-          calc(24px + env(safe-area-inset-bottom, 0px))
-          calc(24px + env(safe-area-inset-left, 0px));
+        padding: 24px;
         background: rgba(0,0,0,0.88);
         text-align: center;
         touch-action: manipulation;
@@ -62,44 +46,35 @@
         padding: 18px 16px;
         box-sizing: border-box;
       }
-      #startCard h2 { margin: 0 0 10px 0; font-size: 1.2rem; }
-      #startCard p { margin: 0 0 10px 0; opacity: 0.9; line-height: 1.35rem; }
+      #startCard h2 { margin:0 0 10px 0; font-size: 1.2rem; }
+      #startCard p { margin:0 0 10px 0; opacity: 0.9; line-height: 1.35rem; }
       #tapAnywhere {
-        display: inline-block;
-        margin-top: 10px;
-        padding: 12px 14px;
-        border-radius: 12px;
-        background: rgba(255, 213, 79, 0.18);
-        border: 1px solid rgba(255, 213, 79, 0.35);
-        font-weight: 750;
+        display:inline-block; margin-top:10px; padding:12px 14px;
+        border-radius:12px; background: rgba(255,213,79,0.18);
+        border:1px solid rgba(255,213,79,0.35); font-weight: 750;
       }
-      #startCard .hint { margin-top: 10px; font-size: 0.85rem; opacity: 0.75; }
 
-      a-scene {
-        position: fixed !important;
-        inset: 0 !important;
-        z-index: 1;
-      }
+      a-scene { position: fixed !important; inset: 0 !important; z-index: 1; }
     </style>
   </head>
 
   <body>
     <div id="hud">
-      <div><strong>Geo Shark Spawn Test</strong></div>
-      <div id="status" class="warn">Tap to start, then allow Camera + Location.</div>
+      <div><strong>Geo Shark Spawn Test (Debug)</strong></div>
+      <div id="status" class="warn">Tap to start. Then check the “Cam:” line.</div>
       <div id="coords" class="mono">Lat: — | Lon: — | Acc: —</div>
       <div id="distance" class="mono">Dist: —</div>
-      <div id="camdiag" style="opacity:0.85; font-size:0.8rem;">Cam: —</div>
+      <div id="camdiag" class="mono">Cam: —</div>
+      <div style="opacity:0.85; font-size:0.8rem;">
+        If Cam stays 0x0, it’s permissions / browser / device policy.
+      </div>
     </div>
 
-    <div id="startOverlay" role="button" aria-label="Tap to start">
+    <div id="startOverlay">
       <div id="startCard">
         <h2>Tap anywhere to start</h2>
-        <p>This needs <strong>Camera</strong> + <strong>Location</strong>. After you tap, choose <strong>Allow</strong>.</p>
-        <div id="tapAnywhere">Tap anywhere on this screen</div>
-        <div class="hint">
-          If camera stays black: make sure you are on <strong>HTTPS</strong> (GitHub Pages), not Private Browsing, and no other tab/app is using the camera.
-        </div>
+        <p>Make sure this page is on <strong>HTTPS</strong> and that Camera + Location are allowed in Chrome site settings.</p>
+        <div id="tapAnywhere">Tap anywhere</div>
       </div>
     </div>
 
@@ -107,54 +82,27 @@
       vr-mode-ui="enabled: false"
       embedded
       renderer="antialias: true; alpha: true;"
-      arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
+      arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: true;"
     >
-      <!-- Shark shown when in range -->
       <a-entity id="sharkRoot" visible="false">
-        <a-entity
-          id="shark"
-          position="0 -0.2 -4"
-          scale="0.001 0.001 0.001"
+        <a-entity id="shark" position="0 -0.2 -4" scale="0.001 0.001 0.001"
           animation__popin="property: scale; to: 1 1 1; dur: 800; easing: easeOutBack; startEvents: popin;"
           animation__rise="property: position; to: 0 0 -4; dur: 800; easing: easeOutCubic; startEvents: popin;"
         >
           <a-cone position="0 0.08 0" rotation="90 0 0" radius-bottom="0.14" radius-top="0.02" height="0.45"
-                  material="color: #2aa9b6; roughness: 0.85"></a-cone>
-          <a-cone position="0 0.18 -0.05" radius-bottom="0.05" radius-top="0.0" height="0.12"
-                  material="color: #1b6f77; roughness: 0.9"></a-cone>
-          <a-box position="0.11 0.10 0.03" rotation="0 0 20" width="0.12" height="0.02" depth="0.10"
-                 material="color: #1b6f77"></a-box>
-          <a-box position="-0.11 0.10 0.03" rotation="0 0 -20" width="0.12" height="0.02" depth="0.10"
-                 material="color: #1b6f77"></a-box>
-          <a-box position="0 0.08 0.22" width="0.18" height="0.03" depth="0.14"
-                 material="color: #1b6f77"></a-box>
-
-          <a-text value="Shark spawned!" position="0 0.45 0" align="center" color="#ffffff" side="double"></a-text>
+            material="color: #2aa9b6; roughness: 0.85"></a-cone>
+          <a-text value="Shark spawned!" position="0 0.45 0" align="center" color="#fff" side="double"></a-text>
         </a-entity>
       </a-entity>
 
-      <a-camera gps-camera rotation-reader></a-camera>
+      <a-camera gps-camera></a-camera>
     </a-scene>
 
     <script>
-      AFRAME.registerComponent("rotation-reader", {
-        tick: function () {
-          const rot = this.el.getAttribute("rotation");
-          if (!this.el.object3D) return;
-          this.el.object3D.rotation.set(
-            THREE.Math.degToRad(rot.x),
-            THREE.Math.degToRad(rot.y),
-            THREE.Math.degToRad(rot.z)
-          );
-        }
-      });
-
       (function () {
-        // Target coordinate (from you)
+        // Your target coordinate (update as needed)
         const TARGET_LAT = 37.3028;
         const TARGET_LON = -121.9982;
-
-        // Start generous; tighten later
         const RADIUS_METERS = 35;
 
         const statusEl = document.getElementById("status");
@@ -166,18 +114,16 @@
         const shark = document.querySelector("#shark");
 
         let spawned = false;
-        let watchId = null;
 
         function toRad(deg) { return (deg * Math.PI) / 180; }
-
         function distanceMeters(lat1, lon1, lat2, lon2) {
           const R = 6371000;
           const dLat = toRad(lat2 - lat1);
           const dLon = toRad(lon2 - lon1);
           const a =
-            Math.sin(dLat / 2) ** 2 +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-          return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+            Math.sin(dLat/2)**2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+          return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
         }
 
         function setStatus(text, cls) {
@@ -185,15 +131,31 @@
           statusEl.textContent = text;
         }
 
+        function updateCamDiag() {
+          const video = document.querySelector("video");
+          if (!video) {
+            camdiagEl.textContent = "Cam: video element not created yet";
+            return;
+          }
+          // Force inline behavior on iOS-webkit based browsers too
+          video.setAttribute("playsinline", "");
+          video.setAttribute("webkit-playsinline", "");
+          const rs = video.readyState;
+          const paused = video.paused;
+          const w = video.videoWidth;
+          const h = video.videoHeight;
+          camdiagEl.textContent = `Cam: readyState ${rs}, paused=${paused}, size=${w}x${h}`;
+        }
+
         function startGeoWatch() {
           if (!navigator.geolocation) {
-            setStatus("Geolocation not supported in this browser.", "bad");
+            setStatus("Geolocation not supported.", "bad");
             return;
           }
 
-          setStatus("Getting GPS… (allow Location)", "warn");
+          setStatus("Getting GPS…", "warn");
 
-          watchId = navigator.geolocation.watchPosition(
+          navigator.geolocation.watchPosition(
             (pos) => {
               const lat = pos.coords.latitude;
               const lon = pos.coords.longitude;
@@ -203,11 +165,10 @@
                 `Lat: ${lat.toFixed(6)} | Lon: ${lon.toFixed(6)} | Acc: ~${acc ? acc.toFixed(0) : "?"}m`;
 
               const d = distanceMeters(lat, lon, TARGET_LAT, TARGET_LON);
-              distanceEl.textContent = `Dist: ${d.toFixed(1)} m (target radius ${RADIUS_METERS}m)`;
+              distanceEl.textContent = `Dist: ${d.toFixed(1)} m (radius ${RADIUS_METERS}m)`;
 
               if (d <= RADIUS_METERS) {
-                setStatus(`✅ In range. Shark spawned.`, "ok");
-
+                setStatus("✅ In range. Shark spawned.", "ok");
                 if (!spawned) {
                   spawned = true;
                   sharkRoot.setAttribute("visible", "true");
@@ -216,7 +177,7 @@
                   shark.emit("popin");
                 }
               } else {
-                setStatus("⏳ Not in range. Walk closer to the target point.", "warn");
+                setStatus("⏳ Not in range.", "warn");
               }
             },
             (err) => setStatus(`GPS error: ${err.message}`, "bad"),
@@ -224,37 +185,14 @@
           );
         }
 
-        // Diagnostic: check whether AR.js video actually starts
-        function startCameraDiagnostics() {
-          // AR.js usually creates a <video> in the DOM
-          const check = () => {
-            const video = document.querySelector("video");
-            if (!video) {
-              camdiagEl.textContent = "Cam: video element not created yet";
-              return;
-            }
-            const rs = video.readyState; // 0..4
-            const paused = video.paused;
-            const w = video.videoWidth;
-            const h = video.videoHeight;
+        document.getElementById("startOverlay").addEventListener("click", () => {
+          document.getElementById("startOverlay").style.display = "none";
 
-            camdiagEl.textContent = `Cam: readyState ${rs}, paused=${paused}, size=${w}x${h}`;
+          // Start periodic camera diag
+          updateCamDiag();
+          setInterval(updateCamDiag, 1200);
 
-            // If after a few seconds size is 0x0, camera didn’t start
-            if (w === 0 || h === 0) {
-              // keep updating; this message helps you confirm what’s happening
-            }
-          };
-
-          check();
-          setInterval(check, 1500);
-        }
-
-        // Tap overlay start (no getUserMedia preflight)
-        const overlay = document.getElementById("startOverlay");
-        overlay.addEventListener("click", () => {
-          overlay.style.display = "none";
-          startCameraDiagnostics();
+          // Start GPS watch
           startGeoWatch();
         }, { passive: true });
       })();
