@@ -1,14 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8">
-    <title>San Jose XR Portal – Stadium with Grace Period</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="Web AR demo using AR.js and A-Frame for SJSU logo and stadium model with pop-up and grace period.">
+    <meta charset="UTF-8" />
+    <title>Shark Graffiti Mockup – AR.js</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="description" content="AR.js mockup: scan a shark marker, spawn a shark that pops up and swims forward." />
 
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-
     <!-- AR.js for A-Frame -->
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.0/aframe/build/aframe-ar.js"></script>
 
@@ -20,177 +19,168 @@
         background: #000;
         color: #fff;
       }
-
       #info {
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
-        padding: 0.5rem 0.75rem;
-        font-size: 0.8rem;
-        background: rgba(0, 0, 0, 0.6);
+        padding: 0.6rem 0.8rem;
+        font-size: 0.85rem;
+        background: rgba(0, 0, 0, 0.65);
         z-index: 10;
         text-align: center;
       }
-
-      #info strong {
-        color: #ffd54f;
-      }
+      #info strong { color: #ffd54f; }
     </style>
   </head>
 
   <body>
     <div id="info">
-      Point your camera at a <strong>Hiro marker</strong> (cube) or the <strong>SJSU marker</strong> (stadium).<br>
-      On SJSU, the stadium pops up, and lingers briefly after the marker is lost.
+      <strong>Shark Graffiti Mockup</strong><br />
+      Point camera at the <strong>shark marker</strong>. Shark pops up + swims the direction the marker points.
     </div>
 
     <a-scene
       vr-mode-ui="enabled: false"
       embedded
       renderer="antialias: true; alpha: true;"
-      arjs="sourceType: webcam; patternRatio: 0.50; debugUIEnabled: false;"
+      arjs="sourceType: webcam; debugUIEnabled: false; patternRatio: 0.50;"
     >
-      <!-- Assets -->
       <a-assets>
-        <a-asset-item id="stadiumModel" src="assets/stadium.glb"></a-asset-item>
+        <!-- Optional baked shadow (recommended). Put your PNG here: assets/shadow.png -->
+        <img id="shadowTex" src="assets/shadow.png" />
       </a-assets>
 
-      <!-- 1) Hiro marker (baseline/debug) -->
-      <a-marker preset="hiro">
-        <a-ring
-          position="0 0.01 0"
-          rotation="-90 0 0"
-          radius-inner="0.4"
-          radius-outer="0.7"
-          color="#ffffff"
-          opacity="0.7"
-          animation__pulse="property: scale; from: 1 1 1; to: 1.1 1.1 1.1;
-                            dir: alternate; loop: true; dur: 1200; easing: easeInOutSine"
-        ></a-ring>
+      <!-- Marker: your shark pattern file -->
+      <a-marker id="sharkMarker" type="pattern" url="markers/shark1.patt" emitevents="true"></a-marker>
 
-        <a-box
-          position="0 0.5 0"
-          depth="0.8"
-          height="0.8"
-          width="0.8"
-          color="#4CC3D9"
-          animation__rotate="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear"
-          animation__hover="property: position; from: 0 0.45 0; to: 0 0.6 0;
-                            dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"
-        ></a-box>
-
-        <a-text
-          value="Hiro marker (debug)"
-          position="-1.1 1.2 0"
-          color="#ffff66"
-          side="double"
-          wrap-count="22"
-        ></a-text>
-      </a-marker>
-
-      <!-- 2) SJSU marker used only as tracker -->
-      <a-marker
-        id="sjsuMarker"
-        type="pattern"
-        url="markers/sjsu-logo.patt"
-        emitevents="true"
-      >
-      </a-marker>
-
-      <!-- 3) Stadium anchor that follows marker and has grace period -->
-      <a-entity id="stadiumAnchor" stadium-follow-marker="graceMs: 800">
-        <!-- Portal pad + stadium + label all move together -->
-
-        <!-- Portal ring -->
-        <a-ring
-          position="0 0.01 0"
-          rotation="-90 0 0"
-          radius-inner="0.45"
-          radius-outer="0.8"
-          color="#00ffaa"
-          opacity="0.8"
-          animation__pulse="property: scale; from: 1 1 1; to: 1.1 1.1 1.1;
-                            dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"
-        ></a-ring>
-
-        <!-- Stadium model -->
+      <!-- Shark anchor is NOT inside the marker, so we can add a grace period and prevent instant blinking -->
+      <a-entity id="sharkAnchor" shark-follow-marker="graceMs: 900; swimSpeed: 0.25; popDurMs: 700">
+        <!-- Shadow: uses baked texture if available; otherwise still shows as dark circle -->
         <a-entity
-          id="stadium"
-          gltf-model="#stadiumModel"
-          position="0 -0.2 0"  <!-- start slightly below plane -->
-          rotation="0 45 0"
-          scale="0.001 0.001 0.001"  <!-- start tiny -->
-          animation__popin="
-            property: scale;
-            to: 0.03 0.03 0.03;
-            dur: 800;
-            easing: easeOutBack;
-            startEvents: popin;
-          "
-          animation__rise="
-            property: position;
-            to: 0 0 0;
-            dur: 800;
-            easing: easeOutCubic;
-            startEvents: popin;
-          "
-          animation__rotate="
-            property: rotation;
-            to: 0 405 0;
-            loop: true;
-            dur: 15000;
-            easing: linear;
-          "
+          id="shadow"
+          position="0 0.01 0"
+          rotation="-90 0 0"
+          geometry="primitive: circle; radius: 0.45;"
+          material="src: #shadowTex; transparent: true; opacity: 0.0; color: #000;"
+          animation__shadowin="property: material.opacity; to: 0.45; dur: 300; easing: easeOutCubic; startEvents: popin;"
+          animation__shadowpop="property: scale; from: 0.2 0.2 0.2; to: 1 1 1; dur: 450; easing: easeOutBack; startEvents: popin;"
         ></a-entity>
 
-        <!-- Label -->
-        <a-text
-          value="San Jose Stadium Portal"
-          position="-1.4 1.3 0"
-          color="#00FFAA"
-          side="double"
-          wrap-count="28"
-          animation__float="property: position; from: -1.4 1.2 0; to: -1.4 1.4 0;
-                            dir: alternate; loop: true; dur: 1600; easing: easeInOutSine"
-        ></a-text>
+        <!-- Simple “shark” placeholder (replace with a GLB later) -->
+        <a-entity
+          id="shark"
+          position="0 -0.15 0"
+          rotation="0 0 0"
+          scale="0.001 0.001 0.001"
+          animation__popin="property: scale; to: 1 1 1; dur: 700; easing: easeOutBack; startEvents: popin;"
+          animation__rise="property: position; to: 0 0.05 0; dur: 700; easing: easeOutCubic; startEvents: popin;"
+        >
+          <!-- Body (cone pointing forward). We’ll treat -Z as “forward” for the shark. -->
+          <a-cone
+            position="0 0.08 0"
+            rotation="90 0 0"
+            radius-bottom="0.14"
+            radius-top="0.02"
+            height="0.45"
+            material="color: #2aa9b6; metalness: 0.1; roughness: 0.8"
+          ></a-cone>
+
+          <!-- Top fin -->
+          <a-cone
+            position="0 0.18 -0.05"
+            rotation="0 0 0"
+            radius-bottom="0.05"
+            radius-top="0.0"
+            height="0.12"
+            material="color: #1b6f77; roughness: 0.9"
+          ></a-cone>
+
+          <!-- Side fins -->
+          <a-box
+            position="0.11 0.10 0.03"
+            rotation="0 0 20"
+            width="0.12"
+            height="0.02"
+            depth="0.10"
+            material="color: #1b6f77"
+          ></a-box>
+          <a-box
+            position="-0.11 0.10 0.03"
+            rotation="0 0 -20"
+            width="0.12"
+            height="0.02"
+            depth="0.10"
+            material="color: #1b6f77"
+          ></a-box>
+
+          <!-- Tail -->
+          <a-box
+            position="0 0.08 0.22"
+            rotation="0 0 0"
+            width="0.18"
+            height="0.03"
+            depth="0.14"
+            material="color: #1b6f77"
+          ></a-box>
+
+          <!-- Label (optional) -->
+          <a-text
+            value="swimming..."
+            position="-0.25 0.35 0"
+            color="#ffffff"
+            side="double"
+            scale="0.7 0.7 0.7"
+            wrap-count="12"
+          ></a-text>
+        </a-entity>
       </a-entity>
 
       <a-entity camera></a-entity>
     </a-scene>
 
-    <!-- Component: make stadiumAnchor follow SJSU marker with grace period -->
     <script>
-      AFRAME.registerComponent('stadium-follow-marker', {
+      // Component: follow marker pose + swim forward + grace period
+      AFRAME.registerComponent('shark-follow-marker', {
         schema: {
-          graceMs: {type: 'int', default: 800}
+          graceMs: { type: 'int', default: 900 },
+          swimSpeed: { type: 'number', default: 0.25 }, // meters/sec in marker-local space
+          popDurMs: { type: 'int', default: 700 }
         },
+
         init: function () {
-          this.marker = document.querySelector('#sjsuMarker');
+          this.marker = document.querySelector('#sharkMarker');
           this.anchor = this.el;
-          this.stadium = this.anchor.querySelector('#stadium');
+          this.shark = this.anchor.querySelector('#shark');
+          this.shadow = this.anchor.querySelector('#shadow');
+
           this.tracking = false;
           this.hideTimeout = null;
 
-          // Start hidden until we see marker first time
+          // Swim state (in anchor-local coordinates)
+          this.swimZ = 0; // We will move shark along -Z direction (forward)
+          this.lastTime = null;
+
+          // Start hidden
           this.anchor.object3D.visible = false;
 
           if (!this.marker) {
-            console.warn('stadium-follow-marker: #sjsuMarker not found');
+            console.warn('shark-follow-marker: #sharkMarker not found');
             return;
           }
 
           this.marker.addEventListener('markerFound', () => {
-            console.log('%cSJSU marker FOUND', 'color: #00FFAA; font-weight: bold;');
-            this.onMarkerFound();
+            console.log('%cSHARK MARKER FOUND', 'color:#00FFAA;font-weight:bold;');
+            this.onFound();
           });
 
           this.marker.addEventListener('markerLost', () => {
-            console.log('%cSJSU marker LOST', 'color: #00FFAA; font-weight: normal;');
-            this.onMarkerLost();
+            console.log('%cSHARK MARKER LOST', 'color:#00FFAA;');
+            this.onLost();
           });
         },
-        onMarkerFound: function () {
+
+        onFound: function () {
           this.tracking = true;
 
           if (this.hideTimeout) {
@@ -198,46 +188,71 @@
             this.hideTimeout = null;
           }
 
-          // Make anchor visible and reset stadium animation
+          // Show anchor immediately
           this.anchor.object3D.visible = true;
 
-          if (this.stadium) {
-            this.stadium.setAttribute('scale', '0.003 0.003 0.003');
-            this.stadium.setAttribute('position', '0 -0.2 0');
-            this.stadium.emit('popin');
+          // Reset swim position each time we reacquire (mockup behavior)
+          this.swimZ = 0;
+
+          // Reset shark + shadow to "pre-pop" state
+          if (this.shark) {
+            this.shark.setAttribute('scale', '0.001 0.001 0.001');
+            this.shark.setAttribute('position', '0 -0.15 0');
+            this.shark.emit('popin');
           }
+
+          if (this.shadow) {
+            this.shadow.setAttribute('material', 'opacity', 0.0);
+            this.shadow.setAttribute('scale', '0.2 0.2 0.2');
+            this.shadow.emit('popin');
+          }
+
+          // Reset timing so tick dt starts clean
+          this.lastTime = null;
         },
-        onMarkerLost: function () {
+
+        onLost: function () {
           this.tracking = false;
 
-          // Start grace period timer
+          // grace period before hiding
           this.hideTimeout = setTimeout(() => {
             if (!this.tracking) {
               this.anchor.object3D.visible = false;
             }
           }, this.data.graceMs);
         },
-        tick: function () {
-          if (!this.tracking || !this.marker) return;
 
-          // Copy marker pose to anchor so stadium stays attached
-          this.anchor.object3D.position.copy(this.marker.object3D.position);
-          this.anchor.object3D.quaternion.copy(this.marker.object3D.quaternion);
-        }
-      });
+        tick: function (time, timeDelta) {
+          if (!this.marker) return;
 
-      // Optional: logging for Hiro as well
-      document.addEventListener('DOMContentLoaded', () => {
-        const hiro = document.querySelector('a-marker[preset="hiro"]');
-        if (hiro) {
-          hiro.addEventListener('markerFound', () =>
-            console.log('%cHiro FOUND', 'color: #4CC3D9; font-weight: bold;')
-          );
-          hiro.addEventListener('markerLost', () =>
-            console.log('%cHiro LOST', 'color: #4CC3D9; font-weight: normal;')
-          );
+          // Always keep anchor glued to marker pose while tracking
+          if (this.tracking) {
+            this.anchor.object3D.position.copy(this.marker.object3D.position);
+            this.anchor.object3D.quaternion.copy(this.marker.object3D.quaternion);
+          } else {
+            // If not tracking, we don't update pose (it "freezes" during grace period)
+            return;
+          }
+
+          // After pop-in, swim forward continuously
+          // Use timeDelta (ms) -> seconds
+          const dt = Math.max(0, (timeDelta || 0)) / 1000;
+          if (!dt) return;
+
+          // Move shark forward in its local -Z direction
+          // This works because the anchor inherits marker rotation; moving along -Z means "in the direction the printed shark points."
+          this.swimZ -= this.data.swimSpeed * dt;
+
+          if (this.shark) {
+            // Keep shark slightly above ground plane while swimming
+            this.shark.object3D.position.set(0, 0.05, this.swimZ);
+          }
+
+          if (this.shadow) {
+            // Shadow follows under the shark, slightly behind (optional vibe)
+            this.shadow.object3D.position.set(0, 0.01, this.swimZ);
+          }
         }
-        console.log('San Jose XR Stadium demo with grace period initialized.');
       });
     </script>
   </body>
