@@ -2,13 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Shark Graffiti Mockup – AR.js</title>
+    <title>Geo Shark Spawn Test – AR.js</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="description" content="AR.js mockup: scan a shark marker, spawn a shark that pops up and swims forward." />
+    <meta name="description" content="Location-based WebAR demo: spawn a shark when within range of a target coordinate." />
 
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <!-- AR.js for A-Frame -->
+
+    <!-- AR.js for A-Frame (includes location-based components) -->
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.0/aframe/build/aframe-ar.js"></script>
 
     <style>
@@ -19,71 +20,58 @@
         background: #000;
         color: #fff;
       }
-      #info {
+      #hud {
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
-        padding: 0.6rem 0.8rem;
+        padding: 0.65rem 0.85rem;
         font-size: 0.85rem;
         background: rgba(0, 0, 0, 0.65);
         z-index: 10;
-        text-align: center;
+        line-height: 1.25rem;
       }
-      #info strong { color: #ffd54f; }
+      #hud strong { color: #ffd54f; }
+      #hud .ok { color: #00ff9a; font-weight: 600; }
+      #hud .warn { color: #ffcc66; font-weight: 600; }
+      #hud .bad { color: #ff6b6b; font-weight: 600; }
     </style>
   </head>
 
   <body>
-    <div id="info">
-      <strong>Shark Graffiti Mockup</strong><br />
-      Point camera at the <strong>shark marker</strong>. Shark pops up + swims the direction the marker points.
+    <div id="hud">
+      <div><strong>Geo Shark Spawn Test</strong></div>
+      <div id="status">Waiting for GPS…</div>
+      <div id="distance">Distance: —</div>
+      <div style="opacity:0.85; font-size:0.8rem;">
+        Tips: use phone + HTTPS + allow Camera + Location. Outdoors works best.
+      </div>
     </div>
 
     <a-scene
       vr-mode-ui="enabled: false"
       embedded
       renderer="antialias: true; alpha: true;"
-      arjs="sourceType: webcam; debugUIEnabled: false; patternRatio: 0.50;"
+      arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
     >
-      <a-assets>
-        <!-- Optional baked shadow (recommended). Put your PNG here: assets/shadow.png -->
-        <img id="shadowTex" src="assets/shadow.png" />
-      </a-assets>
-
-      <!-- Marker: your shark pattern file -->
-      <a-marker id="sharkMarker" type="pattern" url="markers/shark1.patt" emitevents="true"></a-marker>
-
-      <!-- Shark anchor is NOT inside the marker, so we can add a grace period and prevent instant blinking -->
-      <a-entity id="sharkAnchor" shark-follow-marker="graceMs: 900; swimSpeed: 0.25; popDurMs: 700">
-        <!-- Shadow: uses baked texture if available; otherwise still shows as dark circle -->
-        <a-entity
-          id="shadow"
-          position="0 0.01 0"
-          rotation="-90 0 0"
-          geometry="primitive: circle; radius: 0.45;"
-          material="src: #shadowTex; transparent: true; opacity: 0.0; color: #000;"
-          animation__shadowin="property: material.opacity; to: 0.45; dur: 300; easing: easeOutCubic; startEvents: popin;"
-          animation__shadowpop="property: scale; from: 0.2 0.2 0.2; to: 1 1 1; dur: 450; easing: easeOutBack; startEvents: popin;"
-        ></a-entity>
-
-        <!-- Simple “shark” placeholder (replace with a GLB later) -->
-        <a-entity
-          id="shark"
-          position="0 -0.15 0"
+      <!-- This entity will be shown/hidden by our geo logic -->
+      <a-entity id="sharkRoot" visible="false">
+        <!-- “Shark” placeholder geometry (you can swap to a GLB later) -->
+        <a-entity id="shark"
+          position="0 -0.2 -4"
           rotation="0 0 0"
           scale="0.001 0.001 0.001"
-          animation__popin="property: scale; to: 1 1 1; dur: 700; easing: easeOutBack; startEvents: popin;"
-          animation__rise="property: position; to: 0 0.05 0; dur: 700; easing: easeOutCubic; startEvents: popin;"
+          animation__popin="property: scale; to: 1 1 1; dur: 800; easing: easeOutBack; startEvents: popin;"
+          animation__rise="property: position; to: 0 0 -4; dur: 800; easing: easeOutCubic; startEvents: popin;"
         >
-          <!-- Body (cone pointing forward). We’ll treat -Z as “forward” for the shark. -->
+          <!-- Body -->
           <a-cone
             position="0 0.08 0"
             rotation="90 0 0"
             radius-bottom="0.14"
             radius-top="0.02"
             height="0.45"
-            material="color: #2aa9b6; metalness: 0.1; roughness: 0.8"
+            material="color: #2aa9b6; roughness: 0.85"
           ></a-cone>
 
           <!-- Top fin -->
@@ -124,136 +112,133 @@
             material="color: #1b6f77"
           ></a-box>
 
-          <!-- Label (optional) -->
           <a-text
-            value="swimming..."
-            position="-0.25 0.35 0"
+            value="Shark spawned!"
+            position="0 0.45 0"
+            align="center"
             color="#ffffff"
             side="double"
-            scale="0.7 0.7 0.7"
-            wrap-count="12"
+            wrap-count="18"
           ></a-text>
         </a-entity>
       </a-entity>
 
-      <a-entity camera></a-entity>
+      <!-- GPS camera (required for location-based AR.js) -->
+      <a-camera gps-camera rotation-reader></a-camera>
     </a-scene>
 
     <script>
-      // Component: follow marker pose + swim forward + grace period
-      AFRAME.registerComponent('shark-follow-marker', {
-        schema: {
-          graceMs: { type: 'int', default: 900 },
-          swimSpeed: { type: 'number', default: 0.25 }, // meters/sec in marker-local space
-          popDurMs: { type: 'int', default: 700 }
-        },
-
-        init: function () {
-          this.marker = document.querySelector('#sharkMarker');
-          this.anchor = this.el;
-          this.shark = this.anchor.querySelector('#shark');
-          this.shadow = this.anchor.querySelector('#shadow');
-
-          this.tracking = false;
-          this.hideTimeout = null;
-
-          // Swim state (in anchor-local coordinates)
-          this.swimZ = 0; // We will move shark along -Z direction (forward)
-          this.lastTime = null;
-
-          // Start hidden
-          this.anchor.object3D.visible = false;
-
-          if (!this.marker) {
-            console.warn('shark-follow-marker: #sharkMarker not found');
-            return;
-          }
-
-          this.marker.addEventListener('markerFound', () => {
-            console.log('%cSHARK MARKER FOUND', 'color:#00FFAA;font-weight:bold;');
-            this.onFound();
-          });
-
-          this.marker.addEventListener('markerLost', () => {
-            console.log('%cSHARK MARKER LOST', 'color:#00FFAA;');
-            this.onLost();
-          });
-        },
-
-        onFound: function () {
-          this.tracking = true;
-
-          if (this.hideTimeout) {
-            clearTimeout(this.hideTimeout);
-            this.hideTimeout = null;
-          }
-
-          // Show anchor immediately
-          this.anchor.object3D.visible = true;
-
-          // Reset swim position each time we reacquire (mockup behavior)
-          this.swimZ = 0;
-
-          // Reset shark + shadow to "pre-pop" state
-          if (this.shark) {
-            this.shark.setAttribute('scale', '0.001 0.001 0.001');
-            this.shark.setAttribute('position', '0 -0.15 0');
-            this.shark.emit('popin');
-          }
-
-          if (this.shadow) {
-            this.shadow.setAttribute('material', 'opacity', 0.0);
-            this.shadow.setAttribute('scale', '0.2 0.2 0.2');
-            this.shadow.emit('popin');
-          }
-
-          // Reset timing so tick dt starts clean
-          this.lastTime = null;
-        },
-
-        onLost: function () {
-          this.tracking = false;
-
-          // grace period before hiding
-          this.hideTimeout = setTimeout(() => {
-            if (!this.tracking) {
-              this.anchor.object3D.visible = false;
-            }
-          }, this.data.graceMs);
-        },
-
-        tick: function (time, timeDelta) {
-          if (!this.marker) return;
-
-          // Always keep anchor glued to marker pose while tracking
-          if (this.tracking) {
-            this.anchor.object3D.position.copy(this.marker.object3D.position);
-            this.anchor.object3D.quaternion.copy(this.marker.object3D.quaternion);
-          } else {
-            // If not tracking, we don't update pose (it "freezes" during grace period)
-            return;
-          }
-
-          // After pop-in, swim forward continuously
-          // Use timeDelta (ms) -> seconds
-          const dt = Math.max(0, (timeDelta || 0)) / 1000;
-          if (!dt) return;
-
-          // Move shark forward in its local -Z direction
-          // This works because the anchor inherits marker rotation; moving along -Z means "in the direction the printed shark points."
-          this.swimZ -= this.data.swimSpeed * dt;
-
-          if (this.shark) {
-            // Keep shark slightly above ground plane while swimming
-            this.shark.object3D.position.set(0, 0.05, this.swimZ);
-          }
-
-          if (this.shadow) {
-            // Shadow follows under the shark, slightly behind (optional vibe)
-            this.shadow.object3D.position.set(0, 0.01, this.swimZ);
-          }
+      // Helps keep camera orientation in sync (often used with AR.js geo demos)
+      AFRAME.registerComponent("rotation-reader", {
+        tick: function () {
+          const rot = this.el.getAttribute("rotation");
+          if (!this.el.object3D) return;
+          this.el.object3D.rotation.set(
+            THREE.Math.degToRad(rot.x),
+            THREE.Math.degToRad(rot.y),
+            THREE.Math.degToRad(rot.z)
+          );
         }
       });
+
+      // Geo spawn logic: show shark when within radius meters of target
+      (function () {
+        // Your target coordinate:
+        const TARGET_LAT = 37.800331;
+        const TARGET_LON = -121.323543;
+
+        // Tune this. GPS is noisy, so start generous.
+        const RADIUS_METERS = 35;
+
+        const statusEl = document.getElementById("status");
+        const distanceEl = document.getElementById("distance");
+
+        const sharkRoot = document.querySelector("#sharkRoot");
+        const shark = document.querySelector("#shark");
+
+        let spawned = false;
+
+        function toRad(deg) {
+          return (deg * Math.PI) / 180;
+        }
+
+        // Haversine distance in meters
+        function distanceMeters(lat1, lon1, lat2, lon2) {
+          const R = 6371000; // meters
+          const dLat = toRad(lat2 - lat1);
+          const dLon = toRad(lon2 - lon1);
+
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          return R * c;
+        }
+
+        function setStatus(text, cls) {
+          statusEl.className = cls || "";
+          statusEl.textContent = text;
+        }
+
+        // Use browser Geolocation for "are we within radius?"
+        function startGeoWatch() {
+          if (!navigator.geolocation) {
+            setStatus("Geolocation not supported in this browser.", "bad");
+            return;
+          }
+
+          setStatus("Requesting GPS… (allow Location)", "warn");
+
+          navigator.geolocation.watchPosition(
+            (pos) => {
+              const lat = pos.coords.latitude;
+              const lon = pos.coords.longitude;
+              const acc = pos.coords.accuracy; // meters (rough)
+
+              const d = distanceMeters(lat, lon, TARGET_LAT, TARGET_LON);
+              distanceEl.textContent = `Distance: ${d.toFixed(1)} m (accuracy ~ ${acc ? acc.toFixed(0) : "?"} m)`;
+
+              // Spawn logic:
+              if (d <= RADIUS_METERS) {
+                setStatus(`✅ In range (≤ ${RADIUS_METERS}m). Spawning shark.`, "ok");
+
+                if (!spawned) {
+                  spawned = true;
+                  sharkRoot.setAttribute("visible", "true");
+
+                  // Reset + pop in animation
+                  shark.setAttribute("scale", "0.001 0.001 0.001");
+                  shark.setAttribute("position", "0 -0.2 -4");
+                  shark.emit("popin");
+                }
+              } else {
+                setStatus(`⏳ Not in range. Walk closer to the target point.`, "warn");
+
+                // For a mockup, we keep it visible once spawned.
+                // If you want it to hide when you walk away, uncomment:
+                /*
+                if (spawned) {
+                  spawned = false;
+                  sharkRoot.setAttribute("visible", "false");
+                }
+                */
+              }
+            },
+            (err) => {
+              setStatus(`GPS error: ${err.message}`, "bad");
+            },
+            {
+              enableHighAccuracy: true,
+              maximumAge: 1000,
+              timeout: 15000
+            }
+          );
+        }
+
+        document.addEventListener("DOMContentLoaded", startGeoWatch);
+      })();
     </script>
   </body>
 </html>
