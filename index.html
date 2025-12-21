@@ -11,80 +11,59 @@
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
-    <!-- AR.js for A-Frame -->
+    <!-- AR.js for A-Frame (location-based components included) -->
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.0/aframe/build/aframe-ar.js"></script>
 
     <style>
       html, body {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        background: #000;
-        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
-        color: #fff;
+        margin: 0; padding: 0; width: 100%; height: 100%;
+        overflow: hidden; background: #000;
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif; color: #fff;
       }
 
-      /* HUD at top */
+      /* HUD */
       #hud {
         position: fixed;
         top: env(safe-area-inset-top, 0px);
         left: env(safe-area-inset-left, 0px);
-        right: env(safe-area-inset-right, 0px);
         padding: 0.65rem 0.85rem;
         font-size: 0.85rem;
-        background: rgba(0, 0, 0, 0.65);
+        background: rgba(0,0,0,0.65);
         z-index: 99998;
         line-height: 1.25rem;
-        pointer-events: none; /* HUD shouldn't block taps */
+        border-bottom-right-radius: 14px;
+        pointer-events: none;
+        max-width: 92vw;
       }
       #hud strong { color: #ffd54f; }
-      .ok { color: #00ff9a; font-weight: 600; }
-      .warn { color: #ffcc66; font-weight: 600; }
-      .bad { color: #ff6b6b; font-weight: 600; }
+      .ok { color: #00ff9a; font-weight: 700; }
+      .warn { color: #ffcc66; font-weight: 700; }
+      .bad { color: #ff6b6b; font-weight: 700; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
 
-      /* Tap-to-start overlay */
+      /* Tap overlay */
       #startOverlay {
-        position: fixed;
-        inset: 0;
-        z-index: 99999;              /* above everything */
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
+        position: fixed; inset: 0; z-index: 99999;
+        display: flex; align-items: center; justify-content: center;
         padding:
           calc(24px + env(safe-area-inset-top, 0px))
           calc(24px + env(safe-area-inset-right, 0px))
           calc(24px + env(safe-area-inset-bottom, 0px))
           calc(24px + env(safe-area-inset-left, 0px));
         background: rgba(0,0,0,0.88);
-        pointer-events: auto;         /* MUST receive taps */
-        touch-action: manipulation;   /* improves tap handling */
+        text-align: center;
+        touch-action: manipulation;
       }
       #startCard {
-        max-width: 36rem;
-        width: 100%;
-        background: rgba(20, 20, 20, 0.75);
+        max-width: 36rem; width: 100%;
+        background: rgba(20,20,20,0.75);
         border: 1px solid rgba(255,255,255,0.15);
         border-radius: 16px;
         padding: 18px 16px;
         box-sizing: border-box;
       }
-      #startCard h2 {
-        margin: 0 0 10px 0;
-        font-size: 1.2rem;
-      }
-      #startCard p {
-        margin: 0 0 10px 0;
-        opacity: 0.9;
-        line-height: 1.35rem;
-      }
-      #startCard .hint {
-        margin-top: 8px;
-        font-size: 0.85rem;
-        opacity: 0.75;
-      }
+      #startCard h2 { margin: 0 0 10px 0; font-size: 1.2rem; }
+      #startCard p { margin: 0 0 10px 0; opacity: 0.9; line-height: 1.35rem; }
       #tapAnywhere {
         display: inline-block;
         margin-top: 10px;
@@ -92,10 +71,10 @@
         border-radius: 12px;
         background: rgba(255, 213, 79, 0.18);
         border: 1px solid rgba(255, 213, 79, 0.35);
-        font-weight: 650;
+        font-weight: 750;
       }
+      #startCard .hint { margin-top: 10px; font-size: 0.85rem; opacity: 0.75; }
 
-      /* Ensure the AR canvas doesn't create its own stacking weirdness */
       a-scene {
         position: fixed !important;
         inset: 0 !important;
@@ -108,23 +87,18 @@
     <div id="hud">
       <div><strong>Geo Shark Spawn Test</strong></div>
       <div id="status" class="warn">Tap to start, then allow Camera + Location.</div>
-      <div id="distance">Distance: —</div>
-      <div style="opacity:0.85; font-size:0.8rem;">
-        Must be HTTPS (GitHub Pages). Outdoors works best.
-      </div>
+      <div id="coords" class="mono">Lat: — | Lon: — | Acc: —</div>
+      <div id="distance" class="mono">Dist: —</div>
+      <div id="camdiag" style="opacity:0.85; font-size:0.8rem;">Cam: —</div>
     </div>
 
-    <!-- Tap anywhere overlay (no button) -->
     <div id="startOverlay" role="button" aria-label="Tap to start">
       <div id="startCard">
         <h2>Tap anywhere to start</h2>
-        <p>
-          This demo needs <strong>Camera</strong> and <strong>Location</strong> permissions.
-          After you tap, choose <strong>Allow</strong> when prompted.
-        </p>
+        <p>This needs <strong>Camera</strong> + <strong>Location</strong>. After you tap, choose <strong>Allow</strong>.</p>
         <div id="tapAnywhere">Tap anywhere on this screen</div>
         <div class="hint">
-          If the camera stays black: check iPhone Settings → Safari → Camera/Location, and confirm you’re on HTTPS.
+          If camera stays black: make sure you are on <strong>HTTPS</strong> (GitHub Pages), not Private Browsing, and no other tab/app is using the camera.
         </div>
       </div>
     </div>
@@ -135,7 +109,7 @@
       renderer="antialias: true; alpha: true;"
       arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
     >
-      <!-- Shark object shown when in range -->
+      <!-- Shark shown when in range -->
       <a-entity id="sharkRoot" visible="false">
         <a-entity
           id="shark"
@@ -144,56 +118,18 @@
           animation__popin="property: scale; to: 1 1 1; dur: 800; easing: easeOutBack; startEvents: popin;"
           animation__rise="property: position; to: 0 0 -4; dur: 800; easing: easeOutCubic; startEvents: popin;"
         >
-          <a-cone
-            position="0 0.08 0"
-            rotation="90 0 0"
-            radius-bottom="0.14"
-            radius-top="0.02"
-            height="0.45"
-            material="color: #2aa9b6; roughness: 0.85"
-          ></a-cone>
+          <a-cone position="0 0.08 0" rotation="90 0 0" radius-bottom="0.14" radius-top="0.02" height="0.45"
+                  material="color: #2aa9b6; roughness: 0.85"></a-cone>
+          <a-cone position="0 0.18 -0.05" radius-bottom="0.05" radius-top="0.0" height="0.12"
+                  material="color: #1b6f77; roughness: 0.9"></a-cone>
+          <a-box position="0.11 0.10 0.03" rotation="0 0 20" width="0.12" height="0.02" depth="0.10"
+                 material="color: #1b6f77"></a-box>
+          <a-box position="-0.11 0.10 0.03" rotation="0 0 -20" width="0.12" height="0.02" depth="0.10"
+                 material="color: #1b6f77"></a-box>
+          <a-box position="0 0.08 0.22" width="0.18" height="0.03" depth="0.14"
+                 material="color: #1b6f77"></a-box>
 
-          <a-cone
-            position="0 0.18 -0.05"
-            radius-bottom="0.05"
-            radius-top="0.0"
-            height="0.12"
-            material="color: #1b6f77; roughness: 0.9"
-          ></a-cone>
-
-          <a-box
-            position="0.11 0.10 0.03"
-            rotation="0 0 20"
-            width="0.12"
-            height="0.02"
-            depth="0.10"
-            material="color: #1b6f77"
-          ></a-box>
-
-          <a-box
-            position="-0.11 0.10 0.03"
-            rotation="0 0 -20"
-            width="0.12"
-            height="0.02"
-            depth="0.10"
-            material="color: #1b6f77"
-          ></a-box>
-
-          <a-box
-            position="0 0.08 0.22"
-            width="0.18"
-            height="0.03"
-            depth="0.14"
-            material="color: #1b6f77"
-          ></a-box>
-
-          <a-text
-            value="Shark spawned!"
-            position="0 0.45 0"
-            align="center"
-            color="#ffffff"
-            side="double"
-          ></a-text>
+          <a-text value="Shark spawned!" position="0 0.45 0" align="center" color="#ffffff" side="double"></a-text>
         </a-entity>
       </a-entity>
 
@@ -214,15 +150,17 @@
       });
 
       (function () {
-        // Your target coordinate:
+        // Target coordinate (from you)
         const TARGET_LAT = 37.3028;
         const TARGET_LON = -121.9982;
 
-        // GPS is noisy—start generous.
+        // Start generous; tighten later
         const RADIUS_METERS = 35;
 
         const statusEl = document.getElementById("status");
+        const coordsEl = document.getElementById("coords");
         const distanceEl = document.getElementById("distance");
+        const camdiagEl = document.getElementById("camdiag");
 
         const sharkRoot = document.querySelector("#sharkRoot");
         const shark = document.querySelector("#shark");
@@ -238,8 +176,7 @@
           const dLon = toRad(lon2 - lon1);
           const a =
             Math.sin(dLat / 2) ** 2 +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-            Math.sin(dLon / 2) ** 2;
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
           return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
         }
 
@@ -248,18 +185,7 @@
           statusEl.textContent = text;
         }
 
-        async function startPermissionsAndGeo() {
-          // 1) Try to prime camera permission in response to a user gesture.
-          // Some browsers are picky; even if this fails, AR.js may still request camera.
-          try {
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-              await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
-            }
-          } catch (e) {
-            console.warn("Camera preflight failed (may still work):", e);
-          }
-
-          // 2) Start GPS watch
+        function startGeoWatch() {
           if (!navigator.geolocation) {
             setStatus("Geolocation not supported in this browser.", "bad");
             return;
@@ -273,11 +199,14 @@
               const lon = pos.coords.longitude;
               const acc = pos.coords.accuracy;
 
+              coordsEl.textContent =
+                `Lat: ${lat.toFixed(6)} | Lon: ${lon.toFixed(6)} | Acc: ~${acc ? acc.toFixed(0) : "?"}m`;
+
               const d = distanceMeters(lat, lon, TARGET_LAT, TARGET_LON);
-              distanceEl.textContent = `Distance: ${d.toFixed(1)} m (accuracy ~ ${acc ? acc.toFixed(0) : "?"} m)`;
+              distanceEl.textContent = `Dist: ${d.toFixed(1)} m (target radius ${RADIUS_METERS}m)`;
 
               if (d <= RADIUS_METERS) {
-                setStatus(`✅ In range (≤ ${RADIUS_METERS}m). Shark spawned.`, "ok");
+                setStatus(`✅ In range. Shark spawned.`, "ok");
 
                 if (!spawned) {
                   spawned = true;
@@ -295,11 +224,38 @@
           );
         }
 
-        // Tap anywhere overlay start
+        // Diagnostic: check whether AR.js video actually starts
+        function startCameraDiagnostics() {
+          // AR.js usually creates a <video> in the DOM
+          const check = () => {
+            const video = document.querySelector("video");
+            if (!video) {
+              camdiagEl.textContent = "Cam: video element not created yet";
+              return;
+            }
+            const rs = video.readyState; // 0..4
+            const paused = video.paused;
+            const w = video.videoWidth;
+            const h = video.videoHeight;
+
+            camdiagEl.textContent = `Cam: readyState ${rs}, paused=${paused}, size=${w}x${h}`;
+
+            // If after a few seconds size is 0x0, camera didn’t start
+            if (w === 0 || h === 0) {
+              // keep updating; this message helps you confirm what’s happening
+            }
+          };
+
+          check();
+          setInterval(check, 1500);
+        }
+
+        // Tap overlay start (no getUserMedia preflight)
         const overlay = document.getElementById("startOverlay");
-        overlay.addEventListener("click", async () => {
+        overlay.addEventListener("click", () => {
           overlay.style.display = "none";
-          await startPermissionsAndGeo();
+          startCameraDiagnostics();
+          startGeoWatch();
         }, { passive: true });
       })();
     </script>
