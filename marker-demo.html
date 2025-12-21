@@ -2,8 +2,10 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Sharks Way AR - Marker Demo</title>
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
@@ -13,10 +15,14 @@
             margin: 0;
             overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: none;
         }
         #info-panel {
             position: fixed;
-            top: 160px;
+            bottom: 20px;
             right: 20px;
             background: rgba(0, 109, 117, 0.15);
             backdrop-filter: blur(20px) saturate(180%);
@@ -34,7 +40,7 @@
             margin: 0 0 8px 0;
             font-size: 14px;
             font-weight: 700;
-            color: #00A9E0;
+            color: #FFFFFF;
             text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
             letter-spacing: 0.3px;
             line-height: 1.3;
@@ -44,7 +50,7 @@
             margin: 6px 0;
             font-size: 12px;
             line-height: 1.4;
-            color: rgba(255, 255, 255, 0.95);
+            color: rgba(255, 255, 255, 0.85);
         }
         #info-panel .marker-hint {
             font-size: 10px;
@@ -56,9 +62,9 @@
         }
         #event-info {
             position: fixed;
-            top: -280px;
-            left: 160px;
-            transform: translateX(-50%);
+            top: 120px;
+            left: -460px;
+            transform: translateY(-50%);
             background: rgba(0, 109, 117, 0.15);
             backdrop-filter: blur(20px) saturate(180%);
             -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -70,10 +76,10 @@
             border: 1px solid rgba(0, 169, 224, 0.3);
             box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
                         inset 0 1px 0 rgba(255, 255, 255, 0.2);
-            transition: top 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            transition: left 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
         #event-info.visible {
-            top: 60px;
+            left: 20px;
         }
         #event-info h3 {
             margin: 0 0 10px 0;
@@ -196,6 +202,49 @@
             stroke-width: 2;
             fill: none;
         }
+        @media (max-width: 480px) {
+            #info-panel {
+                bottom: 10px;
+                right: 10px;
+                width: 120px;
+                padding: 14px 12px;
+            }
+            #info-panel h2 {
+                font-size: 13px;
+            }
+            #info-panel p {
+                font-size: 11px;
+            }
+            #event-info {
+                max-width: 90%;
+                padding: 14px 16px;
+            }
+            #event-info.visible {
+                left: 10px;
+            }
+            #event-info h3 {
+                font-size: 15px;
+            }
+            #event-info .event-details {
+                font-size: 12px;
+            }
+            #progress-tracker {
+                top: 10px;
+                right: 10px;
+                max-width: 120px;
+                padding: 12px 14px;
+                font-size: 10px;
+            }
+            #tap-hint {
+                bottom: 20px;
+                font-size: 12px;
+                padding: 10px 20px;
+            }
+            .cta-button {
+                padding: 10px 16px;
+                font-size: 13px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -251,111 +300,31 @@
         renderer="logarithmicDepthBuffer: true; precision: medium;">
         
         <a-assets>
-            <a-asset-item id="sharkey-text" src="#"></a-asset-item>
+            <a-asset-item id="shark-model" src="./plushie_shark.glb"></a-asset-item>
         </a-assets>
 
         <a-marker preset="hiro" id="hiro-marker" class="clickable">
-            <!-- Sharkey Body (improved shark model) -->
-            <a-entity id="sharkey" position="0 0.8 0" rotation="0 90 0"
-                animation="property: rotation; to: 0 100 0; dir: alternate; loop: true; dur: 3000; easing: easeInOutSine">
-                <!-- Main body (streamlined) -->
-                <a-sphere 
-                    position="0 0 0" 
-                    radius="0.2"
-                    scale="2 1 1"
-                    color="#006D75"
-                    animation="property: position; to: 0 0.05 0; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine">
-                </a-sphere>
-                
-                <!-- Head (pointed nose) -->
-                <a-cone 
-                    position="0.45 0 0" 
-                    radius-bottom="0.2" 
-                    radius-top="0.01" 
-                    height="0.35" 
-                    color="#006D75"
-                    rotation="0 0 -90">
-                </a-cone>
-                
-                <!-- Tail section -->
-                <a-cone 
-                    position="-0.45 0 0" 
-                    radius-bottom="0.18" 
-                    radius-top="0.05" 
-                    height="0.25" 
-                    color="#006D75"
-                    rotation="0 0 90">
-                </a-cone>
-                
-                <!-- Tail fin (crescent moon shape) -->
-                <a-box 
-                    position="-0.6 0.2 0" 
-                    width="0.05" 
-                    height="0.3" 
-                    depth="0.02"
-                    color="#00A9E0"
-                    rotation="0 0 -20"
-                    animation="property: rotation; to: 0 0 -30; dir: alternate; loop: true; dur: 800; easing: easeInOutSine">
-                </a-box>
-                <a-box 
-                    position="-0.62 -0.15 0" 
-                    width="0.05" 
-                    height="0.25" 
-                    depth="0.02"
-                    color="#00A9E0"
-                    rotation="0 0 20"
-                    animation="property: rotation; to: 0 0 30; dir: alternate; loop: true; dur: 800; easing: easeInOutSine">
-                </a-box>
-                
-                <!-- Dorsal fin (top) -->
-                <a-box 
-                    position="0 0.25 0" 
-                    width="0.25" 
-                    height="0.3" 
-                    depth="0.03"
-                    color="#00A9E0"
-                    rotation="90 0 -70">
-                </a-box>
-                
-                <!-- Pectoral fins (sides) -->
-                <a-box 
-                    position="0.15 -0.08 0.18" 
-                    width="0.2" 
-                    height="0.15" 
-                    depth="0.02"
-                    color="#007A8C"
-                    rotation="-20 30 -45">
-                </a-box>
-                <a-box 
-                    position="0.15 -0.08 -0.18" 
-                    width="0.2" 
-                    height="0.15" 
-                    depth="0.02"
-                    color="#007A8C"
-                    rotation="20 -30 45">
-                </a-box>
-                
-                <!-- Belly (lighter color) -->
-                <a-sphere 
-                    position="0.1 -0.12 0" 
-                    radius="0.15"
-                    scale="1.5 0.8 0.8"
-                    color="#E0F7FA"
-                    opacity="0.7">
-                </a-sphere>
-                
-                <!-- Eyes -->
-                <a-sphere position="0.35 0.1 0.15" radius="0.04" color="#000"></a-sphere>
-                <a-sphere position="0.35 0.1 -0.15" radius="0.04" color="#000"></a-sphere>
-                
-                <!-- Eye highlights -->
-                <a-sphere position="0.36 0.11 0.16" radius="0.015" color="#FFF"></a-sphere>
-                <a-sphere position="0.36 0.11 -0.16" radius="0.015" color="#FFF"></a-sphere>
-                
-                <!-- Gills -->
-                <a-box position="0.2 0.05 0.18" width="0.02" height="0.08" depth="0.01" color="#004D55" rotation="0 20 0"></a-box>
-                <a-box position="0.2 0.05 -0.18" width="0.02" height="0.08" depth="0.01" color="#004D55" rotation="0 -20 0"></a-box>
+            <!-- Sharkey 3D Model -->
+            <a-entity 
+                id="sharkey"
+                gltf-model="#shark-model"
+                position="0 0.5 0"
+                rotation="0 180 0"
+                scale="0.5 0.5 0.5"
+                animation="property: rotation; to: 0 190 0; dir: alternate; loop: true; dur: 3000; easing: easeInOutSine"
+                animation__float="property: position; to: 0 0.6 0; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine">
             </a-entity>
+            
+            <!-- Fallback box (visible if model doesn't load) -->
+            <a-box 
+                id="fallback-shark"
+                position="0 0.5 0" 
+                width="0.3" 
+                height="0.2" 
+                depth="0.6" 
+                color="#006D75"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 3000">
+            </a-box>
             
             <!-- Tour stop platform -->
             <a-cylinder 
@@ -368,20 +337,20 @@
             
             <!-- Floating text with background -->
             <a-plane 
-                position="0 1.9 0" 
+                position="0 1.2 0" 
                 width="1.2" 
-                height="0.4" 
+                height="0.3" 
                 color="#006D75" 
                 opacity="0.7"
-                animation="property: position; to: 0 2.1 0; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine">
+                animation="property: position; to: 0 1.35 0; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine">
             </a-plane>
             <a-text 
                 value="Sharkey's\nTour Stop" 
                 align="center" 
                 color="#FFFFFF" 
-                position="0 1.91 0.01"
-                scale="0.5 0.5 0.5"
-                animation="property: position; to: 0 2.11 0.01; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine">
+                position="0 1.21 0.01"
+                scale="0.4 0.4 0.4"
+                animation="property: position; to: 0 1.36 0.01; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine">
             </a-text>
             
             <!-- Orbiting rings -->
@@ -540,9 +509,36 @@
             }
         });
 
+        // Model loading debug
+        const sharkModel = document.querySelector('#shark-model');
+        if (sharkModel) {
+            sharkModel.addEventListener('loaded', () => {
+                console.log('✅ Shark GLB model loaded successfully');
+                const fallback = document.querySelector('#fallback-shark');
+                if (fallback) fallback.setAttribute('visible', 'false');
+            });
+            sharkModel.addEventListener('error', (e) => {
+                console.error('❌ Error loading shark model:', e);
+                console.log('Make sure plushie-shark.glb is in the same folder as marker-demo.html');
+            });
+        }
+
+        const sharkEntity = document.querySelector('#sharkey');
+        if (sharkEntity) {
+            sharkEntity.addEventListener('model-loaded', () => {
+                console.log('✅ Shark entity model loaded');
+                const fallback = document.querySelector('#fallback-shark');
+                if (fallback) fallback.setAttribute('visible', 'false');
+            });
+            sharkEntity.addEventListener('model-error', (e) => {
+                console.error('❌ Shark entity error:', e);
+            });
+        }
+
         window.addEventListener('load', () => {
             console.log('Sharks Way AR Demo Enhanced Version loaded');
             console.log('Print Hiro marker from: https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png');
+            console.log('Looking for: ./plushie-shark.glb');
         });
     </script>
 </body>

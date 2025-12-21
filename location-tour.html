@@ -2,8 +2,10 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Sharks Way AR - Location Tour</title>
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@1.0.0/dist/aframe-look-at-component.min.js"></script>
@@ -14,6 +16,10 @@
             margin: 0;
             overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: none;
         }
         #ui-overlay {
             position: fixed;
@@ -71,6 +77,62 @@
             stroke: currentColor;
             stroke-width: 2;
             fill: none;
+        }
+        @media (max-width: 480px) {
+            #header {
+                top: 10px;
+                left: 10px;
+                width: 110px;
+                padding: 14px 12px;
+            }
+            #header h2 {
+                font-size: 13px;
+            }
+            #header p {
+                font-size: 10px;
+            }
+            #map-container {
+                bottom: 10px;
+                left: 10px;
+                width: 130px;
+                height: 130px;
+            }
+            #map-container.expanded {
+                width: 250px;
+                height: 250px;
+            }
+            #route-info {
+                bottom: 10px;
+                right: 10px;
+                max-width: 160px;
+                padding: 18px;
+            }
+            #route-info h3 {
+                font-size: 14px;
+            }
+            #distance {
+                font-size: 28px;
+            }
+            #toggle-map {
+                bottom: 150px;
+                left: 10px;
+                padding: 10px 16px;
+                font-size: 12px;
+            }
+            #calibration-warning {
+                top: 10px;
+                right: 10px;
+                max-width: 160px;
+                padding: 8px 12px;
+            }
+        }
+        @media (max-height: 700px) {
+            #header {
+                top: 10px;
+            }
+            #calibration-warning {
+                top: 10px;
+            }
         }
         #map-container {
             position: absolute;
