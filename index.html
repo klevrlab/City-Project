@@ -222,8 +222,6 @@
                 ${createSharkEntityHTML()}
               </a-entity>
             </a-marker>
-
-            <a-entity camera look-controls="enabled: false"></a-entity>
           </a-scene>
         `;
       }
@@ -342,6 +340,9 @@
 
         // Wait for A-Frame scene to fully load before starting geolocation
         await waitForSceneReady();
+        
+        // Give AR.js extra time to stabilize the camera feed
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
         // Start geolocation for the gate logic
         try {
