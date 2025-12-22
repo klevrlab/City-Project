@@ -81,6 +81,7 @@
       let sharkFound = false;
 
       let arVideo = null; // AR.js injected video element
+      let sceneReady = false;
 
       // -------- Helpers --------
       const pad = (n) => String(n).padStart(2, '0');
@@ -246,6 +247,25 @@
         }, 700);
       }
 
+      function waitForSceneReady() {
+        return new Promise((resolve) => {
+          const scene = document.getElementById('markerScene');
+          if (!scene) {
+            setTimeout(() => waitForSceneReady().then(resolve), 100);
+            return;
+          }
+          if (scene.hasLoaded) {
+            sceneReady = true;
+            resolve();
+          } else {
+            scene.addEventListener('loaded', () => {
+              sceneReady = true;
+              resolve();
+            }, { once: true });
+          }
+        });
+      }
+
       function updateMarkerVisibility() {
         const sjsuShark = document.getElementById('sjsuShark');
         const sharkGateShark = document.getElementById('sharkGateShark');
@@ -319,6 +339,9 @@
         await requestOrientationPermissionIfNeeded();
         sceneHost.innerHTML = markerSceneHTML();
         hookMarkerEvents();
+
+        // Wait for A-Frame scene to fully load before starting geolocation
+        await waitForSceneReady();
 
         // Start geolocation for the gate logic
         try {
