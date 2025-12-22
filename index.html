@@ -52,12 +52,11 @@
 
   <script>
     (() => {
-      // -------- Paths relative to index.html --------
+      // -------- Config --------
       const SHADOW_IMG_URL   = "./assets/shadow.png";
       const MARKER_SJSU_URL  = "./markers/sjsu-logo.patt";
       const MARKER_SHARK_URL = "./markers/shark1.patt";
 
-      // -------- Geo gate config --------
       const GEOFENCE_TARGET = { lat: 37.3028, lon: -121.9982 }; // Target A
       const GEOFENCE_RADIUS_M = 60;
       const USE_FIRST_GPS_FIX_AS_TARGET = false;
@@ -70,23 +69,24 @@
       const sceneHost = document.getElementById('sceneHost');
 
       // -------- State --------
-      let geoWatchId = null;
-      let lastPos = null;
-
-      let gateTarget = { ...GEOFENCE_TARGET };
-      let distanceToGate = null;
-      let inGate = false;
-
-      let sjsuFound = false;
-      let sharkFound = false;
-
-      let arVideo = null; // AR.js injected video element
-      let sceneReady = false;
+      const state = {
+        geoWatchId: null,
+        lastPos: null,
+        gateTarget: { ...GEOFENCE_TARGET },
+        distanceToGate: null,
+        inGate: false,
+        sjsuFound: false,
+        sharkFound: false,
+        arVideo: null,
+        sceneReady: false,
+        videoReady: false,
+      };
 
       // -------- Helpers --------
       const pad = (n) => String(n).padStart(2, '0');
       const ts = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
-      const fmt = (n, digits=6) => (n === null || n === undefined || Number.isNaN(n)) ? '—' : Number(n).toFixed(digits);
+      const fmt = (n, digits = 6) => (n === null || n === undefined || Number.isNaN(n)) ? '—' : Number(n).toFixed(digits);
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
       function haversineMeters(lat1, lon1, lat2, lon2) {
         const R = 6371000;
@@ -94,9 +94,9 @@
         const dLat = toRad(lat2 - lat1);
         const dLon = toRad(lon2 - lon1);
         const a =
-          Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
           Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-          Math.sin(dLon/2) * Math.sin(dLon/2);
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
       }
@@ -124,39 +124,8 @@
         } catch (_) {}
       }
 
-      function stopGeoWatch() {
-        if (geoWatchId !== null) {
-          try { navigator.geolocation.clearWatch(geoWatchId); } catch (_) {}
-          geoWatchId = null;
-        }
-      }
-
-      function startGeoWatch() {
-        stopGeoWatch();
-        if (!('geolocation' in navigator)) throw new Error('navigator.geolocation not available.');
-
-        geoWatchId = navigator.geolocation.watchPosition(
-          (pos) => {
-            lastPos = pos;
-
-            if (USE_FIRST_GPS_FIX_AS_TARGET && gateTarget && gateTarget._unset !== false) {
-              gateTarget = { lat: pos.coords.latitude, lon: pos.coords.longitude, _unset: false };
-            }
-
-            const { latitude, longitude } = pos.coords;
-            distanceToGate = haversineMeters(latitude, longitude, gateTarget.lat, gateTarget.lon);
-            inGate = distanceToGate <= GEOFENCE_RADIUS_M;
-
-            updateMarkerVisibility();
-          },
-          (err) => renderHud({ geoError: err }),
-          GEO_OPTS
-        );
-      }
-
-      // -------- Shark + shadow prefab --------
+      // -------- Scene / AR.js wiring --------
       function createSharkEntityHTML() {
-        // Use the <img id="shadowTex"> from a-assets (more reliable than url(...) in material)
         return `
           <a-entity class="sharkRoot" position="0 0 0" rotation="0 20 0">
             <a-plane
@@ -185,15 +154,14 @@
         `;
       }
 
-      // -------- Marker scene --------
       function markerSceneHTML() {
         return `
           <a-scene
             id="markerScene"
             embedded
             vr-mode-ui="enabled:false"
-            renderer="antialias:true; logarithmicDepthBuffer:true"
-            arjs="sourceType: webcam; debugUIEnabled: false;">
+            renderer="antialias:true; alpha:true; precision:mediump"
+            arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; trackingMethod: best;">
 
             <a-assets>
               <img id="shadowTex" src="${SHADOW_IMG_URL}" crossorigin="anonymous" />
@@ -222,6 +190,8 @@
                 ${createSharkEntityHTML()}
               </a-entity>
             </a-marker>
+
+            <a-entity camera="fov: 60" look-controls="enabled: false"></a-entity>
           </a-scene>
         `;
       }
@@ -231,57 +201,125 @@
         const sharkMarker = document.getElementById('sharkMarker');
 
         if (sjsuMarker) {
-          sjsuMarker.addEventListener('markerFound', () => { sjsuFound = true; updateMarkerVisibility(); });
-          sjsuMarker.addEventListener('markerLost',  () => { sjsuFound = false; updateMarkerVisibility(); });
+          sjsuMarker.addEventListener('markerFound', () => { state.sjsuFound = true; updateMarkerVisibility(); });
+          sjsuMarker.addEventListener('markerLost',  () => { state.sjsuFound = false; updateMarkerVisibility(); });
         }
         if (sharkMarker) {
-          sharkMarker.addEventListener('markerFound', () => { sharkFound = true; updateMarkerVisibility(); });
-          sharkMarker.addEventListener('markerLost',  () => { sharkFound = false; updateMarkerVisibility(); });
+          sharkMarker.addEventListener('markerFound', () => { state.sharkFound = true; updateMarkerVisibility(); });
+          sharkMarker.addEventListener('markerLost',  () => { state.sharkFound = false; updateMarkerVisibility(); });
         }
-
-        // AR.js creates its own video; grab it for HUD
-        setTimeout(() => {
-          arVideo = document.querySelector('video.arjs-video') || document.querySelector('#arjs-video') || null;
-        }, 700);
       }
 
       function waitForSceneReady() {
         return new Promise((resolve) => {
           const scene = document.getElementById('markerScene');
           if (!scene) {
-            setTimeout(() => waitForSceneReady().then(resolve), 100);
+            setTimeout(() => waitForSceneReady().then(resolve), 80);
             return;
           }
           if (scene.hasLoaded) {
-            sceneReady = true;
-            resolve();
+            state.sceneReady = true;
+            resolve(scene);
           } else {
             scene.addEventListener('loaded', () => {
-              sceneReady = true;
-              resolve();
+              state.sceneReady = true;
+              resolve(scene);
             }, { once: true });
           }
         });
       }
 
+      function setArVideoRef() {
+        state.arVideo = document.querySelector('video.arjs-video') || document.querySelector('#arjs-video') || null;
+        state.videoReady = !!state.arVideo;
+      }
+
+      function waitForARVideo(scene) {
+        return new Promise((resolve) => {
+          setArVideoRef();
+          if (state.arVideo && state.arVideo.readyState >= 2) {
+            resolve(state.arVideo);
+            return;
+          }
+
+          const onVideo = () => {
+            setArVideoRef();
+            resolve(state.arVideo);
+          };
+
+          // AR.js fires this when the getUserMedia stream is ready
+          scene.addEventListener('arjs-video-loaded', onVideo, { once: true });
+
+          // Fallback poll in case event does not fire
+          const poll = setInterval(() => {
+            setArVideoRef();
+            if (state.arVideo && state.arVideo.readyState >= 2) {
+              clearInterval(poll);
+              resolve(state.arVideo);
+            }
+          }, 200);
+          setTimeout(() => clearInterval(poll), 6000);
+        });
+      }
+
+      async function ensureVideoPlaying() {
+        if (!state.arVideo) return;
+        try {
+          if (state.arVideo.paused) {
+            await state.arVideo.play();
+          }
+        } catch (_) {}
+      }
+
+      // -------- Geo fence --------
+      function stopGeoWatch() {
+        if (state.geoWatchId !== null) {
+          try { navigator.geolocation.clearWatch(state.geoWatchId); } catch (_) {}
+          state.geoWatchId = null;
+        }
+      }
+
+      function startGeoWatch() {
+        stopGeoWatch();
+        if (!('geolocation' in navigator)) throw new Error('navigator.geolocation not available.');
+
+        state.geoWatchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            state.lastPos = pos;
+
+            if (USE_FIRST_GPS_FIX_AS_TARGET && state.gateTarget && state.gateTarget._unset !== false) {
+              state.gateTarget = { lat: pos.coords.latitude, lon: pos.coords.longitude, _unset: false };
+            }
+
+            const { latitude, longitude } = pos.coords;
+            state.distanceToGate = haversineMeters(latitude, longitude, state.gateTarget.lat, state.gateTarget.lon);
+            state.inGate = state.distanceToGate <= GEOFENCE_RADIUS_M;
+
+            updateMarkerVisibility();
+          },
+          (err) => renderHud({ geoError: err }),
+          GEO_OPTS
+        );
+      }
+
+      // -------- Visibility --------
       function updateMarkerVisibility() {
         const sjsuShark = document.getElementById('sjsuShark');
         const sharkGateShark = document.getElementById('sharkGateShark');
         if (!sjsuShark || !sharkGateShark) return;
 
-        // Priority: SJSU marker wins if both markers are visible
-        if (sjsuFound) {
+        if (state.sjsuFound) {
           sjsuShark.setAttribute('visible', true);
           sharkGateShark.setAttribute('visible', false);
         } else {
           sjsuShark.setAttribute('visible', false);
-          sharkGateShark.setAttribute('visible', sharkFound && inGate);
+          sharkGateShark.setAttribute('visible', state.sharkFound && state.inGate);
         }
       }
 
       // -------- HUD --------
       function cameraStatusMarker() {
-        const v = arVideo;
+        const v = state.arVideo;
         if (!v) return { hasVideo: false };
         return {
           hasVideo: true,
@@ -292,12 +330,13 @@
       }
 
       function renderHud(extra = {}) {
-        const geo = lastPos?.coords;
+        const geo = state.lastPos?.coords;
         const cam = cameraStatusMarker();
 
         const lines = [
           `Marker + Geo Gate | ${ts()}`,
           `SecureContext: ${window.isSecureContext}   iOS: ${isIOS()}`,
+          `Scene ready: ${state.sceneReady}   Video ready: ${state.videoReady}`,
           ``,
           `AR.js CAMERA`,
           `  arjs video: ${cam.hasVideo ? 'found' : 'not found yet'}`,
@@ -305,13 +344,13 @@
           cam.hasVideo ? `  dims: ${cam.dims}` : ``,
           ``,
           `MARKERS`,
-          `  sjsu-logo.patt found: ${sjsuFound}  -> shark visible: ${sjsuFound}`,
-          `  shark1.patt found:    ${sharkFound}  -> shark visible: ${(!sjsuFound) && sharkFound && inGate}`,
+          `  sjsu-logo.patt found: ${state.sjsuFound}  -> shark visible: ${state.sjsuFound}`,
+          `  shark1.patt found:    ${state.sharkFound}  -> shark visible: ${(!state.sjsuFound) && state.sharkFound && state.inGate}`,
           ``,
           `GEO GATE (for shark1.patt only)`,
           geo ? `  lat: ${fmt(geo.latitude)}  lon: ${fmt(geo.longitude)}  acc: ${Math.round(geo.accuracy)}m` : `  waiting for fix…`,
-          `  gate target: ${fmt(gateTarget.lat)}  ${fmt(gateTarget.lon)}  ${USE_FIRST_GPS_FIX_AS_TARGET ? '(first-fix mode)' : '(fixed Target A)'}`,
-          `  distance: ${distanceToGate === null ? '—' : Math.round(distanceToGate) + 'm'}   radius: ${GEOFENCE_RADIUS_M}m   inGate: ${inGate}`,
+          `  gate target: ${fmt(state.gateTarget.lat)}  ${fmt(state.gateTarget.lon)}  ${USE_FIRST_GPS_FIX_AS_TARGET ? '(first-fix mode)' : '(fixed Target A)'}`,
+          `  distance: ${state.distanceToGate === null ? '—' : Math.round(state.distanceToGate) + 'm'}   radius: ${GEOFENCE_RADIUS_M}m   inGate: ${state.inGate}`,
           extra.geoError ? `  GEO ERROR: ${extra.geoError.code} ${extra.geoError.message}` : ``,
           ``,
           `PATHS (relative to index.html)`,
@@ -328,23 +367,21 @@
         requestAnimationFrame(tick);
       }
 
-      // -------- Start --------
+      // -------- Start flow --------
       async function start() {
         btnStart.disabled = true;
         btnStart.textContent = "Starting…";
 
-        // Create the scene only after the tap (iOS camera gating)
         await requestOrientationPermissionIfNeeded();
         sceneHost.innerHTML = markerSceneHTML();
+
+        const scene = await waitForSceneReady();
         hookMarkerEvents();
 
-        // Wait for A-Frame scene to fully load before starting geolocation
-        await waitForSceneReady();
-        
-        // Give AR.js extra time to stabilize the camera feed
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await waitForARVideo(scene);
+        await ensureVideoPlaying();
+        await sleep(300);
 
-        // Start geolocation for the gate logic
         try {
           startGeoWatch();
         } catch (err) {
@@ -354,6 +391,7 @@
         overlay.style.display = 'none';
       }
 
+      // -------- Errors --------
       window.addEventListener('error', (e) => {
         hud.textContent = hud.textContent + `\n\nJS ERROR: ${e.message}`;
       });
