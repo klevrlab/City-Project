@@ -1,411 +1,244 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Marker + Geo Gate (Shark + Shadow)</title>
+  <head>
+    <meta charset="UTF-8">
+    <title>San Jose XR Portal – Stadium with Grace Period</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Web AR demo using AR.js and A-Frame for SJSU logo and stadium model with pop-up and grace period.">
 
-  <!-- AR.js 3.4.7 pairs well with A-Frame 1.6.0 -->
-  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
+    <!-- A-Frame -->
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
-  <style>
-    html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#000;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-    #hud {
-      position: fixed; top:0; left:0; z-index:50; padding:10px;
-      color:#00ff66; font-size:12px; line-height:1.25; white-space:pre-wrap;
-      text-shadow:0 0 3px rgba(0,0,0,.85); background:rgba(0,0,0,.35);
-      max-width:92vw; max-height:70vh; overflow:auto; -webkit-overflow-scrolling:touch;
-    }
-    #startOverlay {
-      position: fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
-      background:rgba(0,0,0,.86); color:#fff;
-    }
-    #startOverlay .card { text-align:center; padding:20px; max-width:86vw; }
-    #startOverlay button { font-size:18px; padding:14px 18px; border-radius:12px; border:0; margin-top:10px; min-width:260px; }
-    #startOverlay .small { margin-top:12px; font-size:12px; opacity:.85; line-height:1.35; text-align:left; }
+    <!-- AR.js for A-Frame -->
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.0/aframe/build/aframe-ar.js"></script>
 
-    #sceneHost { position: fixed; inset:0; z-index:10; }
-    a-scene { position: fixed !important; inset:0 !important; }
-  </style>
-</head>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #000;
+        color: #fff;
+      }
 
-<body>
-  <div id="hud">Loading…</div>
+      #info {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 10;
+        text-align: center;
+      }
 
-  <div id="startOverlay">
-    <div class="card">
-      <div style="font-size:18px; font-weight:600; margin-bottom:6px;">
-        Marker mode with geo-gating
-      </div>
-      <button id="btnStart">Start (Camera + Location)</button>
-      <div class="small">
-        <div><b>markers/sjsu-logo.patt</b>: spawns shark anytime (no geo gate)</div>
-        <div><b>markers/shark1.patt</b>: spawns shark only if within geo radius of Target A</div>
-        <div style="margin-top:10px;">Tip: accept both <b>Camera</b> and <b>Location</b> prompts.</div>
-      </div>
+      #info strong {
+        color: #ffd54f;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="info">
+      Point your camera at a <strong>Hiro marker</strong> (cube) or the <strong>SJSU marker</strong> (stadium).<br>
+      On SJSU, the stadium pops up, and lingers briefly after the marker is lost.
     </div>
-  </div>
 
-  <div id="sceneHost"></div>
+    <a-scene
+      vr-mode-ui="enabled: false"
+      embedded
+      renderer="antialias: true; alpha: true;"
+      arjs="sourceType: webcam; patternRatio: 0.50; debugUIEnabled: false;"
+    >
+      <!-- Assets -->
+      <a-assets>
+        <a-asset-item id="stadiumModel" src="assets/stadium.glb"></a-asset-item>
+      </a-assets>
 
-  <script>
-    (() => {
-      // -------- Config --------
-      const SHADOW_IMG_URL   = "./assets/shadow.png";
-      const MARKER_SJSU_URL  = "./markers/sjsu-logo.patt";
-      const MARKER_SHARK_URL = "./markers/shark1.patt";
+      <!-- 1) Hiro marker (baseline/debug) -->
+      <a-marker preset="hiro">
+        <a-ring
+          position="0 0.01 0"
+          rotation="-90 0 0"
+          radius-inner="0.4"
+          radius-outer="0.7"
+          color="#ffffff"
+          opacity="0.7"
+          animation__pulse="property: scale; from: 1 1 1; to: 1.1 1.1 1.1;
+                            dir: alternate; loop: true; dur: 1200; easing: easeInOutSine"
+        ></a-ring>
 
-      const GEOFENCE_TARGET = { lat: 37.3028, lon: -121.9982 }; // Target A
-      const GEOFENCE_RADIUS_M = 60;
-      const USE_FIRST_GPS_FIX_AS_TARGET = false;
-      const GEO_OPTS = { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 };
+        <a-box
+          position="0 0.5 0"
+          depth="0.8"
+          height="0.8"
+          width="0.8"
+          color="#4CC3D9"
+          animation__rotate="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear"
+          animation__hover="property: position; from: 0 0.45 0; to: 0 0.6 0;
+                            dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"
+        ></a-box>
 
-      // -------- Elements --------
-      const hud = document.getElementById('hud');
-      const overlay = document.getElementById('startOverlay');
-      const btnStart = document.getElementById('btnStart');
-      const sceneHost = document.getElementById('sceneHost');
+        <a-text
+          value="Hiro marker (debug)"
+          position="-1.1 1.2 0"
+          color="#ffff66"
+          side="double"
+          wrap-count="22"
+        ></a-text>
+      </a-marker>
 
-      // -------- State --------
-      const state = {
-        geoWatchId: null,
-        lastPos: null,
-        gateTarget: { ...GEOFENCE_TARGET },
-        distanceToGate: null,
-        inGate: false,
-        sjsuFound: false,
-        sharkFound: false,
-        arVideo: null,
-        sceneReady: false,
-        videoReady: false,
-      };
+      <!-- 2) SJSU marker used only as tracker -->
+      <a-marker
+        id="sjsuMarker"
+        type="pattern"
+        url="markers/sjsu-logo.patt"
+        emitevents="true"
+      >
+      </a-marker>
 
-      // -------- Helpers --------
-      const pad = (n) => String(n).padStart(2, '0');
-      const ts = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
-      const fmt = (n, digits = 6) => (n === null || n === undefined || Number.isNaN(n)) ? '—' : Number(n).toFixed(digits);
-      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      <!-- 3) Stadium anchor that follows marker and has grace period -->
+      <a-entity id="stadiumAnchor" stadium-follow-marker="graceMs: 800">
+        <!-- Portal pad + stadium + label all move together -->
 
-      function haversineMeters(lat1, lon1, lat2, lon2) {
-        const R = 6371000;
-        const toRad = (x) => x * Math.PI / 180;
-        const dLat = toRad(lat2 - lat1);
-        const dLon = toRad(lon2 - lon1);
-        const a =
-          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-          Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-          Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-      }
+        <!-- Portal ring -->
+        <a-ring
+          position="0 0.01 0"
+          rotation="-90 0 0"
+          radius-inner="0.45"
+          radius-outer="0.8"
+          color="#00ffaa"
+          opacity="0.8"
+          animation__pulse="property: scale; from: 1 1 1; to: 1.1 1.1 1.1;
+                            dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"
+        ></a-ring>
 
-      function isIOS() {
-        return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      }
+        <!-- Stadium model -->
+        <a-entity
+          id="stadium"
+          gltf-model="#stadiumModel"
+          position="0 -0.2 0"  <!-- start slightly below plane -->
+          rotation="0 45 0"
+          scale="0.001 0.001 0.001"  <!-- start tiny -->
+          animation__popin="
+            property: scale;
+            to: 0.03 0.03 0.03;
+            dur: 800;
+            easing: easeOutBack;
+            startEvents: popin;
+          "
+          animation__rise="
+            property: position;
+            to: 0 0 0;
+            dur: 800;
+            easing: easeOutCubic;
+            startEvents: popin;
+          "
+          animation__rotate="
+            property: rotation;
+            to: 0 405 0;
+            loop: true;
+            dur: 15000;
+            easing: linear;
+          "
+        ></a-entity>
 
-      function explainErr(err) {
-        if (!err) return 'Unknown error';
-        const parts = [];
-        parts.push(`${err.name || 'Error'}: ${err.message || '(no message)'}`);
-        if (err.constraint) parts.push(`constraint: ${err.constraint}`);
-        if (err.code) parts.push(`code: ${err.code}`);
-        return parts.join(' | ');
-      }
+        <!-- Label -->
+        <a-text
+          value="San Jose Stadium Portal"
+          position="-1.4 1.3 0"
+          color="#00FFAA"
+          side="double"
+          wrap-count="28"
+          animation__float="property: position; from: -1.4 1.2 0; to: -1.4 1.4 0;
+                            dir: alternate; loop: true; dur: 1600; easing: easeInOutSine"
+        ></a-text>
+      </a-entity>
 
-      async function requestOrientationPermissionIfNeeded() {
-        try {
-          if (typeof DeviceOrientationEvent !== 'undefined' &&
-              typeof DeviceOrientationEvent.requestPermission === 'function') {
-            await DeviceOrientationEvent.requestPermission();
-          }
-        } catch (_) {}
-      }
+      <a-entity camera></a-entity>
+    </a-scene>
 
-      // -------- Scene / AR.js wiring --------
-      function createSharkEntityHTML() {
-        return `
-          <a-entity class="sharkRoot" position="0 0 0" rotation="0 20 0">
-            <a-plane
-              class="sharkShadow"
-              position="0 0.01 0"
-              rotation="-90 0 0"
-              width="1.4"
-              height="1.4"
-              material="shader: flat; src: #shadowTex; transparent: true; opacity: 0.65; alphaTest: 0.01; depthWrite: false">
-            </a-plane>
+    <!-- Component: make stadiumAnchor follow SJSU marker with grace period -->
+    <script>
+      AFRAME.registerComponent('stadium-follow-marker', {
+        schema: {
+          graceMs: {type: 'int', default: 800}
+        },
+        init: function () {
+          this.marker = document.querySelector('#sjsuMarker');
+          this.anchor = this.el;
+          this.stadium = this.anchor.querySelector('#stadium');
+          this.tracking = false;
+          this.hideTimeout = null;
 
-            <a-cylinder radius="0.18" height="0.9" rotation="0 0 90" color="#7aa" position="0 0.25 0"></a-cylinder>
-            <a-cone radius-bottom="0.18" radius-top="0.01" height="0.35" rotation="0 0 90" position="0.6 0.25 0" color="#7aa"></a-cone>
-            <a-cone radius-bottom="0.22" radius-top="0.01" height="0.35" rotation="0 0 -90" position="-0.6 0.25 0" color="#7aa"></a-cone>
+          // Start hidden until we see marker first time
+          this.anchor.object3D.visible = false;
 
-            <a-triangle
-              vertex-a="0 0.2 0"
-              vertex-b="-0.05 0 0.3"
-              vertex-c="0.05 0 0.3"
-              position="0 0.55 0"
-              color="#688"></a-triangle>
-
-            <a-sphere radius="0.03" position="0.25 0.32 0.09" color="#000"></a-sphere>
-            <a-sphere radius="0.03" position="0.25 0.32 -0.09" color="#000"></a-sphere>
-          </a-entity>
-        `;
-      }
-
-      function markerSceneHTML() {
-        return `
-          <a-scene
-            id="markerScene"
-            embedded
-            vr-mode-ui="enabled:false"
-            renderer="antialias:true; alpha:true; precision:mediump"
-            arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; trackingMethod: best;">
-
-            <a-assets>
-              <img id="shadowTex" src="${SHADOW_IMG_URL}" crossorigin="anonymous" />
-            </a-assets>
-
-            <!-- SJSU marker (always spawns) -->
-            <a-marker id="sjsuMarker"
-              type="pattern"
-              url="${MARKER_SJSU_URL}"
-              emitevents="true"
-              smooth="true" smoothCount="5" smoothTolerance="0.01" smoothThreshold="2">
-              <a-entity id="sjsuShark" visible="false">
-                <a-entity animation="property: position; to: 0 0.15 0; dir: alternate; dur: 1200; loop: true; easing: easeInOutSine"></a-entity>
-                ${createSharkEntityHTML()}
-              </a-entity>
-            </a-marker>
-
-            <!-- Shark marker (geo-gated) -->
-            <a-marker id="sharkMarker"
-              type="pattern"
-              url="${MARKER_SHARK_URL}"
-              emitevents="true"
-              smooth="true" smoothCount="5" smoothTolerance="0.01" smoothThreshold="2">
-              <a-entity id="sharkGateShark" visible="false">
-                <a-entity animation="property: position; to: 0 0.15 0; dir: alternate; dur: 1200; loop: true; easing: easeInOutSine"></a-entity>
-                ${createSharkEntityHTML()}
-              </a-entity>
-            </a-marker>
-
-            <a-entity camera="fov: 60" look-controls="enabled: false"></a-entity>
-          </a-scene>
-        `;
-      }
-
-      function hookMarkerEvents() {
-        const sjsuMarker = document.getElementById('sjsuMarker');
-        const sharkMarker = document.getElementById('sharkMarker');
-
-        if (sjsuMarker) {
-          sjsuMarker.addEventListener('markerFound', () => { state.sjsuFound = true; updateMarkerVisibility(); });
-          sjsuMarker.addEventListener('markerLost',  () => { state.sjsuFound = false; updateMarkerVisibility(); });
-        }
-        if (sharkMarker) {
-          sharkMarker.addEventListener('markerFound', () => { state.sharkFound = true; updateMarkerVisibility(); });
-          sharkMarker.addEventListener('markerLost',  () => { state.sharkFound = false; updateMarkerVisibility(); });
-        }
-      }
-
-      function waitForSceneReady() {
-        return new Promise((resolve) => {
-          const scene = document.getElementById('markerScene');
-          if (!scene) {
-            setTimeout(() => waitForSceneReady().then(resolve), 80);
-            return;
-          }
-          if (scene.hasLoaded) {
-            state.sceneReady = true;
-            resolve(scene);
-          } else {
-            scene.addEventListener('loaded', () => {
-              state.sceneReady = true;
-              resolve(scene);
-            }, { once: true });
-          }
-        });
-      }
-
-      function setArVideoRef() {
-        state.arVideo = document.querySelector('video.arjs-video') || document.querySelector('#arjs-video') || null;
-        state.videoReady = !!state.arVideo;
-      }
-
-      function waitForARVideo(scene) {
-        return new Promise((resolve) => {
-          setArVideoRef();
-          if (state.arVideo && state.arVideo.readyState >= 2) {
-            resolve(state.arVideo);
+          if (!this.marker) {
+            console.warn('stadium-follow-marker: #sjsuMarker not found');
             return;
           }
 
-          const onVideo = () => {
-            setArVideoRef();
-            resolve(state.arVideo);
-          };
+          this.marker.addEventListener('markerFound', () => {
+            console.log('%cSJSU marker FOUND', 'color: #00FFAA; font-weight: bold;');
+            this.onMarkerFound();
+          });
 
-          // AR.js fires this when the getUserMedia stream is ready
-          scene.addEventListener('arjs-video-loaded', onVideo, { once: true });
+          this.marker.addEventListener('markerLost', () => {
+            console.log('%cSJSU marker LOST', 'color: #00FFAA; font-weight: normal;');
+            this.onMarkerLost();
+          });
+        },
+        onMarkerFound: function () {
+          this.tracking = true;
 
-          // Fallback poll in case event does not fire
-          const poll = setInterval(() => {
-            setArVideoRef();
-            if (state.arVideo && state.arVideo.readyState >= 2) {
-              clearInterval(poll);
-              resolve(state.arVideo);
-            }
-          }, 200);
-          setTimeout(() => clearInterval(poll), 6000);
-        });
-      }
-
-      async function ensureVideoPlaying() {
-        if (!state.arVideo) return;
-        try {
-          if (state.arVideo.paused) {
-            await state.arVideo.play();
+          if (this.hideTimeout) {
+            clearTimeout(this.hideTimeout);
+            this.hideTimeout = null;
           }
-        } catch (_) {}
-      }
 
-      // -------- Geo fence --------
-      function stopGeoWatch() {
-        if (state.geoWatchId !== null) {
-          try { navigator.geolocation.clearWatch(state.geoWatchId); } catch (_) {}
-          state.geoWatchId = null;
-        }
-      }
+          // Make anchor visible and reset stadium animation
+          this.anchor.object3D.visible = true;
 
-      function startGeoWatch() {
-        stopGeoWatch();
-        if (!('geolocation' in navigator)) throw new Error('navigator.geolocation not available.');
+          if (this.stadium) {
+            this.stadium.setAttribute('scale', '0.003 0.003 0.003');
+            this.stadium.setAttribute('position', '0 -0.2 0');
+            this.stadium.emit('popin');
+          }
+        },
+        onMarkerLost: function () {
+          this.tracking = false;
 
-        state.geoWatchId = navigator.geolocation.watchPosition(
-          (pos) => {
-            state.lastPos = pos;
-
-            if (USE_FIRST_GPS_FIX_AS_TARGET && state.gateTarget && state.gateTarget._unset !== false) {
-              state.gateTarget = { lat: pos.coords.latitude, lon: pos.coords.longitude, _unset: false };
+          // Start grace period timer
+          this.hideTimeout = setTimeout(() => {
+            if (!this.tracking) {
+              this.anchor.object3D.visible = false;
             }
+          }, this.data.graceMs);
+        },
+        tick: function () {
+          if (!this.tracking || !this.marker) return;
 
-            const { latitude, longitude } = pos.coords;
-            state.distanceToGate = haversineMeters(latitude, longitude, state.gateTarget.lat, state.gateTarget.lon);
-            state.inGate = state.distanceToGate <= GEOFENCE_RADIUS_M;
-
-            updateMarkerVisibility();
-          },
-          (err) => renderHud({ geoError: err }),
-          GEO_OPTS
-        );
-      }
-
-      // -------- Visibility --------
-      function updateMarkerVisibility() {
-        const sjsuShark = document.getElementById('sjsuShark');
-        const sharkGateShark = document.getElementById('sharkGateShark');
-        if (!sjsuShark || !sharkGateShark) return;
-
-        if (state.sjsuFound) {
-          sjsuShark.setAttribute('visible', true);
-          sharkGateShark.setAttribute('visible', false);
-        } else {
-          sjsuShark.setAttribute('visible', false);
-          sharkGateShark.setAttribute('visible', state.sharkFound && state.inGate);
+          // Copy marker pose to anchor so stadium stays attached
+          this.anchor.object3D.position.copy(this.marker.object3D.position);
+          this.anchor.object3D.quaternion.copy(this.marker.object3D.quaternion);
         }
-      }
-
-      // -------- HUD --------
-      function cameraStatusMarker() {
-        const v = state.arVideo;
-        if (!v) return { hasVideo: false };
-        return {
-          hasVideo: true,
-          readyState: v.readyState,
-          paused: v.paused,
-          dims: `${v.videoWidth || 0}x${v.videoHeight || 0}`,
-        };
-      }
-
-      function renderHud(extra = {}) {
-        const geo = state.lastPos?.coords;
-        const cam = cameraStatusMarker();
-
-        const lines = [
-          `Marker + Geo Gate | ${ts()}`,
-          `SecureContext: ${window.isSecureContext}   iOS: ${isIOS()}`,
-          `Scene ready: ${state.sceneReady}   Video ready: ${state.videoReady}`,
-          ``,
-          `AR.js CAMERA`,
-          `  arjs video: ${cam.hasVideo ? 'found' : 'not found yet'}`,
-          cam.hasVideo ? `  readyState: ${cam.readyState} (0..4)   paused: ${cam.paused}` : ``,
-          cam.hasVideo ? `  dims: ${cam.dims}` : ``,
-          ``,
-          `MARKERS`,
-          `  sjsu-logo.patt found: ${state.sjsuFound}  -> shark visible: ${state.sjsuFound}`,
-          `  shark1.patt found:    ${state.sharkFound}  -> shark visible: ${(!state.sjsuFound) && state.sharkFound && state.inGate}`,
-          ``,
-          `GEO GATE (for shark1.patt only)`,
-          geo ? `  lat: ${fmt(geo.latitude)}  lon: ${fmt(geo.longitude)}  acc: ${Math.round(geo.accuracy)}m` : `  waiting for fix…`,
-          `  gate target: ${fmt(state.gateTarget.lat)}  ${fmt(state.gateTarget.lon)}  ${USE_FIRST_GPS_FIX_AS_TARGET ? '(first-fix mode)' : '(fixed Target A)'}`,
-          `  distance: ${state.distanceToGate === null ? '—' : Math.round(state.distanceToGate) + 'm'}   radius: ${GEOFENCE_RADIUS_M}m   inGate: ${state.inGate}`,
-          extra.geoError ? `  GEO ERROR: ${extra.geoError.code} ${extra.geoError.message}` : ``,
-          ``,
-          `PATHS (relative to index.html)`,
-          `  shadow: ${SHADOW_IMG_URL}`,
-          `  sjsu marker: ${MARKER_SJSU_URL}`,
-          `  shark marker: ${MARKER_SHARK_URL}`,
-        ].filter(Boolean);
-
-        hud.textContent = lines.join('\n');
-      }
-
-      function startHudLoop() {
-        const tick = () => { renderHud(); requestAnimationFrame(tick); };
-        requestAnimationFrame(tick);
-      }
-
-      // -------- Start flow --------
-      async function start() {
-        btnStart.disabled = true;
-        btnStart.textContent = "Starting…";
-
-        await requestOrientationPermissionIfNeeded();
-        sceneHost.innerHTML = markerSceneHTML();
-
-        const scene = await waitForSceneReady();
-        hookMarkerEvents();
-
-        await waitForARVideo(scene);
-        await ensureVideoPlaying();
-        await sleep(300);
-
-        try {
-          startGeoWatch();
-        } catch (err) {
-          renderHud({ geoError: { code: 'init', message: String(err) } });
-        }
-
-        overlay.style.display = 'none';
-      }
-
-      // -------- Errors --------
-      window.addEventListener('error', (e) => {
-        hud.textContent = hud.textContent + `\n\nJS ERROR: ${e.message}`;
-      });
-      window.addEventListener('unhandledrejection', (e) => {
-        hud.textContent = hud.textContent + `\n\nPROMISE REJECTION: ${explainErr(e.reason)}`;
       });
 
-      btnStart.addEventListener('click', () => start().catch(() => {
-        btnStart.disabled = false;
-        btnStart.textContent = "Start (Camera + Location)";
-      }));
-
-      startHudLoop();
-    })();
-  </script>
-</body>
+      // Optional: logging for Hiro as well
+      document.addEventListener('DOMContentLoaded', () => {
+        const hiro = document.querySelector('a-marker[preset="hiro"]');
+        if (hiro) {
+          hiro.addEventListener('markerFound', () =>
+            console.log('%cHiro FOUND', 'color: #4CC3D9; font-weight: bold;')
+          );
+          hiro.addEventListener('markerLost', () =>
+            console.log('%cHiro LOST', 'color: #4CC3D9; font-weight: normal;')
+          );
+        }
+        console.log('San Jose XR Stadium demo with grace period initialized.');
+      });
+    </script>
+  </body>
 </html>
