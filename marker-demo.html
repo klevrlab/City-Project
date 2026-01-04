@@ -452,7 +452,7 @@
             document.getElementById('event-description').textContent = event.description;
             document.getElementById('sharkey-message').textContent = event.sharkeyMessage;
             document.getElementById('event-icon').src = event.icon;
-            eventInfo.classList.add('visible');
+            if (eventInfo) eventInfo.classList.add('visible');
             
             visitedStops.add(currentEventIndex);
             updateProgress();
@@ -479,7 +479,7 @@
             playSound('found');
             
             setTimeout(() => {
-                if (markerVisible) {
+                if (markerVisible && tapHint) {
                     tapHint.classList.add('visible');
                 }
             }, 2000);
@@ -488,8 +488,8 @@
         marker.addEventListener('markerLost', () => {
             console.log('Marker lost');
             markerVisible = false;
-            eventInfo.classList.remove('visible');
-            tapHint.classList.remove('visible');
+            if (eventInfo) eventInfo.classList.remove('visible');
+            if (tapHint) tapHint.classList.remove('visible');
         });
 
         document.getElementById('learn-more').addEventListener('click', () => {
