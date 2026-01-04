@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Sharks Way AR - Custom Marker Demo</title>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Copy all styles from marker-demo.html -->
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: none;
+        }
+        /* Include all other styles from marker-demo.html */
+        .marker-instructions {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 109, 117, 0.95);
+            backdrop-filter: blur(20px);
+            color: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            z-index: 2000;
+            max-width: 400px;
+        }
+        .marker-instructions h2 {
+            color: #00A9E0;
+            margin-bottom: 15px;
+        }
+        .marker-instructions p {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        .marker-instructions button {
+            background: #00A9E0;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        .marker-instructions button:hover {
+            background: #0088b3;
+        }
+    </style>
+</head>
+<body>
+    <!-- Show instructions if custom marker not set up yet -->
+    <div id="marker-setup-instructions" class="marker-instructions">
+        <h2>🦈 Custom Shark Marker Setup</h2>
+        <p>To use your custom shark image as a marker:</p>
+        <ol style="text-align: left;">
+            <li>Go to <a href="https://ar-js-org.github.io/AR.js/three.js/examples/marker-training/examples/generator.html" target="_blank" style="color: #00A9E0;">AR.js Marker Generator</a></li>
+            <li>Upload your shark image</li>
+            <li>Download <code>pattern-shark.patt</code></li>
+            <li>Place it in the sharks-way-ar folder</li>
+            <li>Refresh this page</li>
+        </ol>
+        <p><strong>For now, using Hiro marker as fallback</strong></p>
+        <button onclick="document.getElementById('marker-setup-instructions').style.display='none'">Got it!</button>
+    </div>
+
+    <!-- Copy all UI elements from marker-demo.html -->
+    
+    <a-scene
+        embedded
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+        vr-mode-ui="enabled: false"
+        renderer="logarithmicDepthBuffer: true; precision: medium;">
+        
+        <a-assets>
+            <a-asset-item id="shark-model" src="./plushie_shark.glb"></a-asset-item>
+        </a-assets>
+
+        <!-- Custom marker - change 'preset' to 'url' and point to pattern file -->
+        <!-- When you have pattern-shark.patt, change to: -->
+        <!-- <a-marker type="pattern" url="./pattern-shark.patt" id="custom-marker" class="clickable"> -->
+        
+        <!-- For now, using Hiro as fallback -->
+        <a-marker preset="hiro" id="custom-marker" class="clickable">
+            <!-- Sharkey 3D Model -->
+            <a-entity 
+                id="sharkey"
+                gltf-model="#shark-model"
+                position="0 0.5 0"
+                rotation="0 180 0"
+                scale="0.5 0.5 0.5"
+                animation="property: rotation; to: 0 190 0; dir: alternate; loop: true; dur: 3000; easing: easeInOutSine"
+                animation__float="property: position; to: 0 0.6 0; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine">
+            </a-entity>
+            
+            <!-- Fallback box (visible if model doesn't load) -->
+            <a-box 
+                id="fallback-shark"
+                position="0 0.5 0" 
+                width="0.3" 
+                height="0.2" 
+                depth="0.6" 
+                color="#006D75"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 3000">
+            </a-box>
+            
+            <!-- Tour stop platform -->
+            <a-cylinder 
+                position="0 0 0" 
+                radius="0.6" 
+                height="0.1" 
+                color="#F4901E"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 20000; easing: linear">
+            </a-cylinder>
+            
+            <!-- Floating text with background -->
+            <a-plane 
+                position="0 1.2 0" 
+                width="1.2" 
+                height="0.3" 
+                color="#006D75" 
+                opacity="0.7"
+                animation="property: position; to: 0 1.35 0; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine">
+            </a-plane>
+            <a-text 
+                value="Sharkey's\nTour Stop" 
+                align="center" 
+                color="#FFFFFF" 
+                position="0 1.21 0.01"
+                scale="0.4 0.4 0.4"
+                animation="property: position; to: 0 1.36 0.01; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine">
+            </a-text>
+            
+            <!-- Orbiting rings -->
+            <a-torus 
+                position="0 0.5 0" 
+                radius="0.5" 
+                radius-tubular="0.03" 
+                color="#00A9E0"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear">
+            </a-torus>
+            
+            <a-torus 
+                position="0 0.5 0" 
+                radius="0.7" 
+                radius-tubular="0.02" 
+                color="#F4901E"
+                rotation="90 0 0"
+                animation="property: rotation; to: 90 360 0; loop: true; dur: 6000; easing: linear">
+            </a-torus>
+        </a-marker>
+
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+        // Check if custom pattern file exists
+        fetch('./pattern-shark.patt')
+            .then(response => {
+                if (response.ok) {
+                    console.log('✅ Custom shark marker pattern found!');
+                    document.getElementById('marker-setup-instructions').style.display = 'none';
+                } else {
+                    console.log('⚠️ Custom marker not found, using Hiro marker as fallback');
+                }
+            })
+            .catch(() => {
+                console.log('⚠️ Custom marker not found, using Hiro marker as fallback');
+            });
+
+        // Add 3-second persistence logic
+        const marker = document.querySelector('#custom-marker');
+        let markerVisible = false;
+        let markerLostTimeout;
+        
+        marker.addEventListener('markerFound', () => {
+            console.log('Custom marker detected!');
+            
+            if (markerLostTimeout) {
+                clearTimeout(markerLostTimeout);
+            }
+            
+            markerVisible = true;
+        });
+        
+        marker.addEventListener('markerLost', () => {
+            console.log('Marker lost - keeping content visible for 3 seconds');
+            
+            if (markerLostTimeout) {
+                clearTimeout(markerLostTimeout);
+            }
+            
+            markerLostTimeout = setTimeout(() => {
+                markerVisible = false;
+                console.log('Content hidden after 3 second delay');
+            }, 3000);
+        });
+
+        // Model loading debug
+        const sharkModel = document.querySelector('#shark-model');
+        if (sharkModel) {
+            sharkModel.addEventListener('loaded', () => {
+                console.log('✅ Shark GLB model loaded successfully');
+                const fallback = document.querySelector('#fallback-shark');
+                if (fallback) fallback.setAttribute('visible', 'false');
+            });
+            sharkModel.addEventListener('error', (e) => {
+                console.error('❌ Error loading shark model:', e);
+            });
+        }
+    </script>
+</body>
+</html>

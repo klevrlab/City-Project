@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Create Custom Shark Marker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #006D75;
+        }
+        .instructions {
+            background: #e8f4f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .step {
+            margin: 15px 0;
+            padding: 10px;
+            background: #f9f9f9;
+            border-left: 4px solid #00A9E0;
+        }
+        a {
+            color: #00A9E0;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .note {
+            background: #fff3cd;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🦈 Create Custom Shark Marker</h1>
+        
+        <div class="instructions">
+            <h2>Option 1: Use AR.js Marker Generator (Easiest)</h2>
+            
+            <div class="step">
+                <strong>Step 1:</strong> Go to the AR.js Marker Training Tool:<br>
+                <a href="https://ar-js-org.github.io/AR.js/three.js/examples/marker-training/examples/generator.html" target="_blank">
+                    AR.js Marker Generator
+                </a>
+            </div>
+            
+            <div class="step">
+                <strong>Step 2:</strong> Upload your shark image (the one you showed me)
+            </div>
+            
+            <div class="step">
+                <strong>Step 3:</strong> Download two files:
+                <ul>
+                    <li><code>pattern-shark.patt</code> - Pattern file for AR.js</li>
+                    <li><code>marker.png</code> - Printable marker image</li>
+                </ul>
+            </div>
+            
+            <div class="step">
+                <strong>Step 4:</strong> Save <code>pattern-shark.patt</code> to:<br>
+                <code>/Users/spartan/Documents/Immersion 2026/sharks-way-ar/</code>
+            </div>
+            
+            <div class="step">
+                <strong>Step 5:</strong> I'll update the code to use your custom marker!
+            </div>
+        </div>
+        
+        <div class="note">
+            <strong>📝 Note:</strong> The marker generator creates a black border around your image. 
+            This border is necessary for AR tracking. Print or display the generated marker.png file.
+        </div>
+        
+        <h2>Option 2: Use Your Image Directly (NFT)</h2>
+        
+        <div class="instructions">
+            <p>For Natural Feature Tracking (uses your exact image without borders):</p>
+            
+            <div class="step">
+                <strong>Step 1:</strong> Go to NFT Marker Creator:<br>
+                <a href="https://carnaux.github.io/NFT-Marker-Creator/" target="_blank">
+                    NFT Marker Creator
+                </a>
+            </div>
+            
+            <div class="step">
+                <strong>Step 2:</strong> Upload your shark image
+            </div>
+            
+            <div class="step">
+                <strong>Step 3:</strong> Download the generated files (.fset, .fset3, .iset)
+            </div>
+            
+            <div class="step">
+                <strong>Step 4:</strong> Place files in the sharks-way-ar folder
+            </div>
+        </div>
+        
+        <div class="note">
+            <strong>⚠️ NFT Tracking:</strong> Requires more processing power and works best with 
+            high-contrast images. Pattern markers (Option 1) are more reliable.
+        </div>
+        
+        <h2>Which Should You Choose?</h2>
+        <ul>
+            <li><strong>Pattern Marker (Option 1):</strong> More reliable, faster tracking, works on any device</li>
+            <li><strong>NFT (Option 2):</strong> Uses exact image, but slower and less reliable on mobile</li>
+        </ul>
+        
+        <p><strong>Recommendation:</strong> Start with Option 1 (Pattern Marker) for best results!</p>
+    </div>
+</body>
+</html>
