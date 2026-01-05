@@ -174,8 +174,9 @@
       vr-mode-ui="enabled: false"
       embedded
       renderer="antialias: true; alpha: true; precision: medium;"
-      arjs="sourceType: webcam; patternRatio: 0.50; debugUIEnabled: false;"
+      arjs="sourceType: webcam; patternRatio: 0.50; debugUIEnabled: false; trackingMethod: best; detectionMode: mono_and_matrix;"
       loading-screen="enabled: false"
+      device-orientation-permission-ui="enabled: false"
     >
       <a-entity id="ambientLight" light="type: ambient; intensity: 0.9; color: #ffffff"></a-entity>
       <a-entity id="dirLight" light="type: directional; intensity: 1.2; color: #ffffff" position="1 2 1"></a-entity>
@@ -304,7 +305,20 @@
         window.addEventListener('arjs-video-loaded', () => {
           console.log('✓ AR.js video loaded');
           hideLoadingScreen();
-          setTimeout(ensureCanvasVisible, 500);
+          setTimeout(() => {
+            ensureCanvasVisible();
+            // Try to get the video element and check if it's playing
+            const video = document.querySelector('video');
+            if (video) {
+              console.log('✓ Video element found:', video.videoWidth, 'x', video.videoHeight);
+              console.log('✓ Video playing:', !video.paused, 'Ready state:', video.readyState);
+              if (video.paused) {
+                video.play().catch(e => console.error('Video play error:', e));
+              }
+            } else {
+              console.warn('⚠️ No video element found');
+            }
+          }, 500);
         });
 
         // Fallback timeout - more aggressive
