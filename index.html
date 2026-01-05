@@ -6,6 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="WebAR: AR.js marker stadium + day/night card (PNG) + geofence unlock + mode toggle." />
 
+    <!-- Load A-Frame first -->
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <!-- Then AR.js -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <!-- Then SunCalc -->
+    <script src="https://unpkg.com/suncalc@1.9.0/suncalc.js"></script>
+
     <style>
       :root{
         --panel: rgba(0,0,0,.62);
@@ -120,8 +127,8 @@
 
   <body>
     <div id="cameraStatus">
-      <div>Loading libraries...</div>
-      <div style="font-size: 11px; margin-top: 8px; opacity: 0.7;">Please wait</div>
+      <div>Initializing camera...</div>
+      <div style="font-size: 11px; margin-top: 8px; opacity: 0.7;">Allow camera access when prompted</div>
     </div>
 
     <div id="info">
@@ -211,108 +218,11 @@
     </a-scene>
 
     <script>
-      const cameraStatus = document.getElementById('cameraStatus');
-      
-      function updateStatus(msg) {
-        cameraStatus.innerHTML = `<div>${msg}</div>`;
-        console.log(msg);
-      }
-
-      // Suppress the useLegacyLights error - it's just a deprecation warning
-      const originalError = console.error;
-      console.error = function(...args) {
-        const msg = args.join(' ');
-        if (msg.includes('useLegacyLights') || msg.includes('Cannot set properties of undefined')) {
-          return; // Ignore this specific error
-        }
-        originalError.apply(console, args);
-      };
-
-      function loadScript(src, name) {
-        return new Promise((resolve, reject) => {
-          updateStatus(`Loading ${name}...`);
-          const script = document.createElement('script');
-          script.src = src;
-          script.async = false; // Load in order
-          
-          script.onload = () => {
-            console.log(`✓ ${name} loaded from ${src}`);
-            resolve();
-          };
-          
-          script.onerror = () => {
-            console.log(`✗ Failed to load ${name} from ${src}`);
-            reject(new Error(`Failed to load ${name}`));
-          };
-          
-          document.head.appendChild(script);
-        });
-      }
-
-      async function loadAllLibraries() {
-        try {
-          updateStatus('Loading A-Frame...');
-          await loadScript('https://aframe.io/releases/1.5.0/aframe.min.js', 'A-Frame');
-
-          // Wait longer for A-Frame to fully initialize
-          await new Promise(resolve => setTimeout(resolve, 1000));
-
-          // Check multiple ways that AFRAME loaded
-          let aframeLoaded = false;
-          let attempts = 0;
-          
-          while (!aframeLoaded && attempts < 10) {
-            if (window.AFRAME && window.AFRAME.registerComponent) {
-              aframeLoaded = true;
-              console.log('✓ A-Frame confirmed loaded:', window.AFRAME.version);
-            } else {
-              await new Promise(resolve => setTimeout(resolve, 200));
-              attempts++;
-            }
-          }
-
-          if (!aframeLoaded) {
-            console.warn('A-Frame may not be fully loaded, but continuing anyway...');
-          }
-
-          updateStatus('Loading AR.js...');
-          await loadScript('https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js', 'AR.js');
-          await new Promise(resolve => setTimeout(resolve, 500));
-
-          updateStatus('Loading SunCalc...');
-          await loadScript('https://unpkg.com/suncalc@1.9.0/suncalc.js', 'SunCalc');
-          await new Promise(resolve => setTimeout(resolve, 200));
-
-          console.log('✓ All libraries loaded successfully');
-          updateStatus('Initializing camera...');
-          
-          setTimeout(() => {
-            initializeApp();
-          }, 500);
-
-        } catch (error) {
-          console.log('Load error (may be ignorable):', error.message);
-          // Try to continue anyway
-          updateStatus('Initializing camera...');
-          setTimeout(() => {
-            if (window.AFRAME && window.AFRAME.registerComponent) {
-              initializeApp();
-            } else {
-              updateStatus('Please refresh the page');
-            }
-          }, 1000);
-        }
-      }
-
-      function initializeApp() {
-        if (!window.AFRAME || !window.AFRAME.registerComponent) {
-          console.error('AFRAME not available');
-          updateStatus('Error: A-Frame not loaded. Please refresh.');
-          return;
-        }
-
-        console.log('Starting app initialization...');
+      // Wait for everything to be ready
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM loaded, initializing...');
         
+        const cameraStatus = document.getElementById('cameraStatus');
         const GEO_LOCK_ENABLED = true;
 
         const ALLOWED_ZONES = [
@@ -335,22 +245,17 @@
         let modeSetting = "auto";
         let cameraInitialized = false;
 
+        // Camera events
         const sceneEl = document.querySelector('a-scene');
         
         if (sceneEl) {
           sceneEl.addEventListener('renderstart', () => {
-            console.log('✓ A-Frame render started');
+            console.log('✓ Scene render started');
             setTimeout(() => {
-              if (!cameraInitialized) {
-                cameraInitialized = true;
-                cameraStatus.style.display = 'none';
-                console.log('✓ Camera should be visible now');
-              }
+              cameraInitialized = true;
+              cameraStatus.style.display = 'none';
+              console.log('✓ Camera visible');
             }, 1000);
-          });
-
-          sceneEl.addEventListener('loaded', () => {
-            console.log('✓ A-Frame scene loaded');
           });
         }
 
@@ -360,18 +265,17 @@
           cameraStatus.style.display = 'none';
         });
 
-        window.addEventListener('camera-init', () => {
-          console.log('✓ Camera initialized');
-          cameraInitialized = true;
-          cameraStatus.style.display = 'none';
-        });
-
+        // Fallback timeout
         setTimeout(() => {
-          console.log('Timeout reached, hiding loading screen');
-          cameraStatus.style.display = 'none';
+          if (!cameraInitialized) {
+            console.log('Hiding loading screen (timeout)');
+            cameraStatus.style.display = 'none';
+          }
         }, 8000);
 
+        // Helper functions
         function toRad(d) { return d * Math.PI / 180; }
+        
         function haversineMeters(lat1, lon1, lat2, lon2) {
           const R = 6371000;
           const dLat = toRad(lat2 - lat1);
@@ -483,6 +387,7 @@
           if (prev !== next) window.dispatchEvent(new Event("geo-unlock-changed"));
         }
 
+        // Register A-Frame component
         AFRAME.registerComponent("stadium-follow-marker", {
           schema: { graceMs: { type: "int", default: 800 } },
           init: function () {
@@ -537,7 +442,7 @@
           },
 
           onMarkerFound: function () {
-            console.log('✓ Marker found!');
+            console.log('✓ Marker detected!');
             this.tracking = true;
 
             if (this.hideTimeout) {
@@ -546,12 +451,12 @@
             }
 
             if (!this.isUnlocked()) {
-              console.log('⚠️ Marker found but geo-locked');
+              console.log('⚠️ Geo-locked');
               this.hideContent();
               return;
             }
 
-            console.log('✓ Marker found and unlocked - showing content');
+            console.log('✓ Showing AR content');
             this.showContent();
           },
 
@@ -581,8 +486,9 @@
           },
         });
 
-        console.log('✓ Component registered successfully');
+        console.log('✓ Component registered');
 
+        // Mode controls
         function setMode(newMode) {
           modeSetting = newMode;
           segBtns.forEach(b => b.classList.toggle("active", b.dataset.mode === newMode));
@@ -593,11 +499,12 @@
           btn.addEventListener("click", () => setMode(btn.dataset.mode));
         });
 
+        // GPS tracking
         function startGeoWatcher() {
           setVisualsFromMode();
 
           if (!navigator.geolocation) {
-            console.warn('Geolocation not available');
+            console.warn('GPS not available');
             return;
           }
 
@@ -614,7 +521,7 @@
               window.__GEO_UNLOCK__.bestZoneName = z.bestZoneName;
               window.__GEO_UNLOCK__.bestDistM = z.bestDistM;
 
-              console.log('Geo:', z.inZone ? '🟢 UNLOCKED' : '🔴 LOCKED', '-', Math.round(z.bestDistM) + 'm from', z.bestZoneName);
+              console.log(z.inZone ? '🟢 UNLOCKED' : '🔴 LOCKED', '-', Math.round(z.bestDistM) + 'm');
 
               emitGeoUnlockChanged(prev, z.inZone);
               setVisualsFromMode();
@@ -635,18 +542,13 @@
           );
         }
 
+        // Start everything
         setMode("auto");
         startGeoWatcher();
         setInterval(() => setVisualsFromMode(), 60 * 1000);
 
-        console.log('✓ App initialized successfully');
-      }
-
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', loadAllLibraries);
-      } else {
-        loadAllLibraries();
-      }
+        console.log('✓ App ready');
+      });
     </script>
   </body>
 </html>
