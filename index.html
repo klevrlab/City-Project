@@ -249,29 +249,22 @@
 
       async function loadAllLibraries() {
         try {
-          // Try A-Frame from CDN with fallback
+          // Load A-Frame
           updateStatus('Loading A-Frame...');
-          try {
-            await loadScript('https://aframe.io/releases/1.5.0/aframe.min.js', 'A-Frame');
-          } catch (e) {
-            console.log('Trying alternate A-Frame CDN...');
-            await loadScript('https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe-master.min.js', 'A-Frame (fallback)');
-          }
+          await loadScript('https://aframe.io/releases/1.5.0/aframe.min.js', 'A-Frame');
 
-          // Verify A-Frame loaded
-          if (typeof AFRAME === 'undefined') {
-            throw new Error('A-Frame failed to load from all sources');
+          // Wait a moment for A-Frame to initialize
+          await new Promise(resolve => setTimeout(resolve, 300));
+
+          // Verify A-Frame loaded (check window object instead of typeof)
+          if (!window.AFRAME) {
+            throw new Error('A-Frame failed to initialize');
           }
-          console.log('✓ A-Frame confirmed loaded:', AFRAME.version);
+          console.log('✓ A-Frame confirmed loaded:', window.AFRAME.version);
 
           // Load AR.js
           updateStatus('Loading AR.js...');
-          try {
-            await loadScript('https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js', 'AR.js');
-          } catch (e) {
-            console.log('Trying alternate AR.js CDN...');
-            await loadScript('https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js', 'AR.js (fallback)');
-          }
+          await loadScript('https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js', 'AR.js');
 
           // Load SunCalc
           updateStatus('Loading SunCalc...');
@@ -281,7 +274,7 @@
           console.log('✓ All libraries loaded successfully');
           updateStatus('Initializing camera...');
           
-          // Wait a bit for AR.js to fully initialize
+          // Wait for AR.js to fully initialize
           setTimeout(() => {
             initializeApp();
           }, 500);
@@ -343,6 +336,10 @@
               }
             }, 1000);
           });
+
+          sceneEl.addEventListener('loaded', () => {
+            console.log('A-Frame scene loaded');
+          });
         }
 
         window.addEventListener('arjs-video-loaded', () => {
@@ -351,12 +348,17 @@
           cameraStatus.style.display = 'none';
         });
 
-        // Fallback
+        // Camera ready event
+        window.addEventListener('camera-init', () => {
+          console.log('Camera initialized');
+          cameraInitialized = true;
+          cameraStatus.style.display = 'none';
+        });
+
+        // Fallback - hide loading screen after timeout
         setTimeout(() => {
-          if (!cameraInitialized) {
-            console.log('Timeout reached, hiding loading screen anyway');
-            cameraStatus.style.display = 'none';
-          }
+          console.log('Timeout reached, hiding loading screen');
+          cameraStatus.style.display = 'none';
         }, 8000);
 
         // ============================================================
@@ -605,6 +607,7 @@
             (pos) => {
               lastFix = pos;
               const { latitude, longitude, accuracy } = pos.coords;
+              console.log('GPS fix:', latitude.toFixed(6), longitude.toFixed(6), 'accuracy:', Math.round(accuracy) + 'm');
 
               const prev = !!window.__GEO_UNLOCK__.inAllowedZone;
               const z = computeBestZone(latitude, longitude);
@@ -613,11 +616,13 @@
               window.__GEO_UNLOCK__.bestZoneName = z.bestZoneName;
               window.__GEO_UNLOCK__.bestDistM = z.bestDistM;
 
+              console.log('Geo status:', z.inZone ? '🟢 UNLOCKED' : '🔴 LOCKED', '- Distance:', Math.round(z.bestDistM) + 'm from', z.bestZoneName);
+
               emitGeoUnlockChanged(prev, z.inZone);
               setVisualsFromMode();
             },
             (error) => {
-              console.error('Geolocation error:', error);
+              console.error('Geolocation error:', error.message);
               if (GEO_LOCK_ENABLED) {
                 const prev = !!window.__GEO_UNLOCK__.inAllowedZone;
                 window.__GEO_UNLOCK__.inAllowedZone = false;
