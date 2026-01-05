@@ -1,16 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8">
-    <title>San Jose XR Portal – Stadium with Grace Period</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="Web AR demo using AR.js and A-Frame for SJSU logo and stadium model with pop-up and grace period.">
+    <meta charset="UTF-8" />
+    <title>San Jose XR Portal – Stadium + Geo Shark + Day/Night</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="description" content="WebAR demo using AR.js + A-Frame: markers + geo-gated huge shark + day/night lighting." />
 
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
     <!-- AR.js for A-Frame -->
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.0/aframe/build/aframe-ar.js"></script>
+
+    <!-- Sun position (day/night) -->
+    <script src="https://unpkg.com/suncalc@1.9.0/suncalc.js"></script>
 
     <style>
       body {
@@ -36,13 +39,22 @@
       #info strong {
         color: #ffd54f;
       }
+
+      #statusLine {
+        margin-top: 0.35rem;
+        font-size: 0.75rem;
+        opacity: 0.95;
+        color: #b6ffdf;
+        white-space: pre-wrap;
+      }
     </style>
   </head>
 
   <body>
     <div id="info">
-      Point your camera at a <strong>Hiro marker</strong> (cube) or the <strong>SJSU marker</strong> (stadium).<br>
+      Point your camera at a <strong>Hiro marker</strong> (cube) or the <strong>SJSU marker</strong> (stadium).<br />
       On SJSU, the stadium pops up, and lingers briefly after the marker is lost.
+      <div id="statusLine">GPS: waiting…</div>
     </div>
 
     <a-scene
@@ -51,6 +63,10 @@
       renderer="antialias: true; alpha: true;"
       arjs="sourceType: webcam; patternRatio: 0.50; debugUIEnabled: false;"
     >
+      <!-- Lights we can change day/night -->
+      <a-entity id="ambientLight" light="type: ambient; intensity: 0.9; color: #ffffff"></a-entity>
+      <a-entity id="dirLight" light="type: directional; intensity: 1.2; color: #ffffff" position="1 2 1"></a-entity>
+
       <!-- Assets -->
       <a-assets>
         <a-asset-item id="stadiumModel" src="assets/stadium.glb"></a-asset-item>
@@ -65,8 +81,7 @@
           radius-outer="0.7"
           color="#ffffff"
           opacity="0.7"
-          animation__pulse="property: scale; from: 1 1 1; to: 1.1 1.1 1.1;
-                            dir: alternate; loop: true; dur: 1200; easing: easeInOutSine"
+          animation__pulse="property: scale; from: 1 1 1; to: 1.1 1.1 1.1; dir: alternate; loop: true; dur: 1200; easing: easeInOutSine"
         ></a-ring>
 
         <a-box
@@ -76,8 +91,7 @@
           width="0.8"
           color="#4CC3D9"
           animation__rotate="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear"
-          animation__hover="property: position; from: 0 0.45 0; to: 0 0.6 0;
-                            dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"
+          animation__hover="property: position; from: 0 0.45 0; to: 0 0.6 0; dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"
         ></a-box>
 
         <a-text
@@ -90,19 +104,10 @@
       </a-marker>
 
       <!-- 2) SJSU marker used only as tracker -->
-      <a-marker
-        id="sjsuMarker"
-        type="pattern"
-        url="markers/sjsu-logo.patt"
-        emitevents="true"
-      >
-      </a-marker>
+      <a-marker id="sjsuMarker" type="pattern" url="markers/sjsu-logo.patt" emitevents="true"></a-marker>
 
       <!-- 3) Stadium anchor that follows marker and has grace period -->
       <a-entity id="stadiumAnchor" stadium-follow-marker="graceMs: 800">
-        <!-- Portal pad + stadium + label all move together -->
-
-        <!-- Portal ring -->
         <a-ring
           position="0 0.01 0"
           rotation="-90 0 0"
@@ -110,134 +115,223 @@
           radius-outer="0.8"
           color="#00ffaa"
           opacity="0.8"
-          animation__pulse="property: scale; from: 1 1 1; to: 1.1 1.1 1.1;
-                            dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"
+          animation__pulse="property: scale; from: 1 1 1; to: 1.1 1.1 1.1; dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"
         ></a-ring>
 
-        <!-- Stadium model -->
         <a-entity
           id="stadium"
           gltf-model="#stadiumModel"
-          position="0 -0.2 0"  <!-- start slightly below plane -->
+          position="0 -0.2 0"
           rotation="0 45 0"
-          scale="0.001 0.001 0.001"  <!-- start tiny -->
-          animation__popin="
-            property: scale;
-            to: 0.09 0.09 0.09;
-            dur: 800;
-            easing: easeOutBack;
-            startEvents: popin;
-          "
-          animation__rise="
-            property: position;
-            to: 0 0 0;
-            dur: 800;
-            easing: easeOutCubic;
-            startEvents: popin;
-          "
-          animation__rotate="
-            property: rotation;
-            to: 0 405 0;
-            loop: true;
-            dur: 15000;
-            easing: linear;
-          "
+          scale="0.001 0.001 0.001"
+          animation__popin="property: scale; to: 0.09 0.09 0.09; dur: 800; easing: easeOutBack; startEvents: popin;"
+          animation__rise="property: position; to: 0 0 0; dur: 800; easing: easeOutCubic; startEvents: popin;"
+          animation__rotate="property: rotation; to: 0 405 0; loop: true; dur: 15000; easing: linear;"
         ></a-entity>
 
-        <!-- Label -->
         <a-text
           value="San Jose Stadium Portal"
           position="-1.4 1.3 0"
           color="#00FFAA"
           side="double"
           wrap-count="28"
-          animation__float="property: position; from: -1.4 1.2 0; to: -1.4 1.4 0;
-                            dir: alternate; loop: true; dur: 1600; easing: easeInOutSine"
+          animation__float="property: position; from: -1.4 1.2 0; to: -1.4 1.4 0; dir: alternate; loop: true; dur: 1600; easing: easeInOutSine"
         ></a-text>
+      </a-entity>
+
+      <!-- 4) Geo-gated HUGE shark (not marker-tied; shows when you're near target coords) -->
+      <a-entity id="geoShark" visible="false" position="0 -1.2 -8" rotation="0 20 0">
+        <!-- Big slow bob -->
+        <a-entity animation="property: position; to: 0 -1.0 -8; dir: alternate; dur: 1600; loop: true; easing: easeInOutSine"></a-entity>
+
+        <!-- HUGE scale -->
+        <a-entity scale="6 6 6">
+          <!-- body -->
+          <a-cylinder radius="0.18" height="0.9" rotation="0 0 90" color="#7aa" position="0 0.25 0"></a-cylinder>
+          <!-- nose -->
+          <a-cone radius-bottom="0.18" radius-top="0.01" height="0.35" rotation="0 0 90" position="0.6 0.25 0" color="#7aa"></a-cone>
+          <!-- tail -->
+          <a-cone radius-bottom="0.22" radius-top="0.01" height="0.35" rotation="0 0 -90" position="-0.6 0.25 0" color="#7aa"></a-cone>
+          <!-- dorsal fin -->
+          <a-triangle vertex-a="0 0.2 0" vertex-b="-0.05 0 0.3" vertex-c="0.05 0 0.3" position="0 0.55 0" color="#688"></a-triangle>
+          <!-- eyes -->
+          <a-sphere radius="0.03" position="0.25 0.32 0.09" color="#000"></a-sphere>
+          <a-sphere radius="0.03" position="0.25 0.32 -0.09" color="#000"></a-sphere>
+        </a-entity>
+
+        <!-- Label (optional) -->
+        <a-text value="GEO SHARK" position="-1.2 1.7 0" color="#ff66ff" side="double"></a-text>
       </a-entity>
 
       <a-entity camera></a-entity>
     </a-scene>
 
-    <!-- Component: make stadiumAnchor follow SJSU marker with grace period -->
     <script>
-      AFRAME.registerComponent('stadium-follow-marker', {
-        schema: {
-          graceMs: {type: 'int', default: 800}
-        },
+      // -----------------------------
+      // 1) Marker follow + grace period
+      // -----------------------------
+      AFRAME.registerComponent("stadium-follow-marker", {
+        schema: { graceMs: { type: "int", default: 800 } },
         init: function () {
-          this.marker = document.querySelector('#sjsuMarker');
+          this.marker = document.querySelector("#sjsuMarker");
           this.anchor = this.el;
-          this.stadium = this.anchor.querySelector('#stadium');
+          this.stadium = this.anchor.querySelector("#stadium");
           this.tracking = false;
           this.hideTimeout = null;
 
-          // Start hidden until we see marker first time
           this.anchor.object3D.visible = false;
 
           if (!this.marker) {
-            console.warn('stadium-follow-marker: #sjsuMarker not found');
+            console.warn("stadium-follow-marker: #sjsuMarker not found");
             return;
           }
 
-          this.marker.addEventListener('markerFound', () => {
-            console.log('%cSJSU marker FOUND', 'color: #00FFAA; font-weight: bold;');
-            this.onMarkerFound();
-          });
-
-          this.marker.addEventListener('markerLost', () => {
-            console.log('%cSJSU marker LOST', 'color: #00FFAA; font-weight: normal;');
-            this.onMarkerLost();
-          });
+          this.marker.addEventListener("markerFound", () => this.onMarkerFound());
+          this.marker.addEventListener("markerLost", () => this.onMarkerLost());
         },
         onMarkerFound: function () {
           this.tracking = true;
-
           if (this.hideTimeout) {
             clearTimeout(this.hideTimeout);
             this.hideTimeout = null;
           }
 
-          // Make anchor visible and reset stadium animation
           this.anchor.object3D.visible = true;
-
           if (this.stadium) {
-            this.stadium.setAttribute('scale', '0.003 0.003 0.003');
-            this.stadium.setAttribute('position', '0 -0.2 0');
-            this.stadium.emit('popin');
+            this.stadium.setAttribute("scale", "0.003 0.003 0.003");
+            this.stadium.setAttribute("position", "0 -0.2 0");
+            this.stadium.emit("popin");
           }
         },
         onMarkerLost: function () {
           this.tracking = false;
-
-          // Start grace period timer
           this.hideTimeout = setTimeout(() => {
-            if (!this.tracking) {
-              this.anchor.object3D.visible = false;
-            }
+            if (!this.tracking) this.anchor.object3D.visible = false;
           }, this.data.graceMs);
         },
         tick: function () {
           if (!this.tracking || !this.marker) return;
-
-          // Copy marker pose to anchor so stadium stays attached
           this.anchor.object3D.position.copy(this.marker.object3D.position);
           this.anchor.object3D.quaternion.copy(this.marker.object3D.quaternion);
-        }
+        },
       });
 
-      // Optional: logging for Hiro as well
-      document.addEventListener('DOMContentLoaded', () => {
+      // -----------------------------
+      // 2) Geo shark + day/night lighting
+      // -----------------------------
+      const SHARK_TARGET = { lat: 37.41684550842396, lon: -121.9585640598993 };
+      const SHARK_RADIUS_M = 120; // <-- adjust radius here
+      const USE_FIRST_GPS_FIX_AS_TARGET = false; // set true to test anywhere
+
+      const statusLine = document.getElementById("statusLine");
+      const geoShark = document.getElementById("geoShark");
+      const ambientLight = document.getElementById("ambientLight");
+      const dirLight = document.getElementById("dirLight");
+
+      let lastFix = null;
+      let gateTarget = { ...SHARK_TARGET };
+
+      function toRad(d) { return d * Math.PI / 180; }
+      function haversineMeters(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      }
+
+      function isNightAt(lat, lon, date = new Date()) {
+        // Night if sun is below civil twilight (-6 degrees)
+        if (!window.SunCalc) return false;
+        const pos = SunCalc.getPosition(date, lat, lon);
+        const altitudeDeg = pos.altitude * 180 / Math.PI;
+        return altitudeDeg < -6;
+      }
+
+      function applyDayNightLighting(night) {
+        if (!ambientLight || !dirLight) return;
+
+        if (night) {
+          ambientLight.setAttribute("light", "intensity", 0.35);
+          ambientLight.setAttribute("light", "color", "#223344");
+          dirLight.setAttribute("light", "intensity", 0.65);
+          dirLight.setAttribute("light", "color", "#88aaff");
+        } else {
+          ambientLight.setAttribute("light", "intensity", 0.9);
+          ambientLight.setAttribute("light", "color", "#ffffff");
+          dirLight.setAttribute("light", "intensity", 1.2);
+          dirLight.setAttribute("light", "color", "#ffffff");
+        }
+      }
+
+      function updateHUD({ lat, lon, acc, dist, inRange, night, err } = {}) {
+        if (err) {
+          statusLine.textContent = `GPS ERROR: ${err}`;
+          return;
+        }
+        statusLine.textContent =
+          `GPS: ${lat.toFixed(6)}, ${lon.toFixed(6)} (±${Math.round(acc)}m)\n` +
+          `Shark target: ${gateTarget.lat.toFixed(6)}, ${gateTarget.lon.toFixed(6)}\n` +
+          `Distance: ${dist === null ? "—" : Math.round(dist) + "m"}  |  In range: ${inRange}\n` +
+          `Lighting: ${night ? "NIGHT" : "DAY"}`;
+      }
+
+      function handleGeoFix(pos) {
+        lastFix = pos;
+        const { latitude, longitude, accuracy } = pos.coords;
+
+        if (USE_FIRST_GPS_FIX_AS_TARGET && gateTarget && !gateTarget._set) {
+          gateTarget = { lat: latitude, lon: longitude, _set: true };
+        }
+
+        const dist = haversineMeters(latitude, longitude, gateTarget.lat, gateTarget.lon);
+        const inRange = dist <= SHARK_RADIUS_M;
+
+        // Show/hide huge shark
+        if (geoShark) geoShark.setAttribute("visible", inRange);
+
+        // Day/night by sun altitude at current location
+        const night = isNightAt(latitude, longitude);
+        applyDayNightLighting(night);
+
+        updateHUD({
+          lat: latitude, lon: longitude, acc: accuracy,
+          dist, inRange, night
+        });
+      }
+
+      function startGeo() {
+        if (!navigator.geolocation) {
+          updateHUD({ err: "Geolocation not supported in this browser." });
+          return;
+        }
+
+        navigator.geolocation.watchPosition(
+          handleGeoFix,
+          (e) => updateHUD({ err: `${e.code} ${e.message}` }),
+          { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
+        );
+      }
+
+      // Optional: logging for Hiro marker
+      document.addEventListener("DOMContentLoaded", () => {
         const hiro = document.querySelector('a-marker[preset="hiro"]');
         if (hiro) {
-          hiro.addEventListener('markerFound', () =>
-            console.log('%cHiro FOUND', 'color: #4CC3D9; font-weight: bold;')
-          );
-          hiro.addEventListener('markerLost', () =>
-            console.log('%cHiro LOST', 'color: #4CC3D9; font-weight: normal;')
-          );
+          hiro.addEventListener("markerFound", () => console.log("Hiro FOUND"));
+          hiro.addEventListener("markerLost", () => console.log("Hiro LOST"));
         }
-        console.log('San Jose XR Stadium demo with grace period initialized.');
+        console.log("Stadium + Geo Shark + Day/Night initialized.");
+        startGeo();
+
+        // Re-evaluate lighting every minute even if GPS is steady
+        setInterval(() => {
+          if (!lastFix) return;
+          const { latitude, longitude } = lastFix.coords;
+          applyDayNightLighting(isNightAt(latitude, longitude));
+        }, 60 * 1000);
       });
     </script>
   </body>
