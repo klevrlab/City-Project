@@ -270,28 +270,60 @@
           }
         }
 
+        function ensureCanvasVisible() {
+          const canvas = document.querySelector('a-scene canvas');
+          if (canvas) {
+            canvas.style.position = 'fixed';
+            canvas.style.top = '0';
+            canvas.style.left = '0';
+            canvas.style.width = '100%';
+            canvas.style.height = '100%';
+            canvas.style.zIndex = '1';
+            canvas.style.display = 'block';
+            canvas.style.visibility = 'visible';
+            console.log('✓ Canvas forced visible');
+          }
+        }
+
         if (sceneEl) {
           sceneEl.addEventListener('renderstart', () => {
             console.log('✓ Scene render started');
-            setTimeout(hideLoadingScreen, 1500);
+            setTimeout(() => {
+              hideLoadingScreen();
+              ensureCanvasVisible();
+            }, 1500);
           });
 
           sceneEl.addEventListener('camera-ready', () => {
             console.log('✓ Camera ready event');
             hideLoadingScreen();
+            ensureCanvasVisible();
           });
         }
 
         window.addEventListener('arjs-video-loaded', () => {
           console.log('✓ AR.js video loaded');
           hideLoadingScreen();
+          setTimeout(ensureCanvasVisible, 500);
         });
 
         // Fallback timeout - more aggressive
         setTimeout(() => {
           console.log('Timeout reached');
           hideLoadingScreen();
+          ensureCanvasVisible();
         }, 5000);
+
+        // Keep checking canvas visibility every second for 10 seconds
+        let checkCount = 0;
+        const visibilityChecker = setInterval(() => {
+          ensureCanvasVisible();
+          checkCount++;
+          if (checkCount >= 10) {
+            clearInterval(visibilityChecker);
+            console.log('✓ Stopped canvas visibility checks');
+          }
+        }, 1000);
 
         // Helper functions
         function toRad(d) { return d * Math.PI / 180; }
