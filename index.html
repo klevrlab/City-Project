@@ -2,9 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>San Jose XR Portal – Stadium + Day/Night Card (Toggle)</title>
+    <title>San Jose XR Portal – Stadium + Day/Night Card</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="description" content="WebAR demo: marker stadium + floating day/night card (PNG textures) + toggle." />
+    <meta name="description" content="WebAR demo: marker stadium + floating day/night card (PNG textures)." />
 
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
@@ -31,38 +31,14 @@
         right: 0;
         padding: 0.5rem 0.75rem;
         font-size: 0.8rem;
-        background: rgba(0, 0, 0, 0.62);
+        background: rgba(0, 0, 0, 0.6);
         z-index: 10;
         text-align: center;
       }
       #info strong { color: #ffd54f; }
 
-      #controls {
-        margin-top: 0.5rem;
-        display: inline-flex;
-        gap: 10px;
-        align-items: center;
-        justify-content: center;
-        flex-wrap: wrap;
-        font-size: 0.78rem;
-      }
-
-      #modeSelect {
-        font-size: 0.78rem;
-        padding: 6px 10px;
-        border-radius: 10px;
-        border: 1px solid rgba(255,255,255,0.18);
-        background: rgba(255,255,255,0.10);
-        color: #fff;
-        outline: none;
-      }
-
-      #modeSelect option {
-        color: #000; /* dropdown list text */
-      }
-
       #statusLine {
-        margin-top: 0.4rem;
+        margin-top: 0.35rem;
         font-size: 0.75rem;
         opacity: 0.95;
         color: #b6ffdf;
@@ -75,16 +51,6 @@
     <div id="info">
       Point your camera at a <strong>Hiro marker</strong> (cube) or the <strong>SJSU marker</strong> (stadium).<br />
       Stadium pops up + lingers after marker loss. Card above it switches Day/Night.
-
-      <div id="controls">
-        <span>Lighting:</span>
-        <select id="modeSelect" aria-label="Day/Night mode">
-          <option value="auto" selected>Auto</option>
-          <option value="day">Day</option>
-          <option value="night">Night</option>
-        </select>
-      </div>
-
       <div id="statusLine">Loading…</div>
     </div>
 
@@ -102,7 +68,7 @@
       <a-assets>
         <a-asset-item id="stadiumModel" src="assets/stadium.glb"></a-asset-item>
 
-        <!-- Day/Night images -->
+        <!-- Day/Night images (converted from PDFs) -->
         <img id="dayImg" src="assets/day.png" crossorigin="anonymous" />
         <img id="nightImg" src="assets/night.png" crossorigin="anonymous" />
       </a-assets>
@@ -178,6 +144,7 @@
           scale="0.001 0.001 0.001"
           animation__popin="property: scale; to: 1 1 1; dur: 650; easing: easeOutBack; startEvents: cardpop;"
         >
+          <!-- Back plate -->
           <a-plane
             width="1.15"
             height="1.55"
@@ -185,6 +152,7 @@
             material="shader: flat; color: #111; opacity: 0.85; transparent: true"
           ></a-plane>
 
+          <!-- Image plane -->
           <a-plane
             id="cardPlane"
             width="1.05"
@@ -192,6 +160,7 @@
             material="shader: flat; src: #dayImg; side: double;"
           ></a-plane>
 
+          <!-- hover -->
           <a-entity animation="property: position; to: 0 0.06 0; dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"></a-entity>
         </a-entity>
       </a-entity>
@@ -210,4 +179,151 @@
           this.anchor = this.el;
           this.stadium = this.anchor.querySelector("#stadium");
           this.card = this.anchor.querySelector("#dayNightCard");
-          this.tracking = false
+          this.tracking = false;
+          this.hideTimeout = null;
+
+          this.anchor.object3D.visible = false;
+          if (this.card) this.card.setAttribute("visible", false);
+
+          if (!this.marker) {
+            console.warn("stadium-follow-marker: #sjsuMarker not found");
+            return;
+          }
+
+          this.marker.addEventListener("markerFound", () => this.onMarkerFound());
+          this.marker.addEventListener("markerLost", () => this.onMarkerLost());
+        },
+        onMarkerFound: function () {
+          this.tracking = true;
+
+          if (this.hideTimeout) {
+            clearTimeout(this.hideTimeout);
+            this.hideTimeout = null;
+          }
+
+          this.anchor.object3D.visible = true;
+
+          if (this.stadium) {
+            this.stadium.setAttribute("scale", "0.003 0.003 0.003");
+            this.stadium.setAttribute("position", "0 -0.2 0");
+            this.stadium.emit("popin");
+          }
+
+          // Show + pop card
+          if (this.card) {
+            this.card.setAttribute("visible", true);
+            this.card.setAttribute("scale", "0.001 0.001 0.001");
+            this.card.emit("cardpop");
+          }
+        },
+        onMarkerLost: function () {
+          this.tracking = false;
+
+          this.hideTimeout = setTimeout(() => {
+            if (!this.tracking) {
+              this.anchor.object3D.visible = false;
+              if (this.card) this.card.setAttribute("visible", false);
+            }
+          }, this.data.graceMs);
+        },
+        tick: function () {
+          if (!this.tracking || !this.marker) return;
+          this.anchor.object3D.position.copy(this.marker.object3D.position);
+          this.anchor.object3D.quaternion.copy(this.marker.object3D.quaternion);
+        },
+      });
+
+      // -----------------------------
+      // Day/Night lighting + card swap
+      // -----------------------------
+      const statusLine = document.getElementById("statusLine");
+
+      function isNightAt(lat, lon, date = new Date()) {
+        if (!window.SunCalc) return false;
+        const pos = SunCalc.getPosition(date, lat, lon);
+        const altitudeDeg = pos.altitude * 180 / Math.PI;
+        return altitudeDeg < -6; // civil twilight
+      }
+
+      function isNightByClock(date = new Date()) {
+        const h = date.getHours();
+        return h >= 19 || h < 7;
+      }
+
+      function applyLighting(night) {
+        const ambient = document.getElementById("ambientLight");
+        const dir = document.getElementById("dirLight");
+        if (!ambient || !dir) return;
+
+        if (night) {
+          ambient.setAttribute("light", "intensity", 0.35);
+          ambient.setAttribute("light", "color", "#223344");
+          dir.setAttribute("light", "intensity", 0.65);
+          dir.setAttribute("light", "color", "#88aaff");
+        } else {
+          ambient.setAttribute("light", "intensity", 0.9);
+          ambient.setAttribute("light", "color", "#ffffff");
+          dir.setAttribute("light", "intensity", 1.2);
+          dir.setAttribute("light", "color", "#ffffff");
+        }
+      }
+
+      function setCardTexture(night) {
+        const plane = document.getElementById("cardPlane");
+        if (!plane) return;
+        plane.setAttribute("material", "src", night ? "#nightImg" : "#dayImg");
+      }
+
+      function updateStatus({ night, lat, lon, acc, source }) {
+        const mode = night ? "NIGHT" : "DAY";
+        const gpsLine = lat != null
+          ? `GPS: ${lat.toFixed(6)}, ${lon.toFixed(6)} (±${Math.round(acc)}m)`
+          : `GPS: not used (${source})`;
+        statusLine.textContent = `${gpsLine}\nLighting: ${mode}  |  Card: ${night ? "night.png" : "day.png"}`;
+      }
+
+      function applyMode(night, meta = {}) {
+        applyLighting(night);
+        setCardTexture(night);
+        updateStatus({ night, ...meta });
+      }
+
+      let lastFix = null;
+
+      function startDayNight() {
+        // immediate fallback
+        applyMode(isNightByClock(), { source: "clock" });
+
+        if (!navigator.geolocation) return;
+
+        navigator.geolocation.watchPosition(
+          (pos) => {
+            lastFix = pos;
+            const { latitude, longitude, accuracy } = pos.coords;
+            const night = isNightAt(latitude, longitude);
+            applyMode(night, { lat: latitude, lon: longitude, acc: accuracy, source: "gps+suncalc" });
+          },
+          () => {
+            // if denied/fails, keep clock mode
+            applyMode(isNightByClock(), { source: "clock (gps denied)" });
+          },
+          { enableHighAccuracy: true, maximumAge: 60000, timeout: 15000 }
+        );
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        startDayNight();
+
+        // re-check every minute
+        setInterval(() => {
+          if (lastFix?.coords) {
+            const { latitude, longitude, accuracy } = lastFix.coords;
+            applyMode(isNightAt(latitude, longitude), { lat: latitude, lon: longitude, acc: accuracy, source: "gps+suncalc" });
+          } else {
+            applyMode(isNightByClock(), { source: "clock" });
+          }
+        }, 60 * 1000);
+      });
+    </script>
+  </body>
+</html>
