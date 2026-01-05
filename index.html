@@ -2,22 +2,23 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>San Jose XR Portal – Stadium + Day/Night Card + Geo Lock</title>
+    <title>San Jose XR Portal – Stadium + Day/Night Card (NO Geo Lock)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="description" content="WebAR: AR.js marker stadium + day/night card (PNG) + geofence unlock + mode toggle." />
+    <meta name="description" content="WebAR: AR.js marker stadium + day/night card (PNG) + mode toggle (no geo lock)." />
 
-    <!-- Load A-Frame first -->
+    <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <!-- Then AR.js -->
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-    <!-- Then SunCalc -->
+
+    <!-- Pin AR.js to a stable version (avoid master) -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
+
+    <!-- SunCalc for day/night (optional; auto falls back to clock) -->
     <script src="https://unpkg.com/suncalc@1.9.0/suncalc.js"></script>
 
     <style>
       :root{
         --panel: rgba(0,0,0,.62);
         --panel2: rgba(255,255,255,.08);
-        --accent: #00ffaa;
         --warn: #ffd54f;
         --ok: #48ff9a;
         --bad: #ff5c7a;
@@ -32,10 +33,9 @@
         top: 0; left: 0; right: 0;
         padding: 10px 10px 8px;
         background: var(--panel);
-        z-index: 100;
+        z-index: 50;
         text-align: center;
         backdrop-filter: blur(6px);
-        pointer-events: auto;
       }
       #info strong { color: var(--warn); }
 
@@ -59,13 +59,6 @@
         line-height: 1;
         white-space: nowrap;
       }
-      .dot {
-        width: 10px; height: 10px; border-radius: 999px;
-        background: #888;
-        box-shadow: 0 0 10px rgba(0,0,0,.35);
-      }
-      .dot.ok { background: var(--ok); }
-      .dot.bad { background: var(--bad); }
 
       .seg {
         display: inline-flex;
@@ -106,53 +99,134 @@
         font-weight: 600;
       }
 
-      #cameraStatus {
+      #startOverlay {
         position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: var(--panel);
-        padding: 20px;
-        border-radius: 12px;
-        z-index: 9999;
-        text-align: center;
-        pointer-events: none;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,.86);
+        color: #fff;
       }
-      #cameraStatus.hidden {
-        display: none !important;
+      #startOverlay .card {
+        text-align: center;
+        padding: 18px 18px 14px;
+        max-width: 90vw;
+        border-radius: 14px;
+        background: rgba(255,255,255,.06);
+        border: 1px solid rgba(255,255,255,.12);
+      }
+      #startOverlay button {
+        font-size: 18px;
+        padding: 14px 18px;
+        border-radius: 12px;
+        border: 0;
+        margin-top: 10px;
+        min-width: 260px;
+      }
+      #startOverlay .small {
+        margin-top: 10px;
+        font-size: 12px;
+        opacity: .85;
+        line-height: 1.35;
+        text-align: left;
       }
 
-      a-scene { 
-        position: fixed !important; 
-        inset: 0 !important;
-        z-index: 1 !important;
-      }
-      
-      a-scene canvas {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-        z-index: 1 !important;
-      }
+      #sceneHost { position: fixed; inset: 0; z-index: 1; }
+      a-scene { position: fixed !important; inset: 0 !important; }
     </style>
+
+    <script>
+      // Register component BEFORE scene exists (more reliable)
+      AFRAME.registerComponent("stadium-follow-marker", {
+        schema: { graceMs: { type: "int", default: 800 } },
+        init: function () {
+          this.marker = document.querySelector("#sjsuMarker");
+          this.anchor = this.el;
+          this.stadium = this.anchor.querySelector("#stadium");
+          this.card = this.anchor.querySelector("#dayNightCard");
+
+          this.tracking = false;
+          this.hideTimeout = null;
+
+          this.anchor.object3D.visible = false;
+          if (this.card) this.card.setAttribute("visible", false);
+
+          if (!this.marker) {
+            console.warn("stadium-follow-marker: #sjsuMarker not found");
+            return;
+          }
+
+          this.marker.addEventListener("markerFound", () => this.onMarkerFound());
+          this.marker.addEventListener("markerLost", () => this.onMarkerLost());
+        },
+
+        showContent: function () {
+          this.anchor.object3D.visible = true;
+
+          if (this.stadium) {
+            this.stadium.setAttribute("scale", "0.003 0.003 0.003");
+            this.stadium.setAttribute("position", "0 -0.2 0");
+            this.stadium.emit("popin");
+          }
+
+          if (this.card) {
+            this.card.setAttribute("visible", true);
+            this.card.setAttribute("scale", "0.001 0.001 0.001");
+            this.card.emit("cardpop");
+          }
+        },
+
+        hideContent: function () {
+          this.anchor.object3D.visible = false;
+          if (this.card) this.card.setAttribute("visible", false);
+        },
+
+        onMarkerFound: function () {
+          this.tracking = true;
+
+          if (this.hideTimeout) {
+            clearTimeout(this.hideTimeout);
+            this.hideTimeout = null;
+          }
+
+          this.showContent();
+        },
+
+        onMarkerLost: function () {
+          this.tracking = false;
+
+          this.hideTimeout = setTimeout(() => {
+            if (!this.tracking) this.hideContent();
+          }, this.data.graceMs);
+        },
+
+        tick: function () {
+          if (!this.tracking || !this.marker) return;
+          this.anchor.object3D.position.copy(this.marker.object3D.position);
+          this.anchor.object3D.quaternion.copy(this.marker.object3D.quaternion);
+        },
+      });
+    </script>
   </head>
 
   <body>
-    <div id="cameraStatus">
-      <div>Initializing camera...</div>
-      <div style="font-size: 11px; margin-top: 8px; opacity: 0.7;">Allow camera access when prompted</div>
+    <div id="startOverlay">
+      <div class="card">
+        <div style="font-size:18px; font-weight:700;">Start AR</div>
+        <div style="margin-top:6px; opacity:.9;">Allows camera (and optional location for Auto day/night).</div>
+        <button id="btnStart">Start</button>
+        <div class="small">
+          <div><b>Day/Night Auto</b> uses GPS+SunCalc if available; otherwise falls back to clock.</div>
+          <div style="margin-top:8px;">Tip: If camera is black, refresh and tap Start again.</div>
+        </div>
+      </div>
     </div>
 
     <div id="info">
-      Point at <strong>Hiro</strong> (debug) or <strong>SJSU marker</strong> (stadium). Stadium + card are <strong>geo-locked</strong>.
+      Point at <strong>Hiro</strong> (debug) or <strong>SJSU marker</strong> (stadium). (Geo-lock removed)
       <div id="controls">
-        <div class="pill" id="lockPill">
-          <span class="dot bad" id="lockDot"></span>
-          <span id="lockText">Geo-lock: LOCKED</span>
-        </div>
-
         <div class="pill">
           <span class="label" style="font-weight:600;">Lighting</span>
           <div class="seg" role="group" aria-label="Day/Night Mode">
@@ -164,457 +238,248 @@
       </div>
 
       <div id="status">
-        <div class="row"><span class="label">GPS</span><span id="gpsText">waiting…</span></div>
-        <div class="row"><span class="label">Closest zone</span><span id="zoneText">—</span></div>
+        <div class="row"><span class="label">GPS</span><span id="gpsText">—</span></div>
         <div class="row"><span class="label">Card</span><span id="cardText">—</span></div>
+        <div class="row"><span class="label">Camera</span><span id="camText">waiting…</span></div>
       </div>
     </div>
 
-    <a-scene
-      vr-mode-ui="enabled: false"
-      embedded
-      renderer="antialias: true; alpha: true; precision: medium;"
-      arjs="sourceType: webcam; patternRatio: 0.50; debugUIEnabled: false; trackingMethod: best; detectionMode: mono_and_matrix;"
-      loading-screen="enabled: false"
-      device-orientation-permission-ui="enabled: false"
-    >
-      <a-entity id="ambientLight" light="type: ambient; intensity: 0.9; color: #ffffff"></a-entity>
-      <a-entity id="dirLight" light="type: directional; intensity: 1.2; color: #ffffff" position="1 2 1"></a-entity>
-
-      <a-assets timeout="10000">
-        <a-asset-item id="stadiumModel" src="assets/stadium.glb"></a-asset-item>
-        <img id="dayImg" src="assets/day.png" crossorigin="anonymous" />
-        <img id="nightImg" src="assets/night.png" crossorigin="anonymous" />
-      </a-assets>
-
-      <a-marker preset="hiro">
-        <a-ring position="0 0.01 0" rotation="-90 0 0" radius-inner="0.4" radius-outer="0.7"
-          color="#ffffff" opacity="0.7"
-          animation__pulse="property: scale; from: 1 1 1; to: 1.1 1.1 1.1; dir: alternate; loop: true; dur: 1200; easing: easeInOutSine"></a-ring>
-
-        <a-box position="0 0.5 0" depth="0.8" height="0.8" width="0.8" color="#4CC3D9"
-          animation__rotate="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear"
-          animation__hover="property: position; from: 0 0.45 0; to: 0 0.6 0; dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"></a-box>
-
-        <a-text value="Hiro marker (debug)" position="-1.1 1.2 0" color="#ffff66" side="double" wrap-count="22"></a-text>
-      </a-marker>
-
-      <a-marker id="sjsuMarker" type="pattern" url="markers/sjsu-logo.patt" emitevents="true"></a-marker>
-
-      <a-entity id="stadiumAnchor" stadium-follow-marker="graceMs: 800">
-        <a-ring position="0 0.01 0" rotation="-90 0 0" radius-inner="0.45" radius-outer="0.8"
-          color="#00ffaa" opacity="0.8"
-          animation__pulse="property: scale; from: 1 1 1; to: 1.1 1.1 1.1; dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"></a-ring>
-
-        <a-entity id="stadium" gltf-model="#stadiumModel"
-          position="0 -0.2 0" rotation="0 45 0" scale="0.001 0.001 0.001"
-          animation__popin="property: scale; to: 0.09 0.09 0.09; dur: 800; easing: easeOutBack; startEvents: popin;"
-          animation__rise="property: position; to: 0 0 0; dur: 800; easing: easeOutCubic; startEvents: popin;"
-          animation__rotate="property: rotation; to: 0 405 0; loop: true; dur: 15000; easing: linear;">
-        </a-entity>
-
-        <a-text value="San Jose Stadium Portal" position="-1.4 1.3 0" color="#00FFAA" side="double" wrap-count="28"
-          animation__float="property: position; from: -1.4 1.2 0; to: -1.4 1.4 0; dir: alternate; loop: true; dur: 1600; easing: easeInOutSine"></a-text>
-
-        <a-entity id="dayNightCard" visible="false" position="0 1.15 0" rotation="-10 0 0"
-          scale="0.001 0.001 0.001"
-          animation__popin="property: scale; to: 1 1 1; dur: 650; easing: easeOutBack; startEvents: cardpop;">
-          <a-plane width="1.15" height="1.55" position="0 0 -0.01"
-            material="shader: flat; color: #111; opacity: 0.85; transparent: true"></a-plane>
-
-          <a-plane id="cardPlane" width="1.05" height="1.45"
-            material="shader: flat; src: #dayImg; side: double;"></a-plane>
-
-          <a-entity animation="property: position; to: 0 0.06 0; dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"></a-entity>
-        </a-entity>
-      </a-entity>
-
-      <a-entity camera></a-entity>
-    </a-scene>
+    <div id="sceneHost"></div>
 
     <script>
-      // Wait for everything to be ready
-      document.addEventListener('DOMContentLoaded', function() {
-        console.log('DOM loaded, initializing...');
-        
-        const cameraStatus = document.getElementById('cameraStatus');
-        const GEO_LOCK_ENABLED = true;
+      const sceneHost = document.getElementById("sceneHost");
+      const overlay = document.getElementById("startOverlay");
+      const btnStart = document.getElementById("btnStart");
 
-        const ALLOWED_ZONES = [
-          { name: "Zone A", lat: 37.41684550842396, lon: -121.9585640598993, radiusM: 150 },
-          { name: "Zone B", lat: 37.33341624258387, lon: -121.8860350187467, radiusM: 150 },
-        ];
+      const gpsText  = document.getElementById("gpsText");
+      const cardText = document.getElementById("cardText");
+      const camText  = document.getElementById("camText");
+      const segBtns  = Array.from(document.querySelectorAll(".seg button"));
 
-        const USE_FIRST_GPS_FIX_AS_ZONE = false;
+      let lastFix = null;
+      let modeSetting = "auto";
 
-        const lockDot  = document.getElementById("lockDot");
-        const lockText = document.getElementById("lockText");
-        const gpsText  = document.getElementById("gpsText");
-        const zoneText = document.getElementById("zoneText");
-        const cardText = document.getElementById("cardText");
-        const segBtns  = Array.from(document.querySelectorAll(".seg button"));
+      function isNightAt(lat, lon, date = new Date()) {
+        if (!window.SunCalc) return false;
+        const pos = SunCalc.getPosition(date, lat, lon);
+        const altitudeDeg = pos.altitude * 180 / Math.PI;
+        return altitudeDeg < -6; // civil twilight
+      }
 
-        window.__GEO_UNLOCK__ = { inAllowedZone: false, bestZoneName: null, bestDistM: null };
+      function isNightByClock(date = new Date()) {
+        const h = date.getHours();
+        return h >= 19 || h < 7;
+      }
 
-        let lastFix = null;
-        let modeSetting = "auto";
-        let cameraInitialized = false;
+      function applyLighting(night) {
+        const ambient = document.getElementById("ambientLight");
+        const dir = document.getElementById("dirLight");
+        if (!ambient || !dir) return;
 
-        // Camera events
-        const sceneEl = document.querySelector('a-scene');
-        
-        function hideLoadingScreen() {
-          if (!cameraInitialized) {
-            cameraInitialized = true;
-            cameraStatus.classList.add('hidden');
-            console.log('✓ Camera visible - loading screen hidden');
-          }
+        if (night) {
+          ambient.setAttribute("light", "intensity", 0.35);
+          ambient.setAttribute("light", "color", "#223344");
+          dir.setAttribute("light", "intensity", 0.65);
+          dir.setAttribute("light", "color", "#88aaff");
+        } else {
+          ambient.setAttribute("light", "intensity", 0.9);
+          ambient.setAttribute("light", "color", "#ffffff");
+          dir.setAttribute("light", "intensity", 1.2);
+          dir.setAttribute("light", "color", "#ffffff");
         }
+      }
 
-        function ensureCanvasVisible() {
-          const canvas = document.querySelector('a-scene canvas');
-          if (canvas) {
-            canvas.style.position = 'fixed';
-            canvas.style.top = '0';
-            canvas.style.left = '0';
-            canvas.style.width = '100%';
-            canvas.style.height = '100%';
-            canvas.style.zIndex = '1';
-            canvas.style.display = 'block';
-            canvas.style.visibility = 'visible';
-            console.log('✓ Canvas forced visible');
-          }
+      function setCardTexture(night) {
+        const plane = document.getElementById("cardPlane");
+        if (!plane) return;
+        plane.setAttribute("material", "src", night ? "#nightImg" : "#dayImg");
+      }
+
+      function getNightEffective() {
+        if (modeSetting === "day") return false;
+        if (modeSetting === "night") return true;
+
+        // auto:
+        if (lastFix?.coords) return isNightAt(lastFix.coords.latitude, lastFix.coords.longitude);
+        return isNightByClock();
+      }
+
+      function setVisualsFromMode() {
+        const night = getNightEffective();
+        applyLighting(night);
+        setCardTexture(night);
+
+        const modeLabel = modeSetting.toUpperCase();
+        cardText.textContent = `${modeLabel} → ${night ? "night.png" : "day.png"}`;
+      }
+
+      function setMode(newMode) {
+        modeSetting = newMode;
+        segBtns.forEach(b => b.classList.toggle("active", b.dataset.mode === newMode));
+        setVisualsFromMode();
+      }
+
+      segBtns.forEach(btn => btn.addEventListener("click", () => setMode(btn.dataset.mode)));
+
+      function updateGPSUI() {
+        if (lastFix?.coords) {
+          const { latitude, longitude, accuracy } = lastFix.coords;
+          gpsText.textContent = `${latitude.toFixed(6)}, ${longitude.toFixed(6)} (±${Math.round(accuracy)}m)`;
+        } else {
+          gpsText.textContent = "not available (clock fallback)";
         }
+      }
 
-        if (sceneEl) {
-          sceneEl.addEventListener('renderstart', () => {
-            console.log('✓ Scene render started');
-            setTimeout(() => {
-              hideLoadingScreen();
-              ensureCanvasVisible();
-            }, 1500);
-          });
+      function startGeoForAutoLighting() {
+        // optional: only improves Auto mode accuracy
+        if (!navigator.geolocation) return;
 
-          sceneEl.addEventListener('camera-ready', () => {
-            console.log('✓ Camera ready event');
-            hideLoadingScreen();
-            ensureCanvasVisible();
-          });
-        }
+        navigator.geolocation.watchPosition(
+          (pos) => {
+            lastFix = pos;
+            updateGPSUI();
+            setVisualsFromMode();
+          },
+          () => {
+            lastFix = null;
+            updateGPSUI();
+            setVisualsFromMode();
+          },
+          { enableHighAccuracy: true, maximumAge: 60000, timeout: 15000 }
+        );
+      }
 
-        window.addEventListener('arjs-video-loaded', () => {
-          console.log('✓ AR.js video loaded');
-          hideLoadingScreen();
-          setTimeout(() => {
-            ensureCanvasVisible();
-            // Try to get the video element and check if it's playing
-            const video = document.querySelector('video');
-            if (video) {
-              console.log('✓ Video element found:', video.videoWidth, 'x', video.videoHeight);
-              console.log('✓ Video playing:', !video.paused, 'Ready state:', video.readyState);
-              if (video.paused) {
-                video.play().catch(e => console.error('Video play error:', e));
-              }
-            } else {
-              console.warn('⚠️ No video element found');
-            }
-          }, 500);
-        });
+      function startCameraDebugLoop() {
+        // AR.js typically creates a <video class="arjs-video">
+        const tick = () => {
+          const v =
+            document.querySelector("video.arjs-video") ||
+            document.querySelector("#arjs-video") ||
+            document.querySelector("video");
 
-        // Fallback timeout - more aggressive
-        setTimeout(() => {
-          console.log('Timeout reached');
-          hideLoadingScreen();
-          ensureCanvasVisible();
-        }, 5000);
-
-        // Keep checking canvas visibility every second for 10 seconds
-        let checkCount = 0;
-        const visibilityChecker = setInterval(() => {
-          ensureCanvasVisible();
-          checkCount++;
-          if (checkCount >= 10) {
-            clearInterval(visibilityChecker);
-            console.log('✓ Stopped canvas visibility checks');
-          }
-        }, 1000);
-
-        // Helper functions
-        function toRad(d) { return d * Math.PI / 180; }
-        
-        function haversineMeters(lat1, lon1, lat2, lon2) {
-          const R = 6371000;
-          const dLat = toRad(lat2 - lat1);
-          const dLon = toRad(lon2 - lon1);
-          const a =
-            Math.sin(dLat / 2) ** 2 +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-          return R * c;
-        }
-
-        function isNightAt(lat, lon, date = new Date()) {
-          if (!window.SunCalc) return false;
-          const pos = SunCalc.getPosition(date, lat, lon);
-          const altitudeDeg = pos.altitude * 180 / Math.PI;
-          return altitudeDeg < -6;
-        }
-
-        function isNightByClock(date = new Date()) {
-          const h = date.getHours();
-          return h >= 19 || h < 7;
-        }
-
-        function computeBestZone(lat, lon) {
-          if (USE_FIRST_GPS_FIX_AS_ZONE && !window.__GEO_UNLOCK__._setFirstZone) {
-            window.__GEO_UNLOCK__._setFirstZone = true;
-            return { inZone: true, bestZoneName: "TEST MODE (first fix)", bestDistM: 0 };
-          }
-
-          let bestName = null;
-          let bestDist = Infinity;
-          let inZone = false;
-
-          for (const z of ALLOWED_ZONES) {
-            const d = haversineMeters(lat, lon, z.lat, z.lon);
-            if (d < bestDist) {
-              bestDist = d;
-              bestName = z.name;
-              inZone = d <= z.radiusM;
-            }
-          }
-          return { inZone, bestZoneName: bestName, bestDistM: bestDist };
-        }
-
-        function applyLighting(night) {
-          const ambient = document.getElementById("ambientLight");
-          const dir = document.getElementById("dirLight");
-          if (!ambient || !dir) return;
-
-          if (night) {
-            ambient.setAttribute("light", "intensity", 0.35);
-            ambient.setAttribute("light", "color", "#223344");
-            dir.setAttribute("light", "intensity", 0.65);
-            dir.setAttribute("light", "color", "#88aaff");
+          if (!v) {
+            camText.textContent = "video: not found";
           } else {
-            ambient.setAttribute("light", "intensity", 0.9);
-            ambient.setAttribute("light", "color", "#ffffff");
-            dir.setAttribute("light", "intensity", 1.2);
-            dir.setAttribute("light", "color", "#ffffff");
+            camText.textContent =
+              `readyState ${v.readyState} • ` +
+              `paused ${v.paused} • ` +
+              `${v.videoWidth || 0}x${v.videoHeight || 0}`;
           }
-        }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
 
-        function setCardTexture(night) {
-          const plane = document.getElementById("cardPlane");
-          if (!plane) return;
-          plane.setAttribute("material", "src", night ? "#nightImg" : "#dayImg");
-        }
-
-        function getNightEffective() {
-          if (modeSetting === "day") return false;
-          if (modeSetting === "night") return true;
-          if (lastFix?.coords) return isNightAt(lastFix.coords.latitude, lastFix.coords.longitude);
-          return isNightByClock();
-        }
-
-        function updateUI(night, gpsMeta) {
-          const u = window.__GEO_UNLOCK__;
-          const inZone = !!u.inAllowedZone;
-
-          lockDot.classList.toggle("ok", inZone);
-          lockDot.classList.toggle("bad", !inZone);
-          lockText.textContent = inZone ? "Geo-lock: UNLOCKED" : "Geo-lock: LOCKED";
-
-          if (gpsMeta?.lat != null) {
-            gpsText.textContent = `${gpsMeta.lat.toFixed(6)}, ${gpsMeta.lon.toFixed(6)} (±${Math.round(gpsMeta.acc)}m)`;
-          } else {
-            gpsText.textContent = "not available (clock fallback)";
+      async function requestOrientationPermissionIfNeeded() {
+        try {
+          if (typeof DeviceOrientationEvent !== "undefined" &&
+              typeof DeviceOrientationEvent.requestPermission === "function") {
+            await DeviceOrientationEvent.requestPermission();
           }
+        } catch (_) {}
+      }
 
-          const distStr = (u.bestDistM == null || !isFinite(u.bestDistM)) ? "—" : `${Math.round(u.bestDistM)}m`;
-          zoneText.textContent = `${u.bestZoneName || "—"} • dist ${distStr}`;
+      function sceneHTML() {
+        return `
+          <a-scene
+            vr-mode-ui="enabled: false"
+            embedded
+            renderer="antialias: true; alpha: true; precision: medium;"
+            arjs="sourceType: webcam; patternRatio: 0.50; debugUIEnabled: false; trackingMethod: best; detectionMode: mono_and_matrix;"
+            loading-screen="enabled: false"
+            device-orientation-permission-ui="enabled: false"
+          >
+            <a-entity id="ambientLight" light="type: ambient; intensity: 0.9; color: #ffffff"></a-entity>
+            <a-entity id="dirLight" light="type: directional; intensity: 1.2; color: #ffffff" position="1 2 1"></a-entity>
 
-          const modeLabel = modeSetting.toUpperCase();
-          cardText.textContent = `${modeLabel} → ${night ? "night.png" : "day.png"}`;
-        }
+            <a-assets timeout="10000">
+              <a-asset-item id="stadiumModel" src="assets/stadium.glb"></a-asset-item>
+              <img id="dayImg" src="assets/day.png" crossorigin="anonymous" />
+              <img id="nightImg" src="assets/night.png" crossorigin="anonymous" />
+            </a-assets>
 
-        function setVisualsFromMode() {
-          const night = getNightEffective();
-          applyLighting(night);
-          setCardTexture(night);
-          updateUI(night, lastFix?.coords ? {
-            lat: lastFix.coords.latitude,
-            lon: lastFix.coords.longitude,
-            acc: lastFix.coords.accuracy
-          } : null);
-        }
+            <a-marker preset="hiro">
+              <a-ring position="0 0.01 0" rotation="-90 0 0" radius-inner="0.4" radius-outer="0.7"
+                color="#ffffff" opacity="0.7"
+                animation__pulse="property: scale; from: 1 1 1; to: 1.1 1.1 1.1; dir: alternate; loop: true; dur: 1200; easing: easeInOutSine"></a-ring>
 
-        function emitGeoUnlockChanged(prev, next) {
-          if (prev !== next) window.dispatchEvent(new Event("geo-unlock-changed"));
-        }
+              <a-box position="0 0.5 0" depth="0.8" height="0.8" width="0.8" color="#4CC3D9"
+                animation__rotate="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear"
+                animation__hover="property: position; from: 0 0.45 0; to: 0 0.6 0; dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"></a-box>
 
-        // Register A-Frame component
-        AFRAME.registerComponent("stadium-follow-marker", {
-          schema: { graceMs: { type: "int", default: 800 } },
-          init: function () {
-            this.marker = document.querySelector("#sjsuMarker");
-            this.anchor = this.el;
-            this.stadium = this.anchor.querySelector("#stadium");
-            this.card = this.anchor.querySelector("#dayNightCard");
+              <a-text value="Hiro marker (debug)" position="-1.1 1.2 0" color="#ffff66" side="double" wrap-count="22"></a-text>
+            </a-marker>
 
-            this.tracking = false;
-            this.wasVisible = false;
-            this.hideTimeout = null;
+            <a-marker id="sjsuMarker" type="pattern" url="markers/sjsu-logo.patt" emitevents="true"></a-marker>
 
-            this.anchor.object3D.visible = false;
-            if (this.card) this.card.setAttribute("visible", false);
+            <a-entity id="stadiumAnchor" stadium-follow-marker="graceMs: 800">
+              <a-ring position="0 0.01 0" rotation="-90 0 0" radius-inner="0.45" radius-outer="0.8"
+                color="#00ffaa" opacity="0.8"
+                animation__pulse="property: scale; from: 1 1 1; to: 1.1 1.1 1.1; dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"></a-ring>
 
-            if (!this.marker) {
-              console.warn("stadium-follow-marker: #sjsuMarker not found");
-              return;
-            }
+              <a-entity id="stadium" gltf-model="#stadiumModel"
+                position="0 -0.2 0" rotation="0 45 0" scale="0.001 0.001 0.001"
+                animation__popin="property: scale; to: 0.09 0.09 0.09; dur: 800; easing: easeOutBack; startEvents: popin;"
+                animation__rise="property: position; to: 0 0 0; dur: 800; easing: easeOutCubic; startEvents: popin;"
+                animation__rotate="property: rotation; to: 0 405 0; loop: true; dur: 15000; easing: linear;">
+              </a-entity>
 
-            this.marker.addEventListener("markerFound", () => this.onMarkerFound());
-            this.marker.addEventListener("markerLost", () => this.onMarkerLost());
-            window.addEventListener("geo-unlock-changed", () => this.onGeoUnlockChanged());
-          },
+              <a-text value="San Jose Stadium Portal" position="-1.4 1.3 0" color="#00FFAA" side="double" wrap-count="28"
+                animation__float="property: position; from: -1.4 1.2 0; to: -1.4 1.4 0; dir: alternate; loop: true; dur: 1600; easing: easeInOutSine"></a-text>
 
-          isUnlocked: function () {
-            if (!GEO_LOCK_ENABLED) return true;
-            return !!(window.__GEO_UNLOCK__ && window.__GEO_UNLOCK__.inAllowedZone);
-          },
+              <a-entity id="dayNightCard" visible="false" position="0 1.15 0" rotation="-10 0 0"
+                scale="0.001 0.001 0.001"
+                animation__popin="property: scale; to: 1 1 1; dur: 650; easing: easeOutBack; startEvents: cardpop;">
+                <a-plane width="1.15" height="1.55" position="0 0 -0.01"
+                  material="shader: flat; color: #111; opacity: 0.85; transparent: true"></a-plane>
 
-          showContent: function () {
-            this.anchor.object3D.visible = true;
-            this.wasVisible = true;
+                <a-plane id="cardPlane" width="1.05" height="1.45"
+                  material="shader: flat; src: #dayImg; side: double;"></a-plane>
 
-            if (this.stadium) {
-              this.stadium.setAttribute("scale", "0.003 0.003 0.003");
-              this.stadium.setAttribute("position", "0 -0.2 0");
-              this.stadium.emit("popin");
-            }
+                <a-entity animation="property: position; to: 0 0.06 0; dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"></a-entity>
+              </a-entity>
+            </a-entity>
 
-            if (this.card) {
-              this.card.setAttribute("visible", true);
-              this.card.setAttribute("scale", "0.001 0.001 0.001");
-              this.card.emit("cardpop");
-            }
-          },
+            <a-entity camera></a-entity>
+          </a-scene>
+        `;
+      }
 
-          hideContent: function () {
-            this.anchor.object3D.visible = false;
-            this.wasVisible = false;
-            if (this.card) this.card.setAttribute("visible", false);
-          },
+      async function start() {
+        btnStart.disabled = true;
+        btnStart.textContent = "Starting…";
 
-          onMarkerFound: function () {
-            console.log('✓ Marker detected!');
-            this.tracking = true;
+        await requestOrientationPermissionIfNeeded();
 
-            if (this.hideTimeout) {
-              clearTimeout(this.hideTimeout);
-              this.hideTimeout = null;
-            }
+        // Create the scene AFTER user gesture (helps iOS/Safari)
+        sceneHost.innerHTML = sceneHTML();
 
-            if (!this.isUnlocked()) {
-              console.log('⚠️ Geo-locked');
-              this.hideContent();
-              return;
-            }
+        // start debug + day/night
+        startCameraDebugLoop();
+        startGeoForAutoLighting();
+        updateGPSUI();
+        setVisualsFromMode();
 
-            console.log('✓ Showing AR content');
-            this.showContent();
-          },
+        // Hide overlay
+        overlay.style.display = "none";
+      }
 
-          onMarkerLost: function () {
-            console.log('Marker lost');
-            this.tracking = false;
-
-            this.hideTimeout = setTimeout(() => {
-              if (!this.tracking) this.hideContent();
-            }, this.data.graceMs);
-          },
-
-          onGeoUnlockChanged: function () {
-            if (!this.tracking) return;
-
-            if (this.isUnlocked()) {
-              if (!this.wasVisible) this.showContent();
-            } else {
-              this.hideContent();
-            }
-          },
-
-          tick: function () {
-            if (!this.tracking || !this.marker) return;
-            this.anchor.object3D.position.copy(this.marker.object3D.position);
-            this.anchor.object3D.quaternion.copy(this.marker.object3D.quaternion);
-          },
+      btnStart.addEventListener("click", () => {
+        start().catch((e) => {
+          console.error(e);
+          btnStart.disabled = false;
+          btnStart.textContent = "Start";
         });
-
-        console.log('✓ Component registered');
-
-        // Mode controls
-        function setMode(newMode) {
-          modeSetting = newMode;
-          segBtns.forEach(b => b.classList.toggle("active", b.dataset.mode === newMode));
-          setVisualsFromMode();
-        }
-
-        segBtns.forEach(btn => {
-          btn.addEventListener("click", () => setMode(btn.dataset.mode));
-        });
-
-        // GPS tracking
-        function startGeoWatcher() {
-          setVisualsFromMode();
-
-          if (!navigator.geolocation) {
-            console.warn('GPS not available');
-            return;
-          }
-
-          navigator.geolocation.watchPosition(
-            (pos) => {
-              lastFix = pos;
-              const { latitude, longitude, accuracy } = pos.coords;
-              console.log('GPS:', latitude.toFixed(6), longitude.toFixed(6), '±' + Math.round(accuracy) + 'm');
-
-              const prev = !!window.__GEO_UNLOCK__.inAllowedZone;
-              const z = computeBestZone(latitude, longitude);
-
-              window.__GEO_UNLOCK__.inAllowedZone = z.inZone;
-              window.__GEO_UNLOCK__.bestZoneName = z.bestZoneName;
-              window.__GEO_UNLOCK__.bestDistM = z.bestDistM;
-
-              console.log(z.inZone ? '🟢 UNLOCKED' : '🔴 LOCKED', '-', Math.round(z.bestDistM) + 'm');
-
-              emitGeoUnlockChanged(prev, z.inZone);
-              setVisualsFromMode();
-            },
-            (error) => {
-              console.error('GPS error:', error.message);
-              if (GEO_LOCK_ENABLED) {
-                const prev = !!window.__GEO_UNLOCK__.inAllowedZone;
-                window.__GEO_UNLOCK__.inAllowedZone = false;
-                window.__GEO_UNLOCK__.bestZoneName = "—";
-                window.__GEO_UNLOCK__.bestDistM = null;
-                emitGeoUnlockChanged(prev, false);
-              }
-              lastFix = null;
-              setVisualsFromMode();
-            },
-            { enableHighAccuracy: true, maximumAge: 60000, timeout: 15000 }
-          );
-        }
-
-        // Start everything
-        setMode("auto");
-        startGeoWatcher();
-        setInterval(() => setVisualsFromMode(), 60 * 1000);
-
-        console.log('✓ App ready');
       });
+
+      // Default mode
+      setMode("auto");
+
+      // Re-evaluate day/night every minute (clock or gps)
+      setInterval(() => {
+        updateGPSUI();
+        setVisualsFromMode();
+      }, 60 * 1000);
     </script>
   </body>
 </html>
