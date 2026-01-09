@@ -1,329 +1,410 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>San Jose XR Portal – Stadium + Day/Night Card</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="description" content="WebAR demo: marker stadium + floating day/night card (PNG textures)." />
+<head>
+  <meta charset="UTF-8" />
+  <title>Marker Evolution – Cracks → Hole → Flaming Ball</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
-    <!-- A-Frame -->
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <!-- AR.js -->
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.0/aframe/build/aframe-ar.js"></script>
 
-    <!-- AR.js for A-Frame -->
-    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.0/aframe/build/aframe-ar.js"></script>
+  <style>
+    html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#000; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    #hud {
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 20;
+      background: rgba(0,0,0,0.55);
+      color: #d7ffe9;
+      font-size: 12px;
+      padding: 10px 10px 8px;
+      text-align: center;
+      text-shadow: 0 0 3px rgba(0,0,0,0.8);
+      pointer-events: none;
+    }
+    #controls {
+      margin-top: 8px;
+      display: inline-flex;
+      gap: 8px;
+      pointer-events: auto; /* buttons clickable */
+    }
+    .btn {
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.10);
+      color: #fff;
+    }
+    .btn.active {
+      background: rgba(0,255,170,0.22);
+      border-color: rgba(0,255,170,0.55);
+    }
+    #note { opacity: 0.9; margin-top: 4px; font-size: 11px; }
+  </style>
+</head>
 
-    <!-- Sun position (day/night) -->
-    <script src="https://unpkg.com/suncalc@1.9.0/suncalc.js"></script>
-
-    <style>
-      body {
-        margin: 0;
-        overflow: hidden;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #000;
-        color: #fff;
-      }
-
-      #info {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        padding: 0.5rem 0.75rem;
-        font-size: 0.8rem;
-        background: rgba(0, 0, 0, 0.6);
-        z-index: 10;
-        text-align: center;
-      }
-      #info strong { color: #ffd54f; }
-
-      #statusLine {
-        margin-top: 0.35rem;
-        font-size: 0.75rem;
-        opacity: 0.95;
-        color: #b6ffdf;
-        white-space: pre-wrap;
-      }
-    </style>
-  </head>
-
-  <body>
-    <div id="info">
-      Point your camera at a <strong>Hiro marker</strong> (cube) or the <strong>SJSU marker</strong> (stadium).<br />
-      Stadium pops up + lingers after marker loss. Card above it switches Day/Night.
-      <div id="statusLine">Loading…</div>
+<body>
+  <div id="hud">
+    <div id="status">Loading…</div>
+    <div id="controls">
+      <button class="btn active" data-mode="auto">Auto</button>
+      <button class="btn" data-mode="1">Phase 1</button>
+      <button class="btn" data-mode="2">Phase 2</button>
+      <button class="btn" data-mode="3">Phase 3</button>
     </div>
+    <div id="note">Scan the SJSU marker. Auto phases are based on March 28, 2026.</div>
+  </div>
 
-    <a-scene
-      vr-mode-ui="enabled: false"
-      embedded
-      renderer="antialias: true; alpha: true;"
-      arjs="sourceType: webcam; patternRatio: 0.50; debugUIEnabled: false;"
+  <a-scene
+    embedded
+    vr-mode-ui="enabled:false"
+    renderer="antialias:true; alpha:true; precision:mediump"
+    arjs="sourceType: webcam; debugUIEnabled:false; patternRatio: 0.50;"
+  >
+    <a-assets>
+      <!-- Swap these to match your repo -->
+      <img id="texCracks" src="assets/cracks.png" crossorigin="anonymous" />
+      <img id="texHole"   src="assets/hole.png" crossorigin="anonymous" />
+      <img id="texBall"   src="assets/basketball.png" crossorigin="anonymous" />
+      <img id="texFlame"  src="assets/flame.png" crossorigin="anonymous" />
+    </a-assets>
+
+    <!-- Lighting we can change by phase -->
+    <a-entity id="ambientLight" light="type: ambient; intensity: 0.9; color: #ffffff"></a-entity>
+    <a-entity id="dirLight" light="type: directional; intensity: 1.1; color: #ffffff" position="1 2 1"></a-entity>
+
+    <!-- Marker -->
+    <a-marker
+      id="evoMarker"
+      type="pattern"
+      url="markers/sjsu-logo.patt"
+      emitevents="true"
     >
-      <!-- Lights we can change day/night -->
-      <a-entity id="ambientLight" light="type: ambient; intensity: 0.9; color: #ffffff"></a-entity>
-      <a-entity id="dirLight" light="type: directional; intensity: 1.2; color: #ffffff" position="1 2 1"></a-entity>
+      <!-- Root that we show/hide by phase -->
+      <a-entity id="evoRoot" evolution-controller></a-entity>
+    </a-marker>
 
-      <!-- Assets -->
-      <a-assets>
-        <a-asset-item id="stadiumModel" src="assets/stadium.glb"></a-asset-item>
+    <a-entity camera></a-entity>
+  </a-scene>
 
-        <!-- Day/Night images (converted from PDFs) -->
-        <img id="dayImg" src="assets/day.png" crossorigin="anonymous" />
-        <img id="nightImg" src="assets/night.png" crossorigin="anonymous" />
-      </a-assets>
+  <script>
+    // ---------- Config ----------
+    const EVENT_DATE_LOCAL = "2026-03-28T18:00:00"; // local time; adjust if you want
+    // Phase thresholds:
+    // daysUntil > 14 => Phase 1
+    // daysUntil > 7  => Phase 2
+    // else           => Phase 3
 
-      <!-- 1) Hiro marker (baseline/debug) -->
-      <a-marker preset="hiro">
-        <a-ring
-          position="0 0.01 0"
-          rotation="-90 0 0"
-          radius-inner="0.4"
-          radius-outer="0.7"
-          color="#ffffff"
-          opacity="0.7"
-          animation__pulse="property: scale; from: 1 1 1; to: 1.1 1.1 1.1; dir: alternate; loop: true; dur: 1200; easing: easeInOutSine"
-        ></a-ring>
+    const GRACE_MS = 800; // keep visible briefly after markerLost
 
-        <a-box
-          position="0 0.5 0"
-          depth="0.8"
-          height="0.8"
-          width="0.8"
-          color="#4CC3D9"
-          animation__rotate="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear"
-          animation__hover="property: position; from: 0 0.45 0; to: 0 0.6 0; dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"
-        ></a-box>
+    // ---------- Utility ----------
+    const statusEl = document.getElementById("status");
+    const btns = Array.from(document.querySelectorAll(".btn"));
 
-        <a-text value="Hiro marker (debug)" position="-1.1 1.2 0" color="#ffff66" side="double" wrap-count="22"></a-text>
-      </a-marker>
+    function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
-      <!-- 2) SJSU marker used only as tracker -->
-      <a-marker id="sjsuMarker" type="pattern" url="markers/sjsu-logo.patt" emitevents="true"></a-marker>
+    async function getServerNow() {
+      // Harder to spoof than device time. Falls back if it fails.
+      try {
+        const r = await fetch(location.href, { method: "HEAD", cache: "no-store" });
+        const d = r.headers.get("Date");
+        if (d) return { now: new Date(d), source: "server" };
+      } catch (_) {}
+      return { now: new Date(), source: "device" };
+    }
 
-      <!-- 3) Stadium anchor that follows marker and has grace period -->
-      <a-entity id="stadiumAnchor" stadium-follow-marker="graceMs: 800">
-        <!-- Portal ring -->
-        <a-ring
-          position="0 0.01 0"
-          rotation="-90 0 0"
-          radius-inner="0.45"
-          radius-outer="0.8"
-          color="#00ffaa"
-          opacity="0.8"
-          animation__pulse="property: scale; from: 1 1 1; to: 1.1 1.1 1.1; dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"
-        ></a-ring>
+    function daysUntilEvent(now) {
+      const event = new Date(EVENT_DATE_LOCAL);
+      const ms = event.getTime() - now.getTime();
+      return ms / (1000 * 60 * 60 * 24);
+    }
 
-        <!-- Stadium model -->
-        <a-entity
-          id="stadium"
-          gltf-model="#stadiumModel"
-          position="0 -0.2 0"
-          rotation="0 45 0"
-          scale="0.001 0.001 0.001"
-          animation__popin="property: scale; to: 0.06 0.06 0.06; dur: 800; easing: easeOutBack; startEvents: popin;"
-          animation__rise="property: position; to: 0 0 0; dur: 800; easing: easeOutCubic; startEvents: popin;"
-          animation__rotate="property: rotation; to: 0 405 0; loop: true; dur: 15000; easing: linear;"
-        ></a-entity>
+    function phaseFromDays(days) {
+      if (days > 14) return 1;
+      if (days > 7) return 2;
+      return 3;
+    }
 
-        <a-text
-          value=""
-          position="-1.4 8.3 0"
-          color="#00FFAA"
-          side="double"
-          wrap-count="28"
-          animation__float="property: position; from: -1.4 1.2 0; to: -1.4 1.4 0; dir: alternate; loop: true; dur: 1600; easing: easeInOutSine"
-        ></a-text>
+    function setActiveButton(mode) {
+      btns.forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+    }
 
-        <!-- Floating Day/Night Card (pops in on markerFound) -->
-        <a-entity
-          id="dayNightCard"
-          visible="false"
-          position="0 1.15 0"
-          rotation="-10 0 0"
-          scale="0.001 0.001 0.001"
-          animation__popin="property: scale; to: 1 1 1; dur: 650; easing: easeOutBack; startEvents: cardpop;"
-        >
-          <!-- Back plate -->
-          <a-plane
-            width="1.15"
-            height="1.55"
-            position="0 0 -0.01"
-            material="shader: flat; color: #111; opacity: 0.85; transparent: true"
-          ></a-plane>
+    // ---------- Evolution Component ----------
+    AFRAME.registerComponent("evolution-controller", {
+      init: function () {
+        this.marker = document.getElementById("evoMarker");
+        this.root = this.el;
 
-          <!-- Image plane -->
-          <a-plane
-            id="cardPlane"
-            width="1.05"
-            height="1.45"
-            material="shader: flat; src: #dayImg; side: double;"
-          ></a-plane>
+        // Build content once
+        this.root.innerHTML = `
+          <!-- Phase 1: cracks -->
+          <a-plane id="cracksPlane"
+            position="0 0.01 0"
+            rotation="-90 0 0"
+            width="1.8" height="1.8"
+            material="shader: flat; src: #texCracks; transparent: true; opacity: 0.95; alphaTest: 0.02; depthWrite: false">
+          </a-plane>
 
-          <!-- hover -->
-          <a-entity animation="property: position; to: 0 0.06 0; dir: alternate; loop: true; dur: 1400; easing: easeInOutSine"></a-entity>
-        </a-entity>
-      </a-entity>
+          <!-- Phase 2+: hole -->
+          <a-plane id="holePlane"
+            visible="false"
+            position="0 0.012 0"
+            rotation="-90 0 0"
+            width="1.05" height="1.05"
+            material="shader: flat; src: #texHole; transparent: true; opacity: 1.0; alphaTest: 0.02; depthWrite: false">
+          </a-plane>
 
-      <a-entity camera></a-entity>
-    </a-scene>
+          <!-- Ball -->
+          <a-entity id="ballRig" visible="false" position="0 0.05 0">
+            <!-- Optional cheap outline: duplicate sphere slightly bigger, black, backfaces -->
+            <a-sphere id="ballOutline" radius="0.155"
+              material="shader: flat; color: #000; side: back"
+              scale="1.06 1.06 1.06"
+              visible="false">
+            </a-sphere>
 
-    <script>
-      // -----------------------------
-      // Marker follow + grace period + card pop
-      // -----------------------------
-      AFRAME.registerComponent("stadium-follow-marker", {
-        schema: { graceMs: { type: "int", default: 800 } },
-        init: function () {
-          this.marker = document.querySelector("#sjsuMarker");
-          this.anchor = this.el;
-          this.stadium = this.anchor.querySelector("#stadium");
-          this.card = this.anchor.querySelector("#dayNightCard");
-          this.tracking = false;
-          this.hideTimeout = null;
+            <a-sphere id="ball"
+              radius="0.15"
+              material="shader: standard; src: #texBall; roughness: 0.85; metalness: 0.05;">
+            </a-sphere>
 
-          this.anchor.object3D.visible = false;
-          if (this.card) this.card.setAttribute("visible", false);
+            <!-- Phase 3 flame aura -->
+            <a-entity id="flames" visible="false">
+              ${[0,60,120,180,240,300].map((deg,i)=>`
+                <a-plane class="flameSprite"
+                  rotation="0 ${deg} 0"
+                  position="0 0 -0.17"
+                  width="0.35" height="0.55"
+                  material="shader: flat; src: #texFlame; transparent: true; opacity: 0.9; alphaTest: 0.02; depthWrite: false; side: double;">
+                </a-plane>
+              `).join("")}
+            </a-entity>
 
-          if (!this.marker) {
-            console.warn("stadium-follow-marker: #sjsuMarker not found");
-            return;
-          }
+            <!-- Phase 3: warm point light -->
+            <a-entity id="ballLight" visible="false"
+              light="type: point; intensity: 1.2; distance: 3.5; color: #ff7a2a"
+              position="0 0.1 0">
+            </a-entity>
+          </a-entity>
+        `;
 
-          this.marker.addEventListener("markerFound", () => this.onMarkerFound());
-          this.marker.addEventListener("markerLost", () => this.onMarkerLost());
-        },
-        onMarkerFound: function () {
-          this.tracking = true;
+        // Cache nodes
+        this.cracksPlane = this.root.querySelector("#cracksPlane");
+        this.holePlane = this.root.querySelector("#holePlane");
+        this.ballRig = this.root.querySelector("#ballRig");
+        this.ball = this.root.querySelector("#ball");
+        this.ballOutline = this.root.querySelector("#ballOutline");
+        this.flames = this.root.querySelector("#flames");
+        this.ballLight = this.root.querySelector("#ballLight");
 
-          if (this.hideTimeout) {
-            clearTimeout(this.hideTimeout);
-            this.hideTimeout = null;
-          }
+        this.ambient = document.getElementById("ambientLight");
+        this.dir = document.getElementById("dirLight");
 
-          this.anchor.object3D.visible = true;
+        this.visible = false;
+        this.hideTimer = null;
 
-          if (this.stadium) {
-            this.stadium.setAttribute("scale", "0.003 0.003 0.003");
-            this.stadium.setAttribute("position", "0 -0.2 0");
-            this.stadium.emit("popin");
-          }
+        // Mode: "auto" or "1"/"2"/"3"
+        this.mode = "auto";
+        this.currentPhase = 1;
+        this.timeSource = "device";
+        this.days = null;
 
-          // Show + pop card
-          if (this.card) {
-            this.card.setAttribute("visible", true);
-            this.card.setAttribute("scale", "0.001 0.001 0.001");
-            this.card.emit("cardpop");
-          }
-        },
-        onMarkerLost: function () {
-          this.tracking = false;
-
-          this.hideTimeout = setTimeout(() => {
-            if (!this.tracking) {
-              this.anchor.object3D.visible = false;
-              if (this.card) this.card.setAttribute("visible", false);
-            }
-          }, this.data.graceMs);
-        },
-        tick: function () {
-          if (!this.tracking || !this.marker) return;
-          this.anchor.object3D.position.copy(this.marker.object3D.position);
-          this.anchor.object3D.quaternion.copy(this.marker.object3D.quaternion);
-        },
-      });
-
-      // -----------------------------
-      // Day/Night lighting + card swap
-      // -----------------------------
-      const statusLine = document.getElementById("statusLine");
-
-      function isNightAt(lat, lon, date = new Date()) {
-        if (!window.SunCalc) return false;
-        const pos = SunCalc.getPosition(date, lat, lon);
-        const altitudeDeg = pos.altitude * 180 / Math.PI;
-        return altitudeDeg < -6; // civil twilight
-      }
-
-      function isNightByClock(date = new Date()) {
-        const h = date.getHours();
-        return h >= 19 || h < 7;
-      }
-
-      function applyLighting(night) {
-        const ambient = document.getElementById("ambientLight");
-        const dir = document.getElementById("dirLight");
-        if (!ambient || !dir) return;
-
-        if (night) {
-          ambient.setAttribute("light", "intensity", 0.35);
-          ambient.setAttribute("light", "color", "#223344");
-          dir.setAttribute("light", "intensity", 0.65);
-          dir.setAttribute("light", "color", "#88aaff");
-        } else {
-          ambient.setAttribute("light", "intensity", 0.9);
-          ambient.setAttribute("light", "color", "#ffffff");
-          dir.setAttribute("light", "intensity", 1.2);
-          dir.setAttribute("light", "color", "#ffffff");
+        // Marker events
+        if (this.marker) {
+          this.marker.addEventListener("markerFound", () => this.onFound());
+          this.marker.addEventListener("markerLost", () => this.onLost());
         }
-      }
 
-      function setCardTexture(night) {
-        const plane = document.getElementById("cardPlane");
-        if (!plane) return;
-        plane.setAttribute("material", "src", night ? "#nightImg" : "#dayImg");
-      }
+        // UI buttons
+        btns.forEach(btn => {
+          btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            this.setMode(btn.dataset.mode);
+          });
+        });
 
-      function updateStatus({ night, lat, lon, acc, source }) {
-        const mode = night ? "NIGHT" : "DAY";
-        const gpsLine = lat != null
-          ? `GPS: ${lat.toFixed(6)}, ${lon.toFixed(6)} (±${Math.round(acc)}m)`
-          : `GPS: not used (${source})`;
-        statusLine.textContent = `${gpsLine}\nLighting: ${mode}  |  Card: ${night ? "night.png" : "day.png"}`;
-      }
+        // Initial compute
+        this.refreshPhase(true);
 
-      function applyMode(night, meta = {}) {
-        applyLighting(night);
-        setCardTexture(night);
-        updateStatus({ night, ...meta });
-      }
-
-      let lastFix = null;
-
-      function startDayNight() {
-        // immediate fallback
-        applyMode(isNightByClock(), { source: "clock" });
-
-        if (!navigator.geolocation) return;
-
-        navigator.geolocation.watchPosition(
-          (pos) => {
-            lastFix = pos;
-            const { latitude, longitude, accuracy } = pos.coords;
-            const night = isNightAt(latitude, longitude);
-            applyMode(night, { lat: latitude, lon: longitude, acc: accuracy, source: "gps+suncalc" });
-          },
-          () => {
-            // if denied/fails, keep clock mode
-            applyMode(isNightByClock(), { source: "clock (gps denied)" });
-          },
-          { enableHighAccuracy: true, maximumAge: 60000, timeout: 15000 }
-        );
-      }
-
-      document.addEventListener("DOMContentLoaded", () => {
-        startDayNight();
-
-        // re-check every minute
+        // Periodic refresh (auto mode)
         setInterval(() => {
-          if (lastFix?.coords) {
-            const { latitude, longitude, accuracy } = lastFix.coords;
-            applyMode(isNightAt(latitude, longitude), { lat: latitude, lon: longitude, acc: accuracy, source: "gps+suncalc" });
-          } else {
-            applyMode(isNightByClock(), { source: "clock" });
-          }
+          if (this.mode === "auto") this.refreshPhase(false);
         }, 60 * 1000);
-      });
-    </script>
-  </body>
+      },
+
+      async refreshPhase(force) {
+        if (this.mode !== "auto") {
+          this.currentPhase = parseInt(this.mode, 10) || 1;
+          this.days = null;
+          this.timeSource = "manual";
+          this.applyPhaseVisuals(force);
+          this.updateHud();
+          return;
+        }
+
+        const { now, source } = await getServerNow();
+        this.timeSource = source;
+        this.days = daysUntilEvent(now);
+        const nextPhase = phaseFromDays(this.days);
+
+        if (force || nextPhase !== this.currentPhase) {
+          this.currentPhase = nextPhase;
+          this.applyPhaseVisuals(true);
+        }
+        this.updateHud();
+      },
+
+      setMode(mode) {
+        this.mode = mode;
+        setActiveButton(mode);
+        this.refreshPhase(true);
+      },
+
+      updateHud() {
+        const d = this.days;
+        const daysStr = (d == null) ? "—" : (d.toFixed(1) + " days");
+        statusEl.textContent =
+          `Mode: ${this.mode.toUpperCase()} | Phase: ${this.currentPhase} | Until Mar 28: ${daysStr} | Time: ${this.timeSource}` +
+          (this.visible ? " | Marker: FOUND" : " | Marker: LOST");
+      },
+
+      applyPhaseVisuals(force) {
+        // Cracks always visible
+        this.cracksPlane.setAttribute("visible", true);
+
+        // Hole + ball only in phase 2+
+        const p = this.currentPhase;
+        this.holePlane.setAttribute("visible", p >= 2);
+
+        // Ball rig exists but is shown only when marker is found (so it can animate out)
+        // We still set per-phase settings now.
+        // Phase-specific lighting
+        if (p === 1) {
+          this.setSceneLighting({ ambientI: 0.95, ambientC: "#ffffff", dirI: 1.1, dirC: "#ffffff" });
+        } else if (p === 2) {
+          this.setSceneLighting({ ambientI: 0.85, ambientC: "#f4fbff", dirI: 1.05, dirC: "#ffffff" });
+        } else {
+          // Phase 3: warmer, punchier
+          this.setSceneLighting({ ambientI: 0.55, ambientC: "#2b2a40", dirI: 1.25, dirC: "#ffd2a3" });
+        }
+
+        // Flames/ballLight only for phase 3
+        this.flames.setAttribute("visible", p === 3 && this.visible);
+        this.ballLight.setAttribute("visible", p === 3 && this.visible);
+
+        // Optional outline only for phase 3 (more “toon”)
+        this.ballOutline.setAttribute("visible", p === 3 && this.visible);
+      },
+
+      setSceneLighting({ ambientI, ambientC, dirI, dirC }) {
+        if (!this.ambient || !this.dir) return;
+        this.ambient.setAttribute("light", "intensity", ambientI);
+        this.ambient.setAttribute("light", "color", ambientC);
+        this.dir.setAttribute("light", "intensity", dirI);
+        this.dir.setAttribute("light", "color", dirC);
+      },
+
+      onFound() {
+        this.visible = true;
+        this.updateHud();
+
+        if (this.hideTimer) {
+          clearTimeout(this.hideTimer);
+          this.hideTimer = null;
+        }
+
+        // Phase 1: no ball, just cracks
+        if (this.currentPhase === 1) {
+          this.ballRig.setAttribute("visible", false);
+          this.holePlane.setAttribute("visible", false);
+          return;
+        }
+
+        // Phase 2+:
+        this.holePlane.setAttribute("visible", true);
+        this.ballRig.setAttribute("visible", true);
+
+        // Reset ball start state “inside hole”
+        this.ballRig.setAttribute("position", "0 -0.18 0");
+        this.ballRig.setAttribute("rotation", "0 0 0");
+        this.ballRig.setAttribute("scale", "1 1 1");
+
+        // Configure animation per phase
+        const isPhase3 = this.currentPhase === 3;
+
+        // Fly-out animation
+        const flyDur = isPhase3 ? 520 : 1200;
+        const flyToY = isPhase3 ? 0.55 : 0.45;
+
+        this.ballRig.setAttribute("animation__fly", `
+          property: position;
+          from: 0 -0.18 0;
+          to: 0 ${flyToY} 0;
+          dur: ${flyDur};
+          easing: ${isPhase3 ? "easeOutBack" : "easeOutCubic"};
+        `);
+
+        // Spin animation
+        const spinDur = isPhase3 ? 2200 : 6000;
+        this.ballRig.setAttribute("animation__spin", `
+          property: rotation;
+          to: 0 360 0;
+          loop: true;
+          dur: ${spinDur};
+          easing: linear;
+        `);
+
+        // Little “breathing” hover
+        this.ballRig.setAttribute("animation__hover", `
+          property: position;
+          dir: alternate;
+          loop: true;
+          dur: ${isPhase3 ? 900 : 1400};
+          easing: easeInOutSine;
+          to: 0 ${flyToY + 0.05} 0;
+        `);
+
+        // Flames + point light only in phase 3
+        this.flames.setAttribute("visible", isPhase3);
+        this.ballLight.setAttribute("visible", isPhase3);
+        this.ballOutline.setAttribute("visible", isPhase3);
+
+        // Flame sprite flicker (cheap)
+        if (isPhase3) {
+          const sprites = this.root.querySelectorAll(".flameSprite");
+          sprites.forEach((s, i) => {
+            s.setAttribute("animation__flicker", `
+              property: material.opacity;
+              from: 0.55;
+              to: 0.95;
+              dir: alternate;
+              loop: true;
+              dur: ${clamp(250 + i * 35, 250, 520)};
+              easing: easeInOutSine;
+            `);
+          });
+        }
+      },
+
+      onLost() {
+        this.visible = false;
+        this.updateHud();
+
+        // Grace period then hide ball & extras
+        if (this.hideTimer) clearTimeout(this.hideTimer);
+        this.hideTimer = setTimeout(() => {
+          this.ballRig.setAttribute("visible", false);
+          this.flames.setAttribute("visible", false);
+          this.ballLight.setAttribute("visible", false);
+          this.ballOutline.setAttribute("visible", false);
+
+          // Keep cracks visible, hide hole when not found (optional)
+          this.holePlane.setAttribute("visible", false);
+        }, GRACE_MS);
+      }
+    });
+  </script>
+</body>
 </html>
