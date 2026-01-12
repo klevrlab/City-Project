@@ -115,10 +115,10 @@
                 font-size: 28px;
             }
             #toggle-map {
-                bottom: 150px;
-                left: 10px;
-                padding: 10px 16px;
-                font-size: 12px;
+                top: 6px;
+                right: 6px;
+                padding: 6px 10px;
+                font-size: 10px;
             }
             #calibration-warning {
                 top: 10px;
@@ -148,6 +148,7 @@
             border: 1px solid rgba(0, 169, 224, 0.3);
             pointer-events: auto;
             overflow: hidden;
+            z-index: 100;
             box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
                         inset 0 1px 0 rgba(255, 255, 255, 0.2);
             transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
@@ -160,6 +161,38 @@
             width: 100%;
             height: 100%;
             position: relative;
+        }
+        .map-legend {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            font-size: 9px;
+            font-family: 'Montserrat', sans-serif;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 4px 8px;
+            border-radius: 6px;
+            line-height: 1.4;
+        }
+        .map-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 2px 0;
+        }
+        .map-legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .map-legend-dot.you {
+            background: #00A9E0;
+            border: 2px solid white;
+        }
+        .map-legend-dot.shark {
+            background: #F4901E;
+            border: 2px solid white;
         }
         .map-dot {
             position: absolute;
@@ -235,26 +268,35 @@
         }
         #toggle-map {
             position: absolute;
-            bottom: 190px;
-            left: 20px;
-            background: rgba(0, 169, 224, 0.25);
+            top: 8px;
+            right: 8px;
+            background: rgba(0, 169, 224, 0.9);
             backdrop-filter: blur(15px) saturate(180%);
             -webkit-backdrop-filter: blur(15px) saturate(180%);
             color: white;
             border: 1px solid rgba(0, 169, 224, 0.4);
-            padding: 12px 20px;
-            border-radius: 25px;
-            font-size: 13px;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 11px;
             font-weight: 600;
+            font-family: 'Montserrat', sans-serif;
             pointer-events: auto;
             cursor: pointer;
+            z-index: 200;
             box-shadow: 0 4px 16px rgba(0, 109, 117, 0.3),
                         inset 0 1px 0 rgba(255, 255, 255, 0.2);
             transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
         #toggle-map:active {
             transform: scale(0.95);
-            background: rgba(0, 169, 224, 0.4);
+            background: rgba(0, 169, 224, 1);
+        }
+        #toggle-map .icon {
+            width: 14px;
+            height: 14px;
         }
         #calibration-warning {
             position: absolute;
@@ -292,6 +334,7 @@
             padding: 6px 12px;
             border-radius: 8px;
             font-size: 10px;
+            font-family: 'Montserrat', sans-serif;
             margin-top: 8px;
             cursor: pointer;
             width: 100%;
@@ -373,14 +416,23 @@
             <p id="celebration-sharkey"></p>
         </div>
 
-        <button id="toggle-map">
-            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-            Map View
-        </button>
-
         <div id="map-container">
+            <button id="toggle-map">
+                <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span id="toggle-text">Expand</span>
+            </button>
             <div id="mini-map">
                 <div class="map-dot user" id="user-dot"></div>
+                <div class="map-legend">
+                    <div class="map-legend-item">
+                        <span class="map-legend-dot you"></span>
+                        <span>You</span>
+                    </div>
+                    <div class="map-legend-item">
+                        <span class="map-legend-dot shark"></span>
+                        <span>Sharks</span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -469,12 +521,13 @@
                 entity.setAttribute('gps-entity-place', `latitude: ${stop.lat}; longitude: ${stop.lng}`);
                 entity.setAttribute('look-at', '[gps-camera]');
                 
-                // Plushie Shark 3D Model (HEAD FIRST)
+                // Plushie Shark 3D Model (HEAD FIRST) with distance-based scaling
                 const sharkModel = document.createElement('a-entity');
+                sharkModel.setAttribute('id', `shark-model-${stop.id}`);
                 sharkModel.setAttribute('gltf-model', '#shark-model');
                 sharkModel.setAttribute('position', '0 3 0');
                 sharkModel.setAttribute('rotation', '0 0 0');
-                sharkModel.setAttribute('scale', '2.5 2.5 2.5');
+                sharkModel.setAttribute('scale', '1 1 1');
                 sharkModel.setAttribute('animation', 'property: position; to: 0 3.5 0; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine');
                 sharkModel.setAttribute('animation__rotate', 'property: rotation; to: 0 10 0; dir: alternate; loop: true; dur: 3000; easing: easeInOutSine');
                 entity.appendChild(sharkModel);
@@ -550,18 +603,39 @@
             document.getElementById('next-stop').textContent = 
                 `${nextStop.name}\n${nextStop.event}`;
 
-            // Update text visibility and scale for ALL sharks based on distance
+            // Update shark size, text visibility and scale based on GPS distance
             tourStops.forEach((stop, index) => {
                 const dist = calculateDistance(userLat, userLng, stop.lat, stop.lng);
                 const textEl = document.querySelector(`#text-${stop.id}`);
+                const sharkEl = document.querySelector(`#shark-model-${stop.id}`);
                 
+                // Dynamic shark scaling based on distance (zoom effect)
+                if (sharkEl) {
+                    let sharkScale;
+                    if (dist > 100) {
+                        // Far away: very small (0.5x)
+                        sharkScale = 0.5;
+                    } else if (dist > 50) {
+                        // 50-100m: scale from 0.5 to 1.5
+                        sharkScale = 0.5 + ((100 - dist) / 50) * 1;
+                    } else if (dist > 20) {
+                        // 20-50m: scale from 1.5 to 2.5
+                        sharkScale = 1.5 + ((50 - dist) / 30) * 1;
+                    } else {
+                        // Very close (< 20m): scale from 2.5 to 4 (HUGE!)
+                        sharkScale = 2.5 + ((20 - dist) / 20) * 1.5;
+                    }
+                    sharkEl.setAttribute('scale', `${sharkScale} ${sharkScale} ${sharkScale}`);
+                }
+                
+                // Text visibility and scaling
                 if (textEl) {
                     // Only show text within 50 meters
                     if (dist < 50) {
                         textEl.setAttribute('visible', 'true');
-                        // Scale from 10 (50m away) to 18 (very close) - more responsive
-                        let scale = 10 + ((50 - dist) / 50) * 8; // 10 to 18
-                        textEl.setAttribute('scale', `${scale} ${scale} ${scale}`);
+                        // Scale from 10 (50m away) to 18 (very close)
+                        let textScale = 10 + ((50 - dist) / 50) * 8;
+                        textEl.setAttribute('scale', `${textScale} ${textScale} ${textScale}`);
                     } else {
                         textEl.setAttribute('visible', 'false');
                     }
@@ -668,15 +742,18 @@
 
         document.getElementById('toggle-map').addEventListener('click', () => {
             const mapContainer = document.getElementById('map-container');
+            const toggleText = document.getElementById('toggle-text');
             const toggleBtn = document.getElementById('toggle-map');
             mapExpanded = !mapExpanded;
             
             if (mapExpanded) {
                 mapContainer.classList.add('expanded');
-                toggleBtn.innerHTML = '<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Collapse';
+                toggleText.textContent = 'Collapse';
+                toggleBtn.querySelector('.icon').innerHTML = '<path d="M21 9v-4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v4"/><polyline points="7 14 12 9 17 14"/><line x1="12" y1="9" x2="12" y2="21"/>';
             } else {
                 mapContainer.classList.remove('expanded');
-                toggleBtn.innerHTML = '<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Expand Map';
+                toggleText.textContent = 'Expand';
+                toggleBtn.querySelector('.icon').innerHTML = '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>';
             }
             
             updateMiniMap();
