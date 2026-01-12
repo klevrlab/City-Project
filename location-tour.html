@@ -519,7 +519,6 @@
                 const entity = document.createElement('a-entity');
                 entity.setAttribute('id', stop.id || `stop${index + 1}`);
                 entity.setAttribute('gps-entity-place', `latitude: ${stop.lat}; longitude: ${stop.lng}`);
-                entity.setAttribute('look-at', '[gps-camera]');
                 
                 // Plushie Shark 3D Model (HEAD FIRST) with distance-based scaling
                 const sharkModel = document.createElement('a-entity');
