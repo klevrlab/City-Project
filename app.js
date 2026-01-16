@@ -1060,6 +1060,7 @@ AFRAME.registerComponent("evolution-controller", {
     this.phase2BallActive = false;
     this.phase2BounceStarted = false;
     this.phase2FlyTimer = null;
+    this.lastSnappedYaw = null;
 
     // Marker events
     if (this.marker) {
@@ -1427,6 +1428,9 @@ AFRAME.registerComponent("evolution-controller", {
     if (this.phase2BallActive) {
       this.handleCourtBallBounce();
     }
+    if (this.markerDetected) {
+      this.updateCourtOrientation();
+    }
     if (this.stickyVisible && this.marker && !this.markerDetected) {
       if (!this.marker.object3D.visible) {
         this.marker.object3D.visible = true;
@@ -1435,6 +1439,27 @@ AFRAME.registerComponent("evolution-controller", {
         this.root.object3D.visible = true;
       }
     }
+  },
+
+  snapAngle90(rad) {
+    const step = Math.PI / 2;
+    return Math.round(rad / step) * step;
+  },
+
+  updateCourtOrientation() {
+    if (!this.root || !this.marker) return;
+    const markerRot = this.marker.object3D.rotation;
+    const targetYaw = this.snapAngle90(markerRot.y);
+
+    if (this.lastSnappedYaw === targetYaw && markerRot.x === 0 && markerRot.z === 0) {
+      return;
+    }
+
+    // Cancel marker tilt so the court stays upright, and snap yaw to 90-degree steps.
+    this.root.object3D.rotation.x = -markerRot.x;
+    this.root.object3D.rotation.z = -markerRot.z;
+    this.root.object3D.rotation.y = targetYaw - markerRot.y;
+    this.lastSnappedYaw = targetYaw;
   },
 
   setSceneLighting({ ambientI, ambientC, dirI, dirC }) {
@@ -1458,6 +1483,7 @@ AFRAME.registerComponent("evolution-controller", {
       this.root.object3D.visible = true;
       fadeObjectOpacity(this.root, 1, 300);
     }
+    this.updateCourtOrientation();
 
     // Show 3D scoreboard
     if (this.scoreboard3d) {
