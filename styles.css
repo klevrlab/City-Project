@@ -313,6 +313,12 @@ video#arjs-video {
   min-width: 280px;
   text-align: center;
 }
+#basketball-game.desktop {
+  right: 24px;
+  left: auto;
+  bottom: 24px;
+  transform: none;
+}
 #basketball-game.visible {
   display: block;
 }
@@ -411,6 +417,22 @@ video#arjs-video {
 #game-instructions.visible {
   display: block;
   animation: fadeInUp 0.3s ease-out;
+}
+@media (min-width: 900px) {
+  #basketball-game {
+    right: 24px;
+    left: auto;
+    bottom: 24px;
+    transform: none;
+    min-width: 320px;
+  }
+  #game-instructions {
+    right: 24px;
+    left: auto;
+    bottom: 200px;
+    transform: none;
+    min-width: 280px;
+  }
 }
 @keyframes fadeInUp {
   from {

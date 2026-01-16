@@ -1268,24 +1268,20 @@ AFRAME.registerComponent("evolution-controller", {
       }
     }
 
-    // Enable shooting in Phase 3 if hoop marker is not visible
-    if (p === 3 && this.visible && this.courtShootingEntity) {
-      const hoopMarker = document.getElementById("hoopMarker");
-      const hoopVisible = hoopMarker && hoopMarker.object3D.visible;
-
-      // Only enable court shooting if hoop marker is not visible
-      if (!hoopVisible) {
-        const shootingComp = this.courtShootingEntity.components['basketball-shooting'];
-        if (shootingComp) {
-          shootingComp.setAttribute('enabled', true);
-        }
-      }
-    } else if (this.courtShootingEntity) {
+    // Enable shooting HUD in Phase 3 even when markers are not visible
+    if (this.courtShootingEntity) {
+      const enabled = p === 3;
+      // Set on the component (if ready) and on the attribute (for late init)
       const shootingComp = this.courtShootingEntity.components['basketball-shooting'];
-      if (shootingComp) {
-        shootingComp.setAttribute('enabled', false);
-      }
+      if (shootingComp) shootingComp.setAttribute('enabled', enabled);
+      this.courtShootingEntity.setAttribute('basketball-shooting', 'enabled', enabled);
     }
+
+    // Force HUD visibility toggle for Phase 3 to avoid marker-gated UI
+    const gameUI = document.getElementById('basketball-game');
+    const instructions = document.getElementById('game-instructions');
+    if (gameUI) gameUI.classList.toggle('visible', p === 3);
+    if (instructions) instructions.classList.toggle('visible', p === 3);
 
     // Ball rig exists but is shown only when marker is found (so it can animate out)
     // We still set per-phase settings now.
@@ -1511,7 +1507,7 @@ AFRAME.registerComponent("hoop-controller", {
     // Build hoop content
     this.root.innerHTML = `
       <!-- Basketball Hoop (Phase 3 only) -->
-      <a-entity id="basketballHoop" visible="false" position="0 4.0 -3" rotation="0 0 0">
+      <a-entity id="basketballHoop" visible="false" position="0 1.75 0" rotation="0 0 0">
         <!-- Pole (support structure - extends from ground to backboard) -->
         <a-cylinder id="hoopPole"
           geometry="primitive: cylinder; radius: 0.08; height: 4.5; segmentsRadial: 16"
