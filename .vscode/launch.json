@@ -4,17 +4,37 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Launch Server",
+      "name": "Launch Server & Debug",
       "skipFiles": [
         "<node_internals>/**"
       ],
       "program": "${workspaceFolder}/server.js",
-      "console": "integratedTerminal",
-      "restart": true,
-      "runtimeExecutable": "node",
+      "cwd": "${workspaceFolder}",
       "env": {
         "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "serverReadyAction": {
+        "pattern": "Server running at (https?://[^:]+:(\\d+))",
+        "uriFormat": "%s",
+        "action": "openExternally"
       }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch Server Only",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/server.js",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
     }
   ]
 }

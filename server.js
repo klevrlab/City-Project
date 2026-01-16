@@ -14,20 +14,47 @@ const MIME_TYPES = {
   '.json': 'application/json',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.gif': 'image/gif',
   '.patt': 'application/octet-stream',
   '.glb': 'model/gltf-binary',
-  '.gltf': 'model/gltf+json'
+  '.gltf': 'model/gltf+json',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg'
 };
 
 const server = http.createServer((req, res) => {
-  let filePath = '.' + req.url;
-  if (filePath === './') {
-    filePath = './index.html';
+  // Parse URL and remove query string
+  const urlPath = new URL(req.url, `http://${req.headers.host}`).pathname;
+  const relativePath = urlPath.replace(/^\/+/, "");
+
+  // Default to index.html for root
+  const requestedPath = relativePath === "" ? "index.html" : relativePath;
+
+  // Normalize path to prevent directory traversal
+  const safePath = path.normalize(requestedPath);
+  const filePath = path.join(__dirname, safePath);
+
+  // Ensure file is within project directory
+  if (!filePath.startsWith(__dirname)) {
+    res.writeHead(403, { 'Content-Type': 'text/html' });
+    res.end('<h1>403 - Forbidden</h1>', 'utf-8');
+    return;
   }
 
   const extname = String(path.extname(filePath)).toLowerCase();
-  const contentType = MIME_TYPES[extname] || 'application/octet-stream';
+  const baseContentType = MIME_TYPES[extname] || 'application/octet-stream';
+  const isUtf8Text = ['.html', '.js', '.css', '.json'].includes(extname);
+  const contentType = isUtf8Text ? `${baseContentType}; charset=utf-8` : baseContentType;
+
+  // Set CORS headers for cross-origin resources
+  const headers = {
+    'Content-Type': contentType,
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0'
+  };
 
   fs.readFile(filePath, (error, content) => {
     if (error) {
@@ -39,7 +66,7 @@ const server = http.createServer((req, res) => {
         res.end(`Server Error: ${error.code}`, 'utf-8');
       }
     } else {
-      res.writeHead(200, { 'Content-Type': contentType });
+      res.writeHead(200, headers);
       res.end(content, 'utf-8');
     }
   });

@@ -10,8 +10,153 @@ const GRACE_MS = 800; // keep visible briefly after markerLost
 // ---------- Utility ----------
 const statusEl = document.getElementById("status");
 const btns = Array.from(document.querySelectorAll(".btn"));
+const loadingScreen = document.getElementById("loading-screen");
+const loadingBarFill = document.getElementById("loading-bar-fill");
+const loadingProgress = document.getElementById("loading-progress");
+const loadingContinue = document.getElementById("loading-continue");
+const onboarding = document.getElementById("onboarding");
+const onboardingClose = document.getElementById("onboarding-close");
+const markerSjsu = document.getElementById("marker-sjsu");
+const markerCourt = document.getElementById("marker-court");
 
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+
+function setMarkerStatus(el, active, label) {
+  if (!el) return;
+  el.classList.toggle("active", active);
+  const span = el.querySelector("span");
+  if (span) span.textContent = active ? "Detected" : label;
+}
+
+function initOnboarding() {
+  if (!onboarding) return;
+  const close = () => {
+    onboarding.style.opacity = "0";
+    onboarding.style.pointerEvents = "none";
+  };
+  if (onboardingClose) onboardingClose.addEventListener("click", close);
+}
+
+function updateMarkerGuide() {
+  setMarkerStatus(markerSjsu, window.__markerSjsuFound, "Searching");
+  setMarkerStatus(markerCourt, window.__markerCourtFound, "Searching");
+}
+
+function setObjectOpacity(obj, opacity) {
+  if (!obj) return;
+  obj.traverse((child) => {
+    if (child.isMesh && child.material) {
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      materials.forEach((mat) => {
+        if (mat.opacity == null) return;
+        if (mat.userData && mat.userData.baseOpacity == null) {
+          mat.userData.baseOpacity = mat.opacity;
+        }
+        const base = (mat.userData && mat.userData.baseOpacity != null) ? mat.userData.baseOpacity : mat.opacity;
+        mat.transparent = true;
+        mat.opacity = clamp(base * opacity, 0, 1);
+        mat.needsUpdate = true;
+      });
+    }
+  });
+}
+
+function fadeObjectOpacity(el, target, duration = 250, onComplete) {
+  if (!el || !el.object3D) return;
+  if (el.__fadeRaf) cancelAnimationFrame(el.__fadeRaf);
+
+  const start = performance.now();
+  const from = (el.__fadeOpacity != null) ? el.__fadeOpacity : 0;
+  const animate = (now) => {
+    const t = clamp((now - start) / duration, 0, 1);
+    const value = from + (target - from) * t;
+    el.__fadeOpacity = value;
+    setObjectOpacity(el.object3D, value);
+    if (t < 1) {
+      el.__fadeRaf = requestAnimationFrame(animate);
+    } else {
+      el.__fadeRaf = null;
+      if (onComplete) onComplete();
+    }
+  };
+  el.__fadeRaf = requestAnimationFrame(animate);
+}
+
+function setLoadingProgress(percent, message) {
+  if (loadingBarFill) loadingBarFill.style.width = `${percent}%`;
+  if (loadingProgress) loadingProgress.textContent = message || `${percent}%`;
+}
+
+function preloadResources() {
+  const urls = [
+    "assets/cracks.png",
+    "assets/hole.png",
+    "assets/flame.png",
+    "assets/half-court.png",
+    "assets/basketball.glb",
+    "assets/bounce.mp3",
+    "markers/sjsu-logo.patt",
+    "markers/pattern-court.patt"
+  ];
+
+  let completed = 0;
+  const total = urls.length;
+  if (total === 0) return Promise.resolve({ failed: 0 });
+
+  return Promise.allSettled(
+    urls.map((url) =>
+      fetch(url, { cache: "force-cache" })
+        .catch(() => null)
+        .finally(() => {
+          completed += 1;
+          const percent = Math.round((completed / total) * 100);
+          setLoadingProgress(percent, `Loading ${percent}%`);
+        })
+    )
+  ).then((results) => {
+    const failed = results.filter((r) => r.status !== "fulfilled").length;
+    return { failed };
+  });
+}
+
+function waitForAframeAssets() {
+  return new Promise((resolve) => {
+    const assets = document.querySelector("a-assets");
+    if (!assets) return resolve();
+    if (assets.hasLoaded) return resolve();
+    assets.addEventListener("loaded", () => resolve(), { once: true });
+  });
+}
+
+function finalizeLoading() {
+  document.body.classList.remove("loading");
+  document.body.classList.add("ready");
+  if (loadingScreen) loadingScreen.classList.remove("loading");
+}
+
+function initLoadingGate() {
+  if (!loadingScreen) return;
+  document.body.classList.add("loading");
+  loadingScreen.classList.add("loading");
+  setLoadingProgress(0, "Initializing...");
+
+  const assetPromise = waitForAframeAssets();
+  const prefetchPromise = preloadResources();
+
+  Promise.all([assetPromise, prefetchPromise]).then(([, prefetchResult]) => {
+    if (prefetchResult.failed > 0) {
+      setLoadingProgress(100, "Some assets failed. Tap to continue.");
+      if (loadingContinue) loadingContinue.style.display = "inline-flex";
+    } else {
+      setLoadingProgress(100, "Ready");
+      setTimeout(finalizeLoading, 350);
+    }
+  });
+
+  if (loadingContinue) {
+    loadingContinue.addEventListener("click", () => finalizeLoading(), { once: true });
+  }
+}
 
 function setActiveButton(mode) {
   btns.forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
@@ -327,10 +472,11 @@ AFRAME.registerComponent("basketball-shooting", {
     this.shotFeedback = document.getElementById('shot-feedback');
     this.instructions = document.getElementById('game-instructions');
 
-    // Touch/click handlers
+    // Touch/pointer handlers
     this.onTouchStart = this.onTouchStart.bind(this);
     this.onTouchEnd = this.onTouchEnd.bind(this);
-    this.onClick = this.onClick.bind(this);
+    this.onPointerDown = this.onPointerDown.bind(this);
+    this.onPointerUp = this.onPointerUp.bind(this);
     this.updatePowerMeter = this.updatePowerMeter.bind(this);
 
     // Collision detection
@@ -342,6 +488,8 @@ AFRAME.registerComponent("basketball-shooting", {
     this.ballPassedThrough = false;
     this.ballHitRim = false;
     this.powerMeterInterval = null;
+    this.inputActive = false;
+    this.inputSource = null;
   },
 
   update: function() {
@@ -363,9 +511,11 @@ AFRAME.registerComponent("basketball-shooting", {
     if (this.instructions) this.instructions.classList.add('visible');
 
     // Add event listeners
-    this.el.sceneEl.addEventListener('touchstart', this.onTouchStart);
+    this.el.sceneEl.addEventListener('touchstart', this.onTouchStart, { passive: true });
     this.el.sceneEl.addEventListener('touchend', this.onTouchEnd);
-    this.el.sceneEl.addEventListener('click', this.onClick);
+    this.el.sceneEl.addEventListener('pointerdown', this.onPointerDown);
+    window.addEventListener('pointerup', this.onPointerUp);
+    window.addEventListener('pointercancel', this.onPointerUp);
 
     // Start score checking
     this.scoreCheckInterval = setInterval(this.checkScore, 100);
@@ -380,7 +530,9 @@ AFRAME.registerComponent("basketball-shooting", {
     // Remove event listeners
     this.el.sceneEl.removeEventListener('touchstart', this.onTouchStart);
     this.el.sceneEl.removeEventListener('touchend', this.onTouchEnd);
-    this.el.sceneEl.removeEventListener('click', this.onClick);
+    this.el.sceneEl.removeEventListener('pointerdown', this.onPointerDown);
+    window.removeEventListener('pointerup', this.onPointerUp);
+    window.removeEventListener('pointercancel', this.onPointerUp);
 
     // Stop score checking
     if (this.scoreCheckInterval) {
@@ -400,7 +552,9 @@ AFRAME.registerComponent("basketball-shooting", {
   },
 
   onTouchStart: function(e) {
-    if (this.isShooting) return;
+    if (this.isShooting || this.inputActive) return;
+    this.inputActive = true;
+    this.inputSource = 'touch';
     this.touchStartTime = Date.now();
     this.touchStartPos = e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
 
@@ -409,21 +563,32 @@ AFRAME.registerComponent("basketball-shooting", {
   },
 
   onTouchEnd: function(e) {
-    if (this.isShooting) return;
+    if (this.isShooting || !this.inputActive || this.inputSource !== 'touch') return;
+    this.inputActive = false;
+    this.inputSource = null;
     this.stopPowerMeter();
     const touchEndPos = e.changedTouches ? { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY } : { x: e.clientX, y: e.clientY };
     const holdTime = Date.now() - this.touchStartTime;
     this.shoot(touchEndPos, holdTime);
   },
 
-  onClick: function(e) {
-    if (this.isShooting) return;
+  onPointerDown: function(e) {
+    if (this.isShooting || this.inputActive) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    this.inputActive = true;
+    this.inputSource = 'pointer';
     this.touchStartTime = Date.now();
+    this.touchStartPos = { x: e.clientX, y: e.clientY };
     this.startPowerMeter();
-    setTimeout(() => {
-      this.stopPowerMeter();
-      this.shoot({ x: e.clientX, y: e.clientY }, 300);
-    }, 300);
+  },
+
+  onPointerUp: function(e) {
+    if (this.isShooting || !this.inputActive || this.inputSource !== 'pointer') return;
+    this.inputActive = false;
+    this.inputSource = null;
+    this.stopPowerMeter();
+    const holdTime = Date.now() - this.touchStartTime;
+    this.shoot({ x: e.clientX, y: e.clientY }, holdTime);
   },
 
   startPowerMeter: function() {
@@ -789,8 +954,7 @@ AFRAME.registerComponent("evolution-controller", {
         position="0 0.01 0"
         rotation="-90 0 0"
         width="16.2" height="16.2"
-        material="shader: flat; src: #texHalfCourt; transparent: false; repeat: 1 1"
-        flat-lock="lockY: false;">
+        material="shader: flat; src: #texHalfCourt; transparent: false; repeat: 1 1">
       </a-plane>
 
       <!-- Phase 1 & 2: cracks (overlay) -->
@@ -1158,7 +1322,7 @@ AFRAME.registerComponent("evolution-controller", {
     // Start near the hole and fly out to the right
     const startPos = '0 0.25 0';
     const endX = 2.0;
-    const endY = 1.2;
+    const endY = 12.0;
     const endZ = 0;
     const flyDur = 600;
 
@@ -1180,7 +1344,7 @@ AFRAME.registerComponent("evolution-controller", {
       this.phase2BounceStarted = true;
       this.courtBallRig.setAttribute('position', `${endX} ${endY} ${endZ}`);
       if (this.physicsEnabled && bounceComp) {
-        bounceComp.enablePhysics(3.5);
+        bounceComp.enablePhysics(35);
       } else {
         // Fallback bounce animation if physics is disabled
         this.courtBallRig.setAttribute('animation__dribble', `
@@ -1264,6 +1428,13 @@ AFRAME.registerComponent("evolution-controller", {
     this.visible = true;
     this.updateHud();
     this.startScoreboard();
+    window.__markerSjsuFound = true;
+    updateMarkerGuide();
+
+    if (this.root) {
+      this.root.object3D.visible = true;
+      fadeObjectOpacity(this.root, 1, 300);
+    }
 
     // Show 3D scoreboard
     if (this.scoreboard3d) {
@@ -1284,6 +1455,12 @@ AFRAME.registerComponent("evolution-controller", {
     // Phase 2+: Show hole
     this.holePlane.setAttribute("visible", true);
 
+    // Phase 2: re-trigger fly-out each time the marker is detected
+    if (this.currentPhase === 2) {
+      if (this.phase2BallActive) this.stopPhase2BallAnimation();
+      this.startPhase2BallAnimation();
+    }
+
     // Notify hoop controller of phase change
     const hoopController = document.getElementById('hoopRoot');
     if (hoopController && hoopController.components['hoop-controller']) {
@@ -1295,6 +1472,8 @@ AFRAME.registerComponent("evolution-controller", {
     this.visible = false;
     this.updateHud();
     this.stopScoreboard();
+    window.__markerSjsuFound = false;
+    updateMarkerGuide();
 
     // Hide 3D scoreboard
     if (this.scoreboard3d) {
@@ -1307,6 +1486,10 @@ AFRAME.registerComponent("evolution-controller", {
       // Keep cracks visible, hide hole when not found (optional)
       this.holePlane.setAttribute("visible", false);
     }, GRACE_MS);
+
+    if (this.root) {
+      fadeObjectOpacity(this.root, 0, 250);
+    }
   }
 });
 
@@ -1318,6 +1501,12 @@ AFRAME.registerComponent("hoop-controller", {
     this.currentPhase = 1;
     this.visible = false;
     this.physicsEnabled = false;
+
+    // Ensure hoop marker is bound to the pattern-court marker
+    if (this.marker) {
+      this.marker.setAttribute("type", "pattern");
+      this.marker.setAttribute("url", "markers/pattern-court.patt");
+    }
 
     // Build hoop content
     this.root.innerHTML = `
@@ -1386,21 +1575,27 @@ AFRAME.registerComponent("hoop-controller", {
   },
 
   applyPhaseVisuals() {
-    const isPhase3 = this.currentPhase === 3;
-
-    // Show hoop in phase 3
+    // Always show hoop when the pattern court marker is visible
     if (this.basketballHoop) {
-      this.basketballHoop.setAttribute("visible", isPhase3 && this.visible);
+      this.basketballHoop.setAttribute("visible", this.visible);
     }
   },
 
   onFound() {
     this.visible = true;
     this.applyPhaseVisuals();
+    window.__markerCourtFound = true;
+    updateMarkerGuide();
+    if (this.root) {
+      this.root.object3D.visible = true;
+      fadeObjectOpacity(this.root, 1, 300);
+    }
   },
 
   onLost() {
     this.visible = false;
+    window.__markerCourtFound = false;
+    updateMarkerGuide();
 
     // Grace period then hide
     setTimeout(() => {
@@ -1408,11 +1603,17 @@ AFRAME.registerComponent("hoop-controller", {
         if (this.basketballHoop) this.basketballHoop.setAttribute("visible", false);
       }
     }, GRACE_MS);
+
+    if (this.root) {
+      fadeObjectOpacity(this.root, 0, 250);
+    }
   }
 });
 
 // Minimal diagnostics to surface camera/compositing state without touching playback.
 window.addEventListener('DOMContentLoaded', () => {
+  initOnboarding();
+  initLoadingGate();
   const scene = document.querySelector('a-scene');
   if (!scene) return;
 
