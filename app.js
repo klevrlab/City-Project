@@ -9,7 +9,7 @@ const GRACE_MS = 800; // keep visible briefly after markerLost
 
 // ---------- Utility ----------
 const statusEl = document.getElementById("status");
-const btns = Array.from(document.querySelectorAll(".btn"));
+const btns = Array.from(document.querySelectorAll("[data-mode]"));
 const loadingScreen = document.getElementById("loading-screen");
 const loadingBarFill = document.getElementById("loading-bar-fill");
 const loadingProgress = document.getElementById("loading-progress");
@@ -18,6 +18,7 @@ const onboarding = document.getElementById("onboarding");
 const onboardingClose = document.getElementById("onboarding-close");
 const markerSjsu = document.getElementById("marker-sjsu");
 const markerCourt = document.getElementById("marker-court");
+const calibrateBtn = document.getElementById("calibrate-flat");
 
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
@@ -1061,6 +1062,7 @@ AFRAME.registerComponent("evolution-controller", {
     this.phase2BounceStarted = false;
     this.phase2FlyTimer = null;
     this.lastSnappedYaw = null;
+    this.calibration = { x: 0, y: 0, z: 0, active: false };
 
     // Marker events
     if (this.marker) {
@@ -1075,6 +1077,12 @@ AFRAME.registerComponent("evolution-controller", {
         this.setMode(btn.dataset.mode);
       });
     });
+    if (calibrateBtn) {
+      calibrateBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        this.calibrateCourtOrientation();
+      });
+    }
 
     // Detect device performance and enable physics if capable (non-blocking)
     // Run after initial render to avoid blocking page load
@@ -1449,17 +1457,33 @@ AFRAME.registerComponent("evolution-controller", {
   updateCourtOrientation() {
     if (!this.root || !this.marker) return;
     const markerRot = this.marker.object3D.rotation;
-    const targetYaw = this.snapAngle90(markerRot.y);
+    const calib = this.calibration || { x: 0, y: 0, z: 0, active: false };
+    const baseYaw = markerRot.y - (calib.active ? calib.y : 0);
+    const targetYaw = this.snapAngle90(baseYaw);
 
-    if (this.lastSnappedYaw === targetYaw && markerRot.x === 0 && markerRot.z === 0) {
+    const pitch = markerRot.x - (calib.active ? calib.x : 0);
+    const roll = markerRot.z - (calib.active ? calib.z : 0);
+    if (this.lastSnappedYaw === targetYaw && pitch === 0 && roll === 0) {
       return;
     }
 
     // Cancel marker tilt so the court stays upright, and snap yaw to 90-degree steps.
-    this.root.object3D.rotation.x = -markerRot.x;
-    this.root.object3D.rotation.z = -markerRot.z;
-    this.root.object3D.rotation.y = targetYaw - markerRot.y;
+    this.root.object3D.rotation.x = -pitch;
+    this.root.object3D.rotation.z = -roll;
+    this.root.object3D.rotation.y = targetYaw - baseYaw;
     this.lastSnappedYaw = targetYaw;
+  },
+
+  calibrateCourtOrientation() {
+    if (!this.marker) return;
+    if (!this.markerDetected) {
+      if (statusEl) statusEl.textContent = "Calibration failed: find SJSU marker first.";
+      return;
+    }
+    const markerRot = this.marker.object3D.rotation;
+    this.calibration = { x: markerRot.x, y: markerRot.y, z: markerRot.z, active: true };
+    if (statusEl) statusEl.textContent = "Calibrated: hold device flat to lock the court.";
+    this.updateCourtOrientation();
   },
 
   setSceneLighting({ ambientI, ambientC, dirI, dirC }) {
@@ -1552,14 +1576,14 @@ AFRAME.registerComponent("hoop-controller", {
         <a-cylinder id="hoopPole"
           geometry="primitive: cylinder; radius: 0.08; height: 4.5; segmentsRadial: 16"
           material="color: #ff6600; metalness: 0.7; roughness: 0.3"
-          position="0 -1.75 0"
+          position="0 -1.75 -0.35"
           rotation="0 0 0">
         </a-cylinder>
         <!-- Backboard -->
         <a-plane id="backboard"
           geometry="primitive: plane; width: 1.5; height: 1.0"
           material="color: #ffffff; transparent: true; opacity: 0.9; side: double"
-          position="0 0.5 0"
+          position="0 0.5 -0.35"
           rotation="0 0 0">
         </a-plane>
         <!-- Rim (torus) -->
@@ -1571,9 +1595,9 @@ AFRAME.registerComponent("hoop-controller", {
         </a-torus>
         <!-- Net (simplified - just visual) -->
         <a-cylinder id="net"
-          geometry="primitive: cylinder; radius: 0.7; height: 0.4; segmentsRadial: 16"
+          geometry="primitive: cylinder; radius: 0.9; height: 0.55; segmentsRadial: 16"
           material="color: #ffffff; transparent: true; opacity: 0.6; wireframe: true"
-          position="0 0.05 0"
+          position="0 0.0 0"
           rotation="0 0 0">
         </a-cylinder>
         <!-- Scoring trigger (invisible cylinder for collision detection) -->
