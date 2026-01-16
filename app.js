@@ -1043,6 +1043,8 @@ AFRAME.registerComponent("evolution-controller", {
     this.dir = document.getElementById("dirLight");
 
     this.visible = false;
+    this.markerDetected = false;
+    this.stickyVisible = false;
     this.hideTimer = null;
     this.scoreboardInterval = null; // Countdown update interval
 
@@ -1190,7 +1192,7 @@ AFRAME.registerComponent("evolution-controller", {
     const perfText = this.performanceText || "";
     statusEl.textContent =
       `Mode: ${this.mode.toUpperCase()} | Phase: ${this.currentPhase} | Until Mar 28: ${daysStr} | Time: ${this.timeSource}${perfText}` +
-      (this.visible ? " | Marker: FOUND" : " | Marker: LOST");
+      (this.markerDetected ? " | Marker: FOUND" : " | Marker: LOST");
   },
 
   async startScoreboard() {
@@ -1231,14 +1233,14 @@ AFRAME.registerComponent("evolution-controller", {
     updateScoreboard(timeUntil);
 
     // Update 3D scoreboard text
-    if (this.scoreboardTime3d && this.visible) {
+    if (this.scoreboardTime3d && this.stickyVisible) {
       const timeStr = `${String(timeUntil.days).padStart(2, '0')}D ${String(timeUntil.hours).padStart(2, '0')}H ${String(timeUntil.minutes).padStart(2, '0')}M ${String(timeUntil.seconds).padStart(2, '0')}S`;
       this.scoreboardTime3d.setAttribute("value", timeStr);
     }
 
     // Show 2D scoreboard if marker is visible
     const scoreboard = document.getElementById("scoreboard");
-    if (scoreboard && this.visible) {
+    if (scoreboard && this.markerDetected) {
       scoreboard.classList.add("visible");
     }
   },
@@ -1246,42 +1248,57 @@ AFRAME.registerComponent("evolution-controller", {
   applyPhaseVisuals(force) {
     const p = this.currentPhase;
 
+    const showContent = this.stickyVisible;
+
     // Half court only visible in Phase 3 (final phase)
     if (this.halfCourtPlane) {
-      this.halfCourtPlane.setAttribute("visible", p === 3);
+      this.halfCourtPlane.setAttribute("visible", p === 3 && showContent);
     }
 
     // Cracks visible in Phase 1 and Phase 2 (not in Phase 3)
-    this.cracksPlane.setAttribute("visible", p === 1 || p === 2);
+    this.cracksPlane.setAttribute("visible", (p === 1 || p === 2) && showContent);
 
     // Hole visible only in Phase 2
-    this.holePlane.setAttribute("visible", p === 2);
+    this.holePlane.setAttribute("visible", p === 2 && showContent);
 
     // Show court basketball in Phase 2 (fly-out + bounce) and Phase 3 (shooting)
     if (this.courtBallRig) {
-      if (p === 2 && this.visible) {
+      if (p === 2 && showContent) {
         this.courtBallRig.setAttribute("visible", true);
-        this.startPhase2BallAnimation();
+        if (this.markerDetected) {
+          this.startPhase2BallAnimation();
+        }
       } else {
         if (this.phase2BallActive) this.stopPhase2BallAnimation();
-        this.courtBallRig.setAttribute("visible", p === 3 && this.visible);
+        this.courtBallRig.setAttribute("visible", p === 3 && showContent);
       }
     }
 
     // Enable shooting HUD in Phase 3 even when markers are not visible
     if (this.courtShootingEntity) {
       const enabled = p === 3;
-      // Set on the component (if ready) and on the attribute (for late init)
-      const shootingComp = this.courtShootingEntity.components['basketball-shooting'];
-      if (shootingComp) shootingComp.setAttribute('enabled', enabled);
+      // Set on the attribute (for late init) and call update if component is ready
       this.courtShootingEntity.setAttribute('basketball-shooting', 'enabled', enabled);
+      const shootingComp = this.courtShootingEntity.components['basketball-shooting'];
+      if (shootingComp) {
+        shootingComp.data.enabled = enabled;
+        if (typeof shootingComp.update === 'function') {
+          shootingComp.update();
+        }
+      }
     }
 
     // Force HUD visibility toggle for Phase 3 to avoid marker-gated UI
     const gameUI = document.getElementById('basketball-game');
     const instructions = document.getElementById('game-instructions');
-    if (gameUI) gameUI.classList.toggle('visible', p === 3);
-    if (instructions) instructions.classList.toggle('visible', p === 3);
+    if (gameUI) {
+      gameUI.classList.toggle('visible', p === 3);
+      gameUI.style.visibility = p === 3 ? 'visible' : '';
+    }
+    if (instructions) {
+      instructions.classList.toggle('visible', p === 3);
+      instructions.style.visibility = p === 3 ? 'visible' : '';
+    }
 
     // Ball rig exists but is shown only when marker is found (so it can animate out)
     // We still set per-phase settings now.
@@ -1410,6 +1427,14 @@ AFRAME.registerComponent("evolution-controller", {
     if (this.phase2BallActive) {
       this.handleCourtBallBounce();
     }
+    if (this.stickyVisible && this.marker && !this.markerDetected) {
+      if (!this.marker.object3D.visible) {
+        this.marker.object3D.visible = true;
+      }
+      if (this.root && !this.root.object3D.visible) {
+        this.root.object3D.visible = true;
+      }
+    }
   },
 
   setSceneLighting({ ambientI, ambientC, dirI, dirC }) {
@@ -1422,6 +1447,8 @@ AFRAME.registerComponent("evolution-controller", {
 
   onFound() {
     this.visible = true;
+    this.markerDetected = true;
+    this.stickyVisible = true;
     this.updateHud();
     this.startScoreboard();
     window.__markerSjsuFound = true;
@@ -1466,26 +1493,11 @@ AFRAME.registerComponent("evolution-controller", {
 
   onLost() {
     this.visible = false;
+    this.markerDetected = false;
     this.updateHud();
     this.stopScoreboard();
     window.__markerSjsuFound = false;
     updateMarkerGuide();
-
-    // Hide 3D scoreboard
-    if (this.scoreboard3d) {
-      this.scoreboard3d.setAttribute("visible", false);
-    }
-
-    // Grace period then hide hole when not found (optional)
-    if (this.hideTimer) clearTimeout(this.hideTimer);
-    this.hideTimer = setTimeout(() => {
-      // Keep cracks visible, hide hole when not found (optional)
-      this.holePlane.setAttribute("visible", false);
-    }, GRACE_MS);
-
-    if (this.root) {
-      fadeObjectOpacity(this.root, 0, 250);
-    }
   }
 });
 
@@ -1496,6 +1508,8 @@ AFRAME.registerComponent("hoop-controller", {
     this.root = this.el;
     this.currentPhase = 1;
     this.visible = false;
+    this.markerDetected = false;
+    this.stickyVisible = false;
     this.physicsEnabled = false;
 
     // Ensure hoop marker is bound to the pattern-court marker
@@ -1571,14 +1585,16 @@ AFRAME.registerComponent("hoop-controller", {
   },
 
   applyPhaseVisuals() {
-    // Always show hoop when the pattern court marker is visible
+    // Keep hoop visible after first detection; update only on new detection
     if (this.basketballHoop) {
-      this.basketballHoop.setAttribute("visible", this.visible);
+      this.basketballHoop.setAttribute("visible", this.stickyVisible);
     }
   },
 
   onFound() {
     this.visible = true;
+    this.markerDetected = true;
+    this.stickyVisible = true;
     this.applyPhaseVisuals();
     window.__markerCourtFound = true;
     updateMarkerGuide();
@@ -1590,18 +1606,19 @@ AFRAME.registerComponent("hoop-controller", {
 
   onLost() {
     this.visible = false;
+    this.markerDetected = false;
     window.__markerCourtFound = false;
     updateMarkerGuide();
+  },
 
-    // Grace period then hide
-    setTimeout(() => {
-      if (!this.visible) {
-        if (this.basketballHoop) this.basketballHoop.setAttribute("visible", false);
+  tick() {
+    if (this.stickyVisible && this.marker && !this.markerDetected) {
+      if (!this.marker.object3D.visible) {
+        this.marker.object3D.visible = true;
       }
-    }, GRACE_MS);
-
-    if (this.root) {
-      fadeObjectOpacity(this.root, 0, 250);
+      if (this.root && !this.root.object3D.visible) {
+        this.root.object3D.visible = true;
+      }
     }
   }
 });
