@@ -954,7 +954,7 @@ AFRAME.registerComponent("evolution-controller", {
         visible="false"
         position="0 0.01 0"
         rotation="-90 0 0"
-        width="16.2" height="16.2"
+        width="3.24" height="3.24"
         material="shader: flat; src: #texHalfCourt; transparent: false; repeat: 1 1">
       </a-plane>
 
