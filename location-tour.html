@@ -8,10 +8,16 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Sharks Way AR - Location Tour</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-    <script src="https://unpkg.com/aframe-look-at-component@1.0.0/dist/aframe-look-at-component.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe@1.6.0/dist/aframe-master.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Mobile debugging console -->
+    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+    <script>eruda.init();</script>
     <script>
         // Global variables for touch rotation and zoom
         let touchStartX = 0;
@@ -20,6 +26,18 @@
         let nearestSharkId = null;
         let sharkRotations = {};
         let sharkZoomLevels = {};
+        
+        // Global variables for shark tracking and celebration
+        let tourStops = [];
+        let sharkData = null;
+        let userLat = null;
+        let userLng = null;
+        let currentStopIndex = 0;
+        let mapExpanded = false;
+        let visitedStops = new Set();
+        let lastDistance = null;
+        let celebratedSharks = new Set();
+        let lastVisibleShark = null;
     </script>
     <style>
         body {
@@ -104,12 +122,27 @@
             #map-container {
                 bottom: 10px;
                 left: 10px;
-                width: 130px;
-                height: 130px;
+                width: 140px;
+                height: 140px;
             }
             #map-container.expanded {
-                width: 250px;
-                height: 250px;
+                width: 85vw;
+                height: 50vh;
+                max-width: 400px;
+                max-height: 400px;
+            }
+            #compass-indicator {
+                width: 45px;
+                height: 45px;
+                top: 8px;
+                left: 8px;
+            }
+            .compass-north-indicator {
+                top: 4px;
+                font-size: 9px;
+            }
+            .direction-label {
+                font-size: 14px;
             }
             #route-info {
                 top: 10px;
@@ -118,19 +151,21 @@
                 padding: 15px;
             }
             #rotation-controls {
-                bottom: 20px;
-                right: 30%;
-                transform: translateX(50%);
-                padding: 12px 15px;
-                gap: 10px;
+                bottom: 10px;
+                left: 74%;
+                transform: translateX(-50%);
+                width: 140px;
+                height: 140px;
+                padding: 15px;
+                gap: 8px;
             }
             .control-group {
                 gap: 6px;
             }
             .rotation-btn {
-                width: 44px;
-                height: 44px;
-                font-size: 18px;
+                width: 38px;
+                height: 38px;
+                font-size: 16px;
             }
             .rotation-row {
                 gap: 6px;
@@ -142,10 +177,14 @@
                 font-size: 28px;
             }
             #toggle-map {
-                top: 6px;
-                right: 6px;
-                padding: 6px 10px;
-                font-size: 10px;
+                bottom: 8px;
+                right: 8px;
+                padding: 8px 12px;
+                font-size: 11px;
+            }
+            #toggle-map .icon {
+                width: 14px;
+                height: 14px;
             }
         }
         @media (max-height: 700px) {
@@ -157,8 +196,8 @@
             position: absolute;
             bottom: 20px;
             left: 20px;
-            width: 160px;
-            height: 160px;
+            width: 180px;
+            height: 180px;
             background: rgba(0, 109, 117, 0.15);
             backdrop-filter: blur(20px) saturate(180%);
             -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -172,79 +211,126 @@
             transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
         #map-container.expanded {
-            width: 300px;
-            height: 300px;
+            width: 90vw;
+            height: 60vh;
+            max-width: 500px;
+            max-height: 500px;
         }
         #mini-map {
             width: 100%;
             height: 100%;
             position: relative;
+            border: none;
+            border-radius: 20px;
+            overflow: hidden;
         }
-        .map-legend {
+        .leaflet-container {
+            width: 100%;
+            height: 100%;
+            border-radius: 20px;
+        }
+        #compass-indicator {
             position: absolute;
-            bottom: 8px;
-            left: 8px;
-            font-size: 9px;
-            font-family: 'Montserrat', sans-serif;
-            color: white;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 4px 8px;
-            border-radius: 6px;
-            line-height: 1.4;
-        }
-        .map-legend-item {
+            top: 12px;
+            left: 12px;
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 169, 224, 0.95);
+            backdrop-filter: blur(15px) saturate(180%);
+            -webkit-backdrop-filter: blur(15px) saturate(180%);
+            border-radius: 50%;
             display: flex;
             align-items: center;
-            gap: 6px;
-            margin: 2px 0;
+            justify-content: center;
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 16px rgba(0, 109, 117, 0.4),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            z-index: 1001;
+            pointer-events: none;
+            transition: transform 0.3s ease;
         }
-        .map-legend-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-        }
-        .map-legend-dot.you {
-            background: #00A9E0;
-            border: 2px solid white;
-        }
-        .map-legend-dot.shark {
-            background: #F4901E;
-            border: 2px solid white;
-        }
-        .map-dot {
+        .compass-north-indicator {
             position: absolute;
-            width: 10px;
-            height: 10px;
+            top: 5px;
+            font-size: 10px;
+            font-weight: 900;
+            color: #FF4444;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+        .direction-label {
+            font-size: 16px;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+            letter-spacing: 0.5px;
+        }
+        @keyframes compassRotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        /* Directional Arrow Indicators */
+        .direction-arrow {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 80px;
+            height: 80px;
+            background: rgba(0, 169, 224, 0.95);
+            backdrop-filter: blur(15px) saturate(180%);
+            -webkit-backdrop-filter: blur(15px) saturate(180%);
             border-radius: 50%;
-            transform: translate(-50%, -50%);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            border: 3px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 4px 20px rgba(0, 169, 224, 0.8),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            animation: arrowPulse 1.5s ease-in-out infinite;
+            pointer-events: none;
         }
-        .map-dot.user {
-            background: #00A9E0;
-            border: 3px solid white;
-            z-index: 10;
-            box-shadow: 0 0 15px rgba(0, 169, 224, 0.8);
-            animation: userPulse 2s ease-in-out infinite;
+        .direction-arrow.left {
+            left: 20px;
         }
-        .map-dot.stop {
-            background: #F4901E;
-            border: 2px solid white;
-            box-shadow: 0 0 10px rgba(244, 144, 30, 0.6);
+        .direction-arrow.right {
+            right: 20px;
         }
-        .map-dot.stop.visited {
-            background: #00D084;
-            box-shadow: 0 0 10px rgba(0, 208, 132, 0.8);
+        .direction-arrow.show {
+            display: flex !important;
         }
-        .map-dot.stop.current {
-            animation: targetPulse 1.5s ease-in-out infinite;
+        .direction-arrow svg {
+            width: 32px;
+            height: 32px;
+            stroke: white;
+            stroke-width: 3;
+            fill: none;
         }
-        @keyframes userPulse {
-            0%, 100% { transform: translate(-50%, -50%) scale(1); }
-            50% { transform: translate(-50%, -50%) scale(1.2); }
+        @keyframes arrowPulse {
+            0%, 100% { 
+                transform: translateY(-50%) scale(1);
+                box-shadow: 0 4px 20px rgba(0, 169, 224, 0.6);
+            }
+            50% { 
+                transform: translateY(-50%) scale(1.1);
+                box-shadow: 0 6px 30px rgba(0, 169, 224, 0.9);
+            }
         }
-        @keyframes targetPulse {
-            0%, 100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 10px rgba(244, 144, 30, 0.6); }
-            50% { transform: translate(-50%, -50%) scale(1.3); box-shadow: 0 0 20px rgba(244, 144, 30, 1); }
+        @media (max-width: 480px) {
+            .direction-arrow {
+                width: 70px;
+                height: 70px;
+            }
+            .direction-arrow.left {
+                left: 15px;
+            }
+            .direction-arrow.right {
+                right: 15px;
+            }
+            .direction-arrow svg {
+                width: 35px;
+                height: 35px;
+            }
         }
         #route-info {
             position: absolute;
@@ -261,6 +347,34 @@
             box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
                         inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
+        #proximity-warning {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(244, 144, 30, 0.95);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            color: white;
+            padding: 20px 25px;
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 8px 32px rgba(244, 144, 30, 0.6);
+            z-index: 3000;
+            display: none;
+            max-width: 250px;
+        }
+        #proximity-warning.show {
+            display: block;
+            animation: warningPulse 1s ease-in-out infinite;
+        }
+        @keyframes warningPulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.05); }
+        }
         /* Hide A-Frame VR/fullscreen button */
         .a-enter-vr-button,
         .a-enter-ar-button,
@@ -269,22 +383,27 @@
         }
         #rotation-controls {
             position: fixed;
-            bottom: 30px;
-            right: 30%;
-            transform: translateX(50%);
+            bottom: 20px;
+            left: 74%;
+            transform: translateX(-50%);
+            width: 180px;
+            height: 180px;
             display: none;
             flex-direction: row;
-            gap: 15px;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
             pointer-events: auto;
             background: rgba(0, 109, 117, 0.15);
             backdrop-filter: blur(20px) saturate(180%);
             -webkit-backdrop-filter: blur(20px) saturate(180%);
-            padding: 15px 20px;
-            border-radius: 25px;
+            padding: 20px;
+            border-radius: 20px;
             border: 1px solid rgba(0, 169, 224, 0.3);
             box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
                         inset 0 1px 0 rgba(255, 255, 255, 0.2);
             z-index: 1000;
+            box-sizing: border-box;
         }
         #rotation-controls.active {
             display: flex;
@@ -294,38 +413,43 @@
             flex-direction: column;
             gap: 8px;
             align-items: center;
+            justify-content: center;
         }
         .rotation-btn {
-            background: rgba(0, 169, 224, 0.9);
-            border: 1px solid rgba(0, 169, 224, 0.4);
+            background: rgba(0, 169, 224, 0.95);
+            border: 2px solid rgba(255, 255, 255, 0.3);
             color: white;
-            width: 50px;
-            height: 50px;
+            width: 42px;
+            height: 42px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
-            box-shadow: 0 4px 16px rgba(0, 109, 117, 0.4);
+            box-shadow: 0 4px 16px rgba(0, 109, 117, 0.5),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.3);
             transition: all 0.2s ease;
         }
         .rotation-btn:active {
-            transform: scale(0.9);
+            transform: scale(0.92);
             background: rgba(0, 169, 224, 1);
+            box-shadow: 0 2px 8px rgba(0, 109, 117, 0.6);
         }
         .rotation-row {
             display: flex;
             gap: 8px;
             justify-content: center;
+            align-items: center;
         }
         .zoom-btn {
-            background: rgba(244, 144, 30, 0.9);
-            border: 1px solid rgba(244, 144, 30, 0.4);
+            background: rgba(244, 144, 30, 0.95);
+            border: 2px solid rgba(255, 255, 255, 0.3);
         }
         .zoom-btn:active {
             background: rgba(244, 144, 30, 1);
+            box-shadow: 0 2px 8px rgba(244, 144, 30, 0.6);
         }
         #route-info h3 {
             margin: 0 0 10px 0;
@@ -352,35 +476,42 @@
         }
         #toggle-map {
             position: absolute;
-            top: 8px;
-            right: 8px;
-            background: rgba(0, 169, 224, 0.9);
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 169, 224, 0.95);
             backdrop-filter: blur(15px) saturate(180%);
             -webkit-backdrop-filter: blur(15px) saturate(180%);
             color: white;
-            border: 1px solid rgba(0, 169, 224, 0.4);
-            padding: 8px 14px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 16px;
+            border-radius: 25px;
+            font-size: 12px;
+            font-weight: 700;
             font-family: 'Montserrat', sans-serif;
             pointer-events: auto;
             cursor: pointer;
-            z-index: 200;
-            box-shadow: 0 4px 16px rgba(0, 109, 117, 0.3),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            z-index: 1002;
+            box-shadow: 0 4px 16px rgba(0, 109, 117, 0.5),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.3);
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
+            white-space: nowrap;
+        }
+        #toggle-map:hover {
+            background: rgba(0, 169, 224, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 109, 117, 0.6);
         }
         #toggle-map:active {
-            transform: scale(0.95);
+            transform: scale(0.95) translateY(0);
             background: rgba(0, 169, 224, 1);
         }
         #toggle-map .icon {
-            width: 14px;
-            height: 14px;
+            width: 16px;
+            height: 16px;
+            stroke-width: 2.5;
         }
         #arrival-celebration {
             position: fixed;
@@ -429,6 +560,18 @@
 </head>
 <body>
     <div id="ui-overlay">
+        <!-- Directional Arrow Indicators -->
+        <div class="direction-arrow left" id="arrow-left">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+        </div>
+        <div class="direction-arrow right" id="arrow-right">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+        </div>
+
         <div id="header">
             <img id="event-icon-header" src="./the-big-game.svg" alt="Event" onerror="this.style.display='none'">
             <h2>Sharks Way Tour</h2>
@@ -448,24 +591,22 @@
             <p id="celebration-sharkey"></p>
         </div>
 
+        <div id="proximity-warning">
+            <svg class="icon" style="width: 20px; height: 20px; margin-bottom: 8px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4m0 4h.01"/></svg>
+            <div>Too Close!</div>
+            <div style="font-size: 11px; margin-top: 8px; opacity: 0.9;">Step back 8+ meters to view Sharkey</div>
+        </div>
+
         <div id="map-container">
             <button id="toggle-map">
                 <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 <span id="toggle-text">Expand</span>
             </button>
-            <div id="mini-map">
-                <div class="map-dot user" id="user-dot"></div>
-                <div class="map-legend">
-                    <div class="map-legend-item">
-                        <span class="map-legend-dot you"></span>
-                        <span>You</span>
-                    </div>
-                    <div class="map-legend-item">
-                        <span class="map-legend-dot shark"></span>
-                        <span>Sharks</span>
-                    </div>
-                </div>
+            <div id="compass-indicator">
+                <div class="compass-north-indicator">N</div>
+                <span class="direction-label" id="compass-direction">N</span>
             </div>
+            <div id="mini-map"></div>
         </div>
 
         <div id="rotation-controls">
@@ -495,8 +636,9 @@
 
     <a-scene
         vr-mode-ui="enabled: false"
-        arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
-        renderer="logarithmicDepthBuffer: true; precision: medium;">
+        arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false; gpsMinDistance: 10;"
+        renderer="logarithmicDepthBuffer: true; precision: medium;"
+        camera="near: 0.1; far: 10000;">
 
         <a-assets>
             <a-asset-item id="shark-model" src="./plushie_shark.glb"></a-asset-item>
@@ -520,14 +662,109 @@
     </a-scene>
 
     <script>
-        let tourStops = [];
-        let sharkData = null;
-        let userLat = null;
-        let userLng = null;
-        let currentStopIndex = 0;
-        let mapExpanded = false;
-        let visitedStops = new Set();
-        let lastDistance = null;
+        // Register custom A-Frame component to enforce minimum distance
+        AFRAME.registerComponent('min-distance-enforcer', {
+            schema: {
+                minDistance: {type: 'number', default: 10}
+            },
+            init: function() {
+                this.checkDistance = this.checkDistance.bind(this);
+                // Start hidden by default
+                this.el.setAttribute('visible', false);
+            },
+            tick: function() {
+                this.checkDistance();
+            },
+            checkDistance: function() {
+                // Lazy load camera reference
+                if (!this.camera) {
+                    this.camera = document.querySelector('[gps-camera]');
+                    if (!this.camera) return;
+                }
+                
+                try {
+                    const cameraPos = this.camera.object3D.position;
+                    const entityPos = this.el.object3D.position;
+                    const distance = cameraPos.distanceTo(entityPos);
+                    
+                    // Hide if too close (within minimum distance)
+                    if (distance < this.data.minDistance) {
+                        this.el.setAttribute('visible', false);
+                    } else {
+                        this.el.setAttribute('visible', true);
+                    }
+                } catch(e) {
+                    // Silently fail if positions not ready
+                }
+            }
+        });
+        
+        // Register component to detect when shark is in camera view
+        AFRAME.registerComponent('shark-visibility-detector', {
+            schema: {
+                sharkId: {type: 'string', default: ''}
+            },
+            init: function() {
+                this.checkVisibility = this.checkVisibility.bind(this);
+                this.wasVisible = false;
+            },
+            tick: function() {
+                this.checkVisibility();
+            },
+            checkVisibility: function() {
+                if (!this.camera) {
+                    this.camera = document.querySelector('[gps-camera]');
+                    if (!this.camera) return;
+                }
+                
+                try {
+                    // Check if entity is visible and in front of camera
+                    const isVisible = this.el.getAttribute('visible');
+                    if (!isVisible) {
+                        this.wasVisible = false;
+                        return;
+                    }
+                    
+                    // Get camera and entity positions
+                    const cameraPos = this.camera.object3D.position;
+                    const entityPos = this.el.object3D.position;
+                    const distance = cameraPos.distanceTo(entityPos);
+                    
+                    // Get camera direction
+                    const cameraDirection = new THREE.Vector3();
+                    this.camera.object3D.getWorldDirection(cameraDirection);
+                    
+                    // Get direction to entity
+                    const toEntity = new THREE.Vector3();
+                    toEntity.subVectors(entityPos, cameraPos).normalize();
+                    
+                    // Calculate angle between camera direction and entity direction
+                    const dotProduct = cameraDirection.dot(toEntity);
+                    const angle = Math.acos(dotProduct) * (180 / Math.PI);
+                    
+                    // Shark is in view if angle < 30 degrees and distance is reasonable
+                    const inView = angle < 30 && distance > 8 && distance < 50;
+                    
+                    // Debug logging every 60 frames (~1 second)
+                    if (!this.frameCount) this.frameCount = 0;
+                    this.frameCount++;
+                    if (this.frameCount % 60 === 0) {
+                        console.log(`Shark ${this.data.sharkId}: dist=${distance.toFixed(1)}m, angle=${angle.toFixed(1)}°, inView=${inView}, visible=${isVisible}`);
+                    }
+                    
+                    // Trigger celebration when shark enters view for the first time
+                    if (inView && !this.wasVisible && !celebratedSharks.has(this.data.sharkId)) {
+                        console.log(`🎉 Shark ${this.data.sharkId} entered camera view!`);
+                        celebrateSharkInView(this.data.sharkId);
+                        this.wasVisible = true;
+                    } else if (!inView) {
+                        this.wasVisible = false;
+                    }
+                } catch(e) {
+                    console.error('Visibility check error:', e);
+                }
+            }
+        });
 
         // Load shark locations from JSON
         fetch('./shark-locations.json')
@@ -546,16 +783,26 @@
                 }));
                 console.log(`✅ Loaded ${tourStops.length} shark locations from JSON`);
                 createSharkEntities();
+                // Initialize map once we have shark locations
+                initializeMap();
+                if (userLat && userLng) {
+                    updateLeafletMap();
+                }
             })
             .catch(error => {
                 console.error('❌ Error loading shark locations:', error);
                 // Fallback to default locations if JSON fails
                 tourStops = [
-                    { name: "SAP Center", event: "The Big Game", lat: 37.3326, lng: -121.9010 },
-                    { name: "Downtown SJ", event: "March Madness", lat: 37.3382, lng: -121.8863 },
-                    { name: "San Pedro Square", event: "World Cup", lat: 37.3369, lng: -121.8936 }
+                    { id: 'stop1', name: "SAP Center", event: "The Big Game", lat: 37.3326, lng: -121.9010 },
+                    { id: 'stop2', name: "Downtown SJ", event: "March Madness", lat: 37.3382, lng: -121.8863 },
+                    { id: 'stop3', name: "San Pedro Square", event: "World Cup", lat: 37.3369, lng: -121.8936 }
                 ];
                 createSharkEntities();
+                // Initialize map once we have shark locations
+                initializeMap();
+                if (userLat && userLng) {
+                    updateLeafletMap();
+                }
             });
 
         function createSharkEntities() {
@@ -566,15 +813,18 @@
                 const entity = document.createElement('a-entity');
                 entity.setAttribute('id', stop.id || `stop${index + 1}`);
                 entity.setAttribute('gps-entity-place', `latitude: ${stop.lat}; longitude: ${stop.lng}`);
+                entity.setAttribute('min-distance-enforcer', 'minDistance: 10');
+                entity.setAttribute('shark-visibility-detector', `sharkId: ${stop.id}`);
+                entity.setAttribute('visible', 'false'); // Start hidden, will show when distance check passes
                 
-                // Plushie Shark 3D Model centered on platform
+                // Plushie Shark 3D Model centered on platform (elevated higher to avoid camera overlap)
                 const sharkModel = document.createElement('a-entity');
                 sharkModel.setAttribute('id', `shark-model-${stop.id}`);
                 sharkModel.setAttribute('gltf-model', '#shark-model');
-                sharkModel.setAttribute('position', '0 2 0');
+                sharkModel.setAttribute('position', '0 5 0');
                 sharkModel.setAttribute('rotation', '0 0 0');
-                sharkModel.setAttribute('scale', '1 1 1');
-                sharkModel.setAttribute('animation', 'property: position; to: 0 2 0; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine');
+                sharkModel.setAttribute('scale', '0.6 0.6 0.6');
+                sharkModel.setAttribute('animation', 'property: position; to: 0 5.3 0; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine');
                 entity.appendChild(sharkModel);
                 
                 // Initialize rotation and zoom tracking
@@ -590,9 +840,9 @@
                 platform.setAttribute('animation', 'property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear');
                 entity.appendChild(platform);
                 
-                // Ring (LARGER)
+                // Ring (LARGER) - positioned at shark height
                 const ring = document.createElement('a-torus');
-                ring.setAttribute('position', '0 2 0');
+                ring.setAttribute('position', '0 5 0');
                 ring.setAttribute('radius', '1.8');
                 ring.setAttribute('radius-tubular', '0.1');
                 ring.setAttribute('color', '#00A9E0');
@@ -667,11 +917,28 @@
                 });
             }
             
+            // Check if user is too close to ANY shark
+            let tooCloseToShark = false;
+            
             // Update shark size, text visibility and scale based on GPS distance
             tourStops.forEach((stop, index) => {
                 const dist = calculateDistance(userLat, userLng, stop.lat, stop.lng);
                 const textEl = document.querySelector(`#text-${stop.id}`);
                 const sharkEl = document.querySelector(`#shark-model-${stop.id}`);
+                const entityEl = document.querySelector(`#${stop.id}`);
+                
+                // CRITICAL FIX: Hide entire entity if too close (prevents camera inside model)
+                if (entityEl) {
+                    if (dist < 8) {
+                        // Too close - hide everything to prevent glitch (increased from 3m to 8m)
+                        entityEl.setAttribute('visible', 'false');
+                        tooCloseToShark = true;
+                        return; // Skip rest of processing for this shark
+                    } else {
+                        // Far enough - show entity
+                        entityEl.setAttribute('visible', 'true');
+                    }
+                }
                 
                 // Dynamic shark scaling based on distance (zoom effect)
                 if (sharkEl) {
@@ -680,14 +947,14 @@
                         // Far away: very small (0.5x)
                         sharkScale = 0.5;
                     } else if (dist > 50) {
-                        // 50-100m: scale from 0.5 to 1.5
-                        sharkScale = 0.5 + ((100 - dist) / 50) * 1;
+                        // 50-100m: scale from 0.5 to 1.2
+                        sharkScale = 0.5 + ((100 - dist) / 50) * 0.7;
                     } else if (dist > 20) {
-                        // 20-50m: scale from 1.5 to 2.5
-                        sharkScale = 1.5 + ((50 - dist) / 30) * 1;
-                    } else {
-                        // Very close (< 20m): scale from 2.5 to 4 (HUGE!)
-                        sharkScale = 2.5 + ((20 - dist) / 20) * 1.5;
+                        // 20-50m: scale from 1.2 to 2.0
+                        sharkScale = 1.2 + ((50 - dist) / 30) * 0.8;
+                    } else if (dist >= 8) {
+                        // Close (8-20m): scale from 2.0 to 3.0 (visible but not overwhelming)
+                        sharkScale = 2.0 + ((20 - dist) / 12) * 1.0;
                     }
                     sharkEl.setAttribute('scale', `${sharkScale} ${sharkScale} ${sharkScale}`);
                 }
@@ -708,32 +975,63 @@
                     }
                 }
             });
-
-            if (distance < 30 && !visitedStops.has(currentStopIndex)) {
-                celebrateArrival(nextStop);
-                visitedStops.add(currentStopIndex);
-                currentStopIndex = (currentStopIndex + 1) % tourStops.length;
+            
+            // Show/hide proximity warning
+            const proximityWarning = document.getElementById('proximity-warning');
+            if (tooCloseToShark) {
+                proximityWarning.classList.add('show');
+            } else {
+                proximityWarning.classList.remove('show');
             }
+
+            // Checkpoint arrival logic removed - celebration now happens when shark is in view
             
             lastDistance = distance;
         }
 
-        function celebrateArrival(stop) {
+        function celebrateSharkInView(sharkId) {
+            // Find the shark data
+            const shark = tourStops.find(s => s.id === sharkId);
+            if (!shark || celebratedSharks.has(sharkId)) return;
+            
+            celebratedSharks.add(sharkId);
+            visitedStops.add(tourStops.indexOf(shark));
+            
             const celebration = document.getElementById('arrival-celebration');
-            document.getElementById('celebration-title').innerHTML = `<svg class="icon" style="width: 24px; height: 24px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="m9 16 2 2 4-4"/></svg>You've Arrived at ${stop.name}!`;
-            document.getElementById('celebration-message').textContent = `Welcome to ${stop.event}`;
-            document.getElementById('celebration-sharkey').textContent = `Sharkey says: Great job finding this stop! Enjoy the experience!`;
+            document.getElementById('celebration-title').innerHTML = `<svg class="icon" style="width: 24px; height: 24px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="m9 16 2 2 4-4"/></svg>🎉 Hooray! You Found Sharkey!`;
+            document.getElementById('celebration-message').textContent = `${shark.name} - ${shark.event}`;
+            document.getElementById('celebration-sharkey').textContent = shark.sharkeyMessage || `Sharkey says: Great job finding me! Enjoy the experience!`;
             
             celebration.classList.add('show');
             
-            createConfetti();
+            // Hide arrows during celebration
+            arrowsEnabled = false;
+            const arrowLeft = document.getElementById('arrow-left');
+            const arrowRight = document.getElementById('arrow-right');
+            if (arrowLeft) arrowLeft.classList.remove('show');
+            if (arrowRight) arrowRight.classList.remove('show');
             
-            if ('vibrate' in navigator) {
-                navigator.vibrate([200, 100, 200]);
+            // Vibrate on arrival (only if user has interacted with page)
+            try {
+                if (navigator.vibrate && document.hasFocus()) {
+                    navigator.vibrate([200, 100, 200]);
+                }
+            } catch (e) {
+                // Silently fail if vibration not allowed
             }
+            
+            createConfetti();
             
             setTimeout(() => {
                 celebration.classList.remove('show');
+                // Re-enable arrows after celebration
+                arrowsEnabled = true;
+                console.log('🎯 Arrows re-enabled after celebration');
+                // Force immediate update
+                setTimeout(() => {
+                    updateDirectionalArrows();
+                    console.log('🎯 Arrow update called after celebration');
+                }, 100);
             }, 4000);
         }
 
@@ -754,46 +1052,243 @@
             }
         }
 
-        function updateMiniMap() {
-            if (!userLat || !userLng) return;
-
+        let currentHeading = 0;
+        let map = null;
+        let userMarker = null;
+        let sharkMarkers = [];
+        
+        function initializeMap() {
+            if (map) return; // Already initialized
+            
             const mapContainer = document.getElementById('mini-map');
-            const userDot = document.getElementById('user-dot');
-
-            const existingStops = mapContainer.querySelectorAll('.map-dot.stop');
-            existingStops.forEach(dot => dot.remove());
-
-            const centerLat = userLat;
-            const centerLng = userLng;
-            const scale = mapExpanded ? 1500 : 3000;
-            const mapSize = mapExpanded ? 280 : 150;
-            const center = mapSize / 2;
-
-            userDot.style.left = '50%';
-            userDot.style.top = '50%';
-
+            
+            // Create Leaflet map with OpenStreetMap tiles
+            map = L.map(mapContainer, {
+                zoomControl: false,
+                attributionControl: true
+            }).setView([16.475338, 81.846102], 16);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap',
+                maxZoom: 19
+            }).addTo(map);
+            
+            console.log('🗺️ OpenStreetMap initialized');
+        }
+        
+        function updateLeafletMap() {
+            if (!userLat || !userLng || tourStops.length === 0) return;
+            
+            // Initialize map if not already done
+            if (!map) {
+                initializeMap();
+            }
+            
+            const zoom = mapExpanded ? 15 : 16;
+            
+            // Center map on user location
+            map.setView([userLat, userLng], zoom);
+            
+            // Remove old markers
+            if (userMarker) {
+                map.removeLayer(userMarker);
+            }
+            sharkMarkers.forEach(marker => map.removeLayer(marker));
+            sharkMarkers = [];
+            
+            // Find closest shark
+            let closestIndex = 0;
+            let minDistance = Infinity;
             tourStops.forEach((stop, index) => {
-                const dx = (stop.lng - centerLng) * scale * Math.cos(centerLat * Math.PI / 180);
-                const dy = (centerLat - stop.lat) * scale;
-
-                const x = center + dx;
-                const y = center + dy;
-
-                if (x >= 0 && x <= mapSize && y >= 0 && y <= mapSize) {
-                    const stopDot = document.createElement('div');
-                    stopDot.className = 'map-dot stop';
-                    if (visitedStops.has(index)) {
-                        stopDot.classList.add('visited');
-                    }
-                    if (index === currentStopIndex) {
-                        stopDot.classList.add('current');
-                    }
-                    stopDot.style.left = `${x}px`;
-                    stopDot.style.top = `${y}px`;
-                    stopDot.title = stop.name;
-                    mapContainer.appendChild(stopDot);
+                const dist = calculateDistance(userLat, userLng, stop.lat, stop.lng);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    closestIndex = index;
                 }
             });
+            
+            // Responsive marker sizes
+            const userSize = mapExpanded ? 32 : 24;
+            const sharkSize = mapExpanded ? 38 : 28;
+            const fontSize = mapExpanded ? 15 : 12;
+            
+            // Create custom user icon
+            const userIcon = L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="background: #00A9E0; width: ${userSize}px; height: ${userSize}px; border-radius: 50%; border: 2px solid white; box-shadow: 0 3px 10px rgba(0,169,224,0.5); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: ${fontSize}px;">U</div>`,
+                iconSize: [userSize, userSize],
+                iconAnchor: [userSize/2, userSize/2]
+            });
+            
+            // Add user marker
+            userMarker = L.marker([userLat, userLng], { icon: userIcon })
+                .addTo(map)
+                .bindPopup('Your Location');
+            
+            // Add shark markers - only closest is highlighted
+            tourStops.forEach((stop, index) => {
+                const isClosest = index === closestIndex;
+                const isVisited = visitedStops.has(index);
+                
+                // Color scheme: Closest = Orange, Visited = Green, Others = Gray
+                let color, opacity, borderColor;
+                if (isVisited) {
+                    color = '#00D084';
+                    opacity = 0.9;
+                    borderColor = 'white';
+                } else if (isClosest) {
+                    color = '#F4901E';
+                    opacity = 1;
+                    borderColor = 'white';
+                } else {
+                    color = '#9E9E9E';
+                    opacity = 0.6;
+                    borderColor = 'rgba(255,255,255,0.5)';
+                }
+                
+                const sharkIcon = L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div style="background: ${color}; width: ${sharkSize}px; height: ${sharkSize}px; border-radius: 50%; border: 2px solid ${borderColor}; box-shadow: 0 3px 10px rgba(0,0,0,${opacity * 0.4}); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: ${fontSize}px; opacity: ${opacity};">${index + 1}</div>`,
+                    iconSize: [sharkSize, sharkSize],
+                    iconAnchor: [sharkSize/2, sharkSize/2]
+                });
+                
+                const marker = L.marker([stop.lat, stop.lng], { icon: sharkIcon })
+                    .addTo(map)
+                    .bindPopup(`<strong>${stop.name}</strong><br>${stop.event}<br>${isClosest ? '<em>Closest to you!</em>' : ''}`);
+                
+                sharkMarkers.push(marker);
+            });
+            
+            console.log('📍 Map updated: Closest shark is #' + (closestIndex + 1));
+        }
+        
+        function updateCompass(heading) {
+            currentHeading = heading;
+            const compassEl = document.getElementById('compass-indicator');
+            const directionEl = document.getElementById('compass-direction');
+            
+            // Rotate compass to show direction
+            compassEl.style.transform = `rotate(${-heading}deg)`;
+            
+            // Update direction label (N, NE, E, SE, S, SW, W, NW)
+            const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+            const index = Math.round(heading / 45) % 8;
+            directionEl.textContent = directions[index];
+        }
+        
+        // Get device orientation for compass and directional arrows
+        let deviceHeading = 0;
+        
+        if (window.DeviceOrientationEvent) {
+            window.addEventListener('deviceorientation', (event) => {
+                if (event.alpha !== null) {
+                    // Alpha gives compass heading (0-360)
+                    deviceHeading = event.alpha;
+                    updateCompass(deviceHeading);
+                    updateDirectionalArrows();
+                }
+            });
+        }
+        
+        let arrowsEnabled = true;
+        
+        // Handle page visibility to fix mobile initialization issue
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                // Page became visible - force update
+                console.log('📱 Page visible, forcing update');
+                setTimeout(() => {
+                    updateRouteInfo();
+                    updateDirectionalArrows();
+                }, 100);
+            }
+        });
+        
+        function updateDirectionalArrows() {
+            if (!arrowsEnabled || !userLat || !userLng || tourStops.length === 0) return;
+            
+            const arrowLeft = document.getElementById('arrow-left');
+            const arrowRight = document.getElementById('arrow-right');
+            
+            if (!arrowLeft || !arrowRight) return;
+            
+            // Find closest unvisited shark
+            let closestShark = null;
+            let minDistance = Infinity;
+            
+            tourStops.forEach((stop, index) => {
+                // Skip visited sharks
+                if (visitedStops.has(index)) return;
+                
+                const dist = calculateDistance(userLat, userLng, stop.lat, stop.lng);
+                if (dist < minDistance && dist < 300) {
+                    minDistance = dist;
+                    closestShark = stop;
+                }
+            });
+            
+            if (!closestShark) {
+                // No unvisited sharks nearby
+                arrowLeft.classList.remove('show');
+                arrowRight.classList.remove('show');
+                arrowLeft.style.display = 'none';
+                arrowRight.style.display = 'none';
+                return;
+            }
+            
+            // Show directional arrows based on GPS bearing (hide only when very close < 1m)
+            if (minDistance > 1) {
+                const bearing = calculateBearing(userLat, userLng, closestShark.lat, closestShark.lng);
+                const heading = deviceHeading || 0;
+                let relativeAngle = bearing - heading;
+                
+                // Normalize to -180 to 180
+                while (relativeAngle > 180) relativeAngle -= 360;
+                while (relativeAngle < -180) relativeAngle += 360;
+                
+                // Show arrow based on direction (±30 degree threshold)
+                if (relativeAngle < -30) {
+                    arrowLeft.classList.add('show');
+                    arrowRight.classList.remove('show');
+                    arrowLeft.style.display = 'flex';
+                    arrowRight.style.display = 'none';
+                } else if (relativeAngle > 30) {
+                    arrowRight.classList.add('show');
+                    arrowLeft.classList.remove('show');
+                    arrowRight.style.display = 'flex';
+                    arrowLeft.style.display = 'none';
+                } else {
+                    // Facing shark - hide arrows
+                    arrowLeft.classList.remove('show');
+                    arrowRight.classList.remove('show');
+                    arrowLeft.style.display = 'none';
+                    arrowRight.style.display = 'none';
+                }
+            } else {
+                // Very close to shark (< 1m) - hide arrows
+                arrowLeft.classList.remove('show');
+                arrowRight.classList.remove('show');
+                arrowLeft.style.display = 'none';
+                arrowRight.style.display = 'none';
+                console.log('🎯 Very close to shark (' + minDistance.toFixed(1) + 'm) - arrows hidden');
+            }
+        }
+        
+        function calculateBearing(lat1, lon1, lat2, lon2) {
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+            
+            const y = Math.sin(Δλ) * Math.cos(φ2);
+            const x = Math.cos(φ1) * Math.sin(φ2) -
+                      Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+            
+            const θ = Math.atan2(y, x);
+            const bearing = (θ * 180 / Math.PI + 360) % 360; // Convert to degrees and normalize
+            
+            return bearing;
         }
 
         window.addEventListener('gps-camera-update-position', (e) => {
@@ -804,26 +1299,82 @@
                 `<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>${userLat.toFixed(4)}, ${userLng.toFixed(4)}`;
             
             updateRouteInfo();
-            updateMiniMap();
+            updateLeafletMap();
+            updateDirectionalArrows();
         });
+        
+        // Update arrows periodically
+        setInterval(updateDirectionalArrows, 500);
+        
+        // Multiple initialization points for mobile reliability
+        
+        // 1. Scene loaded event
+        const scene = document.querySelector('a-scene');
+        if (scene) {
+            scene.addEventListener('loaded', () => {
+                console.log('🎯 Scene loaded');
+                setTimeout(() => {
+                    updateRouteInfo();
+                    updateDirectionalArrows();
+                }, 500);
+            });
+        }
+        
+        // 2. Window load event
+        window.addEventListener('load', () => {
+            console.log('🎯 Window loaded');
+            setTimeout(() => {
+                updateRouteInfo();
+                updateDirectionalArrows();
+            }, 1000);
+        });
+        
+        // 3. Delayed fallback
+        setTimeout(() => {
+            console.log('🎯 Delayed init 2s');
+            updateRouteInfo();
+            updateDirectionalArrows();
+        }, 2000);
+        
+        // 4. Extra delayed fallback for slow mobile
+        setTimeout(() => {
+            console.log('🎯 Delayed init 4s');
+            updateRouteInfo();
+            updateDirectionalArrows();
+        }, 4000);
 
         document.getElementById('toggle-map').addEventListener('click', () => {
             const mapContainer = document.getElementById('map-container');
             const toggleText = document.getElementById('toggle-text');
             const toggleBtn = document.getElementById('toggle-map');
+            const rotationControls = document.getElementById('rotation-controls');
             mapExpanded = !mapExpanded;
             
             if (mapExpanded) {
                 mapContainer.classList.add('expanded');
                 toggleText.textContent = 'Collapse';
                 toggleBtn.querySelector('.icon').innerHTML = '<path d="M21 9v-4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v4"/><polyline points="7 14 12 9 17 14"/><line x1="12" y1="9" x2="12" y2="21"/>';
+                // Hide rotation controls when map is expanded
+                if (rotationControls) {
+                    rotationControls.style.display = 'none';
+                }
             } else {
                 mapContainer.classList.remove('expanded');
                 toggleText.textContent = 'Expand';
                 toggleBtn.querySelector('.icon').innerHTML = '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>';
+                // Show rotation controls when map is collapsed
+                if (rotationControls && nearestSharkId) {
+                    rotationControls.style.display = 'flex';
+                }
             }
             
-            updateMiniMap();
+            // Refresh map with new zoom level and invalidate size for Leaflet
+            setTimeout(() => {
+                if (map) {
+                    map.invalidateSize();
+                    updateLeafletMap();
+                }
+            }, 400);
         });
 
         window.addEventListener('load', () => {
@@ -837,6 +1388,8 @@
                 (position) => {
                     userLat = position.coords.latitude;
                     userLng = position.coords.longitude;
+                    // Update map when GPS position changes
+                    updateLeafletMap();
                 },
                 (error) => {
                     console.error('Geolocation error:', error);
