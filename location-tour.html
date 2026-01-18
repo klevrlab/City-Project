@@ -1201,18 +1201,31 @@
                 ring.setAttribute('animation', 'property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear');
                 entity.appendChild(ring);
 
-                // Text label BELOW platform (responsive sizing)
+                // Elegant background panel with teal gradient
+                const textBg = document.createElement('a-plane');
+                textBg.setAttribute('id', `text-bg-${stop.id}`);
+                textBg.setAttribute('position', '0 -3.2 0');
+                textBg.setAttribute('width', '4.8');
+                textBg.setAttribute('height', '1.1');
+                textBg.setAttribute('color', '#006D75');
+                textBg.setAttribute('material', 'shader: flat; transparent: true; opacity: 0.9; side: double');
+                textBg.setAttribute('visible', 'false');
+                entity.appendChild(textBg);
+
+                // Elegant text label with better formatting
                 const text = document.createElement('a-text');
                 text.setAttribute('id', `text-${stop.id}`);
                 text.setAttribute('value', `${stop.name}\n${stop.event}`);
                 text.setAttribute('align', 'center');
-                text.setAttribute('color', '#00A9E0');
+                text.setAttribute('baseline', 'center');
+                text.setAttribute('color', '#FFFFFF');
                 text.setAttribute('font', 'https://cdn.aframe.io/fonts/Roboto-msdf.json');
-                text.setAttribute('wrap-count', '40');
-                text.setAttribute('width', '8');
-                // Much smaller base scale for mobile readability
-                text.setAttribute('scale', '3 3 3');
-                text.setAttribute('position', '0 -3.2 0');
+                text.setAttribute('letterSpacing', '0');
+                text.setAttribute('lineHeight', '50');
+                text.setAttribute('wrap-count', '25');
+                text.setAttribute('width', '4.2');
+                text.setAttribute('scale', '1.8 1.8 1.8');
+                text.setAttribute('position', '0 -3.2 0.06');
                 text.setAttribute('visible', 'false');
                 entity.appendChild(text);
 
@@ -1311,19 +1324,29 @@
                     sharkEl.setAttribute('scale', `${sharkScale} ${sharkScale} ${sharkScale}`);
                 }
 
-                // Text visibility and responsive scaling
+                // Text visibility and responsive scaling with background
+                const textBgEl = document.querySelector(`#text-bg-${stop.id}`);
                 if (textEl) {
                     // Only show text within 50 meters
                     if (dist < 50) {
                         textEl.setAttribute('visible', 'true');
-                        // Smaller base scale with gentle distance scaling
-                        const baseScale = 3;
-                        // Distance multiplier: 1x (far) to 1.5x (close)
-                        const distanceFactor = 1 + ((50 - dist) / 50) * 0.5;
+                        if (textBgEl) textBgEl.setAttribute('visible', 'true');
+                        
+                        // Elegant responsive scaling based on distance
+                        const baseScale = 1.8;
+                        // Smooth distance multiplier: 1.0x (far) to 2.2x (close)
+                        const distanceFactor = 1.0 + ((50 - dist) / 50) * 1.2;
                         let textScale = baseScale * distanceFactor;
                         textEl.setAttribute('scale', `${textScale} ${textScale} ${textScale}`);
+                        
+                        // Scale background proportionally with padding
+                        const bgScale = textScale / 1.8; // Normalize to base
+                        if (textBgEl) {
+                            textBgEl.setAttribute('scale', `${bgScale * 1.05} ${bgScale * 1.05} 1`);
+                        }
                     } else {
                         textEl.setAttribute('visible', 'false');
+                        if (textBgEl) textBgEl.setAttribute('visible', 'false');
                     }
                 }
             });
