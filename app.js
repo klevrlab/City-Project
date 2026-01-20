@@ -95,6 +95,7 @@ function preloadResources() {
     "assets/flame.png",
     "assets/half-court.png",
     "assets/basketball.glb",
+    "assets/shark.glb",
     "assets/bounce.mp3",
     "markers/sjsu-logo.patt",
     "markers/pattern-court.patt"
@@ -992,8 +993,45 @@ AFRAME.registerComponent("evolution-controller", {
         </a-entity>
       </a-entity>
 
-      <!-- Phase 3: Virtual hoop target position (fixed relative to court) -->
-      <a-entity id="virtualHoopTarget" visible="false" position="0 2.5 2.5"></a-entity>
+      <!-- Phase 3: Basketball Hoop -->
+      <a-entity id="basketballHoop" visible="false" position="0 1.75 0" rotation="0 0 0">
+        <!-- Pole (support structure - extends from ground to backboard) -->
+        <a-cylinder id="hoopPole"
+          geometry="primitive: cylinder; radius: 0.08; height: 4.5; segmentsRadial: 16"
+          material="color: #ff6600; metalness: 0.7; roughness: 0.3"
+          position="0 -1.75 -0.35"
+          rotation="0 0 0">
+        </a-cylinder>
+        <!-- Backboard -->
+        <a-plane id="backboard"
+          geometry="primitive: plane; width: 1.5; height: 1.0"
+          material="color: #ffffff; transparent: true; opacity: 0.9; side: double"
+          position="0 0.5 -0.35"
+          rotation="0 0 0">
+        </a-plane>
+        <!-- Rim (torus) -->
+        <a-torus id="rim"
+          geometry="primitive: torus; radius: 0.75; radiusTubular: 0.05; segmentsTubular: 16"
+          material="color: #ff6600; metalness: 0.8; roughness: 0.2"
+          position="0 0.25 0"
+          rotation="90 0 0">
+        </a-torus>
+        <!-- Net (simplified - just visual) -->
+        <a-cylinder id="net"
+          geometry="primitive: cylinder; radius: 0.9; height: 0.55; segmentsRadial: 16"
+          material="color: #ffffff; transparent: true; opacity: 0.6; wireframe: true"
+          position="0 0.0 0"
+          rotation="0 0 0">
+        </a-cylinder>
+        <!-- Scoring trigger (invisible cylinder for collision detection) -->
+        <a-cylinder id="hoopTrigger"
+          geometry="primitive: cylinder; radius: 0.8; height: 0.1; segmentsRadial: 16"
+          material="visible: false"
+          position="0 0.25 0"
+          rotation="90 0 0"
+          class="hoop-trigger">
+        </a-cylinder>
+      </a-entity>
 
       <!-- 3D Scoreboard floating above marker -->
       <a-entity id="scoreboard3d" visible="false" position="0 2.5 0" rotation="0 0 0">
@@ -1021,8 +1059,8 @@ AFRAME.registerComponent("evolution-controller", {
         </a-text>
       </a-entity>
 
-      <!-- Basketball Shooting Component for court-only mode -->
-      <a-entity id="courtShootingEntity" basketball-shooting="hoopId: virtualHoopTarget; ballId: courtBallRig; enabled: false;"></a-entity>
+      <!-- Basketball Shooting Component -->
+      <a-entity id="courtShootingEntity" basketball-shooting="hoopId: basketballHoop; ballId: courtBallRig; enabled: false;"></a-entity>
     `;
 
     // Cache nodes
@@ -1032,7 +1070,7 @@ AFRAME.registerComponent("evolution-controller", {
     this.groundPlane = this.root.querySelector("#groundPlane");
     this.courtBallRig = this.root.querySelector("#courtBallRig");
     this.courtBasketball = this.root.querySelector("#courtBasketball");
-    this.virtualHoopTarget = this.root.querySelector("#virtualHoopTarget");
+    this.basketballHoop = this.root.querySelector("#basketballHoop");
     this.courtShootingEntity = this.root.querySelector("#courtShootingEntity");
     this.scoreboard3d = this.root.querySelector("#scoreboard3d");
     this.scoreboardTime3d = this.root.querySelector("#scoreboardTime3d");
@@ -1283,9 +1321,14 @@ AFRAME.registerComponent("evolution-controller", {
       }
     }
 
+    // Show hoop in Phase 3
+    if (this.basketballHoop) {
+      this.basketballHoop.setAttribute("visible", p === 3 && showContent);
+    }
+
     // Enable shooting HUD in Phase 3 even when markers are not visible
     if (this.courtShootingEntity) {
-      const enabled = p === 3;
+      const enabled = p === 3 && showContent;
       // Set on the attribute (for late init) and call update if component is ready
       this.courtShootingEntity.setAttribute('basketball-shooting', 'enabled', enabled);
       const shootingComp = this.courtShootingEntity.components['basketball-shooting'];
@@ -1321,7 +1364,7 @@ AFRAME.registerComponent("evolution-controller", {
       this.setSceneLighting({ ambientI: 0.55, ambientC: "#2b2a40", dirI: 1.25, dirC: "#ffd2a3" });
     }
 
-    // Hoop visuals are handled by the hoop-controller
+    // Hoop visuals are handled by this component (evolution-controller)
   },
 
   startPhase2BallAnimation() {
@@ -1534,11 +1577,6 @@ AFRAME.registerComponent("evolution-controller", {
       this.startPhase2BallAnimation();
     }
 
-    // Notify hoop controller of phase change
-    const hoopController = document.getElementById('hoopRoot');
-    if (hoopController && hoopController.components['hoop-controller']) {
-      hoopController.components['hoop-controller'].setPhase(this.currentPhase);
-    }
   },
 
   onLost() {
@@ -1548,115 +1586,116 @@ AFRAME.registerComponent("evolution-controller", {
     this.stopScoreboard();
     window.__markerSjsuFound = false;
     updateMarkerGuide();
+    
+    // Grace period then hide hole and hoop when not found (optional)
+    if (this.hideTimer) clearTimeout(this.hideTimer);
+    this.hideTimer = setTimeout(() => {
+      // Keep cracks visible, hide hole and hoop when not found (optional)
+      this.holePlane.setAttribute("visible", false);
+      if (this.basketballHoop) {
+        this.basketballHoop.setAttribute("visible", false);
+      }
+    }, GRACE_MS);
   }
 });
 
-// ---------- Hoop Controller Component (Hoop Marker) ----------
-AFRAME.registerComponent("hoop-controller", {
+// ---------- Shark Controller Component (Pattern Court Marker) ----------
+AFRAME.registerComponent("shark-controller", {
   init: function () {
-    this.marker = document.getElementById("hoopMarker");
+    this.marker = document.getElementById("sharkMarker");
     this.root = this.el;
-    this.currentPhase = 1;
     this.visible = false;
-    this.markerDetected = false;
-    this.stickyVisible = false;
-    this.physicsEnabled = false;
+    this.isSwimming = false; // Track if shark is currently swimming forward
 
-    // Ensure hoop marker is bound to the pattern-court marker
-    if (this.marker) {
-      this.marker.setAttribute("type", "pattern");
-      this.marker.setAttribute("url", "markers/pattern-court.patt");
-    }
-
-    // Build hoop content
+    // Build shark content
     this.root.innerHTML = `
-      <!-- Basketball Hoop (Phase 3 only) -->
-      <a-entity id="basketballHoop" visible="false" position="0 1.75 0" rotation="0 0 0">
-        <!-- Pole (support structure - extends from ground to backboard) -->
-        <a-cylinder id="hoopPole"
-          geometry="primitive: cylinder; radius: 0.08; height: 4.5; segmentsRadial: 16"
-          material="color: #ff6600; metalness: 0.7; roughness: 0.3"
-          position="0 -1.75 -0.35"
-          rotation="0 0 0">
-        </a-cylinder>
-        <!-- Backboard -->
-        <a-plane id="backboard"
-          geometry="primitive: plane; width: 1.5; height: 1.0"
-          material="color: #ffffff; transparent: true; opacity: 0.9; side: double"
-          position="0 0.5 -0.35"
-          rotation="0 0 0">
-        </a-plane>
-        <!-- Rim (torus) -->
-        <a-torus id="rim"
-          geometry="primitive: torus; radius: 0.75; radiusTubular: 0.05; segmentsTubular: 16"
-          material="color: #ff6600; metalness: 0.8; roughness: 0.2"
-          position="0 0.25 0"
-          rotation="90 0 0">
-        </a-torus>
-        <!-- Net (simplified - just visual) -->
-        <a-cylinder id="net"
-          geometry="primitive: cylinder; radius: 0.9; height: 0.55; segmentsRadial: 16"
-          material="color: #ffffff; transparent: true; opacity: 0.6; wireframe: true"
-          position="0 0.0 0"
-          rotation="0 0 0">
-        </a-cylinder>
-        <!-- Scoring trigger (invisible cylinder for collision detection) -->
-        <a-cylinder id="hoopTrigger"
-          geometry="primitive: cylinder; radius: 0.8; height: 0.1; segmentsRadial: 16"
-          material="visible: false"
-          position="0 0.25 0"
-          rotation="90 0 0"
-          class="hoop-trigger">
-        </a-cylinder>
+      <!-- Shark Model -->
+      <a-entity id="sharkEntity" 
+        gltf-model="#sharkModel"
+        visible="false"
+        position="0 -2 0"
+        rotation="0 0 0"
+        scale="1 1 1"
+        animation-mixer="clip: 1; loop: repeat; timeScale: 1.0">
       </a-entity>
     `;
 
     // Cache nodes
-    this.basketballHoop = this.root.querySelector("#basketballHoop");
+    this.sharkEntity = this.root.querySelector("#sharkEntity");
 
     // Marker events
     if (this.marker) {
       this.marker.addEventListener("markerFound", () => this.onFound());
       this.marker.addEventListener("markerLost", () => this.onLost());
     }
-
-    // Get physics enabled state from evolution controller
-    setTimeout(() => {
-      const evoRoot = document.getElementById('evoRoot');
-      if (evoRoot && evoRoot.components['evolution-controller']) {
-        this.physicsEnabled = evoRoot.components['evolution-controller'].physicsEnabled;
-      }
-    }, 1000);
   },
 
-  setPhase(phase) {
-    this.currentPhase = phase;
-    this.applyPhaseVisuals();
-  },
-
-  applyPhaseVisuals() {
-    // Keep hoop visible after first detection; update only on new detection
-    if (this.basketballHoop) {
-      this.basketballHoop.setAttribute("visible", this.stickyVisible);
-    }
-  },
-
-  onFound() {
+  onFound: function() {
     this.visible = true;
-    this.markerDetected = true;
-    this.stickyVisible = true;
-    this.applyPhaseVisuals();
     window.__markerCourtFound = true;
     updateMarkerGuide();
-    if (this.root) {
-      this.root.object3D.visible = true;
-      fadeObjectOpacity(this.root, 1, 300);
+    
+    // Only start swim-out if shark isn't already swimming
+    if (!this.isSwimming && this.sharkEntity) {
+      this.sharkEntity.setAttribute("visible", true);
+      
+      // Start swimming out animation
+      this.swimOut();
     }
   },
 
-  onLost() {
+  swimOut: function() {
+    if (!this.sharkEntity) return;
+
+    // Animation: swim up from ground (y: -2 to y: 0.5) and forward (z: 0 to z: 3)
+    // Duration: 2 seconds
+    this.sharkEntity.setAttribute("animation__swimOut", {
+      property: "position",
+      from: "0 -2 0",
+      to: "0 0.5 3",
+      dur: 2000,
+      easing: "easeOutCubic"
+    });
+
+    // Rotate slightly downward as it swims forward (more natural swimming motion)
+    this.sharkEntity.setAttribute("animation__swimRotate", {
+      property: "rotation",
+      from: "0 0 0",
+      to: "-15 0 0",
+      dur: 2000,
+      easing: "easeOutCubic"
+    });
+
+    // After swimming out, continue swimming forward for a bit
+    setTimeout(() => {
+      this.continueSwimming();
+    }, 2000);
+  },
+
+  continueSwimming: function() {
+    if (!this.sharkEntity) return;
+
+    this.isSwimming = true;
+    const currentPos = this.sharkEntity.getAttribute("position");
+    const forwardDistance = 8; // Swim 8 units forward
+    const swimDuration = 4000; // 4 seconds
+    
+    this.sharkEntity.setAttribute("animation__swimForward", {
+      property: "position",
+      from: `${currentPos.x} ${currentPos.y} ${currentPos.z}`,
+      to: `${currentPos.x} ${currentPos.y} ${currentPos.z + forwardDistance}`,
+      dur: swimDuration,
+      easing: "linear"
+    });
+
+    // After swimming forward completes, mark as done swimming
+    setTimeout(() => {
+      this.isSwimming = false;
+    }, swimDuration);
+  },
+
+  onLost: function() {
     this.visible = false;
-    this.markerDetected = false;
     window.__markerCourtFound = false;
     updateMarkerGuide();
   },
