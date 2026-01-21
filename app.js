@@ -103,12 +103,30 @@ function preloadResources() {
 
   let completed = 0;
   const total = urls.length;
-  if (total === 0) return Promise.resolve({ failed: 0 });
+  if (total === 0) return Promise.resolve({ failed: 0, errors: [] });
 
   return Promise.allSettled(
     urls.map((url) =>
       fetch(url, { cache: "force-cache" })
-        .catch(() => null)
+        .then((response) => {
+          if (!response.ok) {
+            const error = new Error(`Failed to load ${url}: ${response.status} ${response.statusText}`);
+            error.url = url;
+            error.status = response.status;
+            error.is404 = response.status === 404;
+            throw error;
+          }
+          return response;
+        })
+        .catch((error) => {
+          // If error doesn't have status, it's a network error
+          if (!error.status) {
+            error.url = url;
+            error.status = 0;
+            error.is404 = false;
+          }
+          throw error;
+        })
         .finally(() => {
           completed += 1;
           const percent = Math.round((completed / total) * 100);
@@ -116,8 +134,19 @@ function preloadResources() {
         })
     )
   ).then((results) => {
-    const failed = results.filter((r) => r.status !== "fulfilled").length;
-    return { failed };
+    const errors = [];
+    results.forEach((result, index) => {
+      if (result.status !== "fulfilled") {
+        const error = result.reason || { url: urls[index], status: 0, is404: false };
+        errors.push({
+          url: error.url || urls[index],
+          status: error.status || 0,
+          is404: error.is404 || false,
+          message: error.message || `Failed to load ${urls[index]}`
+        });
+      }
+    });
+    return { failed: errors.length, errors };
   });
 }
 
@@ -147,8 +176,24 @@ function initLoadingGate() {
 
   Promise.all([assetPromise, prefetchPromise]).then(([, prefetchResult]) => {
     if (prefetchResult.failed > 0) {
-      setLoadingProgress(100, "Some assets failed. Tap to continue.");
+      const errors = prefetchResult.errors || [];
+      const error404s = errors.filter(e => e.is404);
+      
+      let errorMessage = "Some assets failed to load. ";
+      if (error404s.length > 0) {
+        const missingFiles = error404s.map(e => e.url.split('/').pop()).join(', ');
+        errorMessage += `Missing files (404): ${missingFiles}. `;
+      }
+      if (errors.length > error404s.length) {
+        errorMessage += `${errors.length - error404s.length} other error(s). `;
+      }
+      errorMessage += "Tap to continue anyway.";
+      
+      setLoadingProgress(100, errorMessage);
       if (loadingContinue) loadingContinue.style.display = "inline-flex";
+      
+      // Log errors to console for debugging
+      console.error("Asset loading errors:", errors);
     } else {
       setLoadingProgress(100, "Ready");
       setTimeout(finalizeLoading, 350);
