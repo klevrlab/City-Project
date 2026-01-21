@@ -1659,7 +1659,7 @@ AFRAME.registerComponent("shark-controller", {
         gltf-model="#sharkModel"
         visible="false"
         position="0 -2 0"
-        rotation="0 90 0"
+        rotation="0 -90 0"
         scale="1 1 1"
         animation-mixer="clip: 1; loop: repeat; timeScale: 1.0">
       </a-entity>
@@ -1704,11 +1704,11 @@ AFRAME.registerComponent("shark-controller", {
     });
 
     // Rotate slightly downward as it swims forward (more natural swimming motion)
-    // Starting from 90° Y rotation (initial rotation)
+    // Starting from -90° Y rotation (initial rotation, 90° clockwise)
     this.sharkEntity.setAttribute("animation__swimRotate", {
       property: "rotation",
-      from: "0 90 0",
-      to: "-15 90 0",
+      from: "0 -90 0",
+      to: "-15 -90 0",
       dur: 2000,
       easing: "easeOutCubic"
     });
