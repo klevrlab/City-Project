@@ -1692,13 +1692,13 @@ AFRAME.registerComponent("shark-controller", {
   swimOut: function() {
     if (!this.sharkEntity) return;
 
-    // Animation: swim up from ground (y: -2 to y: 0.5) and forward (z: 0 to z: 3)
+    // Animation: swim up from ground (y: -2 to y: 0.5) and forward (z: 0 to z: -3)
     // Duration: 2 seconds
-    // Note: Shark is rotated 90° on Y axis, so Z+ is forward relative to marker
+    // Note: Shark is rotated -90° on Y axis, movement flipped 180° to go in opposite direction
     this.sharkEntity.setAttribute("animation__swimOut", {
       property: "position",
       from: "0 -2 0",
-      to: "0 0.5 3",
+      to: "0 0.5 -3",
       dur: 2000,
       easing: "easeOutCubic"
     });
@@ -1724,13 +1724,13 @@ AFRAME.registerComponent("shark-controller", {
 
     this.isSwimming = true;
     const currentPos = this.sharkEntity.getAttribute("position");
-    const forwardDistance = 8; // Swim 8 units forward
+    const forwardDistance = 8; // Swim 8 units forward (direction flipped 180°)
     const swimDuration = 4000; // 4 seconds
     
     this.sharkEntity.setAttribute("animation__swimForward", {
       property: "position",
       from: `${currentPos.x} ${currentPos.y} ${currentPos.z}`,
-      to: `${currentPos.x} ${currentPos.y} ${currentPos.z + forwardDistance}`,
+      to: `${currentPos.x} ${currentPos.y} ${currentPos.z - forwardDistance}`,
       dur: swimDuration,
       easing: "linear"
     });
