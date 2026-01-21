@@ -1660,7 +1660,7 @@ AFRAME.registerComponent("shark-controller", {
         visible="false"
         position="0 -2 0"
         rotation="0 -90 0"
-        scale="1 1 1"
+        scale="0.33 0.33 0.33"
         animation-mixer="clip: 1; loop: repeat; timeScale: 1.0">
       </a-entity>
     `;
