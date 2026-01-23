@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Marker Evolution – Cracks ? Hole ? Flaming Ball</title>
+  <title>Marker Evolution ï¿½ Cracks ? Hole ? Flaming Ball</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
   <!-- A-Frame (pinned to 1.2.0 for AR.js compatibility) -->
@@ -45,7 +45,7 @@
   </div>
 
   <div id="hud">
-    <div id="status">Loading…</div>
+    <div id="status">Loadingï¿½</div>
     <div id="controls">
       <button class="btn active" data-mode="auto">Auto</button>
       <button class="btn" data-mode="1">Phase 1</button>
@@ -110,6 +110,9 @@
       <!-- Note: fly.wav and flame.wav files missing - these elements are kept for future use -->
       <audio id="flySound" crossorigin="anonymous"></audio>
       <audio id="flameSound" crossorigin="anonymous" loop></audio>
+      
+      <!-- Video assets -->
+      <video id="videoTexture" src="assets/video.mp4" autoplay loop muted playsinline crossorigin="anonymous" preload="auto"></video>
     </a-assets>
 
     <!-- Ground plane for physics (invisible, positioned at marker level) -->

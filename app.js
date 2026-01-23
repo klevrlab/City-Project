@@ -1021,6 +1021,15 @@ AFRAME.registerComponent("evolution-controller", {
         material="shader: flat; src: #texHole; transparent: true; opacity: 1.0; alphaTest: 0.02; depthWrite: false">
       </a-plane>
 
+      <!-- Video Plane - displays video on marker plane (bottom right) -->
+      <a-plane id="videoPlane"
+        visible="false"
+        position="1.2 0.04 -1.2"
+        rotation="-90 0 0"
+        width="1.5" height="1.5"
+        material="shader: flat; src: #videoTexture; transparent: false">
+      </a-plane>
+
       <!-- Ground plane for physics (invisible, at marker level) -->
       <a-entity id="groundPlane"
         geometry="primitive: plane; width: 30; height: 30"
@@ -1112,6 +1121,7 @@ AFRAME.registerComponent("evolution-controller", {
     this.halfCourtPlane = this.root.querySelector("#halfCourtPlane");
     this.cracksPlane = this.root.querySelector("#cracksPlane");
     this.holePlane = this.root.querySelector("#holePlane");
+    this.videoPlane = this.root.querySelector("#videoPlane");
     this.groundPlane = this.root.querySelector("#groundPlane");
     this.courtBallRig = this.root.querySelector("#courtBallRig");
     this.courtBasketball = this.root.querySelector("#courtBasketball");
@@ -1341,6 +1351,21 @@ AFRAME.registerComponent("evolution-controller", {
     const p = this.currentPhase;
 
     const showContent = this.stickyVisible;
+
+    // Video plane - can be shown in any phase (adjust as needed)
+    if (this.videoPlane) {
+      // Set to true to show video, false to hide
+      // You can make this phase-specific or always visible when marker is found
+      this.videoPlane.setAttribute("visible", showContent);
+      
+      // Auto-play video when shown
+      if (showContent) {
+        const videoEl = document.getElementById("videoTexture");
+        if (videoEl) {
+          videoEl.play().catch(e => console.warn("Video play failed:", e));
+        }
+      }
+    }
 
     // Half court only visible in Phase 3 (final phase)
     if (this.halfCourtPlane) {
@@ -1596,6 +1621,12 @@ AFRAME.registerComponent("evolution-controller", {
       fadeObjectOpacity(this.root, 1, 300);
     }
     this.updateCourtOrientation();
+    
+    // Start video playback when marker is found
+    const videoEl = document.getElementById("videoTexture");
+    if (videoEl && this.videoPlane && this.videoPlane.getAttribute("visible")) {
+      videoEl.play().catch(e => console.warn("Video play failed:", e));
+    }
 
     // Show 3D scoreboard
     if (this.scoreboard3d) {
@@ -1632,6 +1663,12 @@ AFRAME.registerComponent("evolution-controller", {
     window.__markerSjsuFound = false;
     updateMarkerGuide();
     
+    // Pause video when marker is lost
+    const videoEl = document.getElementById("videoTexture");
+    if (videoEl) {
+      videoEl.pause();
+    }
+    
     // Grace period then hide hole and hoop when not found (optional)
     if (this.hideTimer) clearTimeout(this.hideTimer);
     this.hideTimer = setTimeout(() => {
@@ -1654,6 +1691,15 @@ AFRAME.registerComponent("shark-controller", {
 
     // Build shark content
     this.root.innerHTML = `
+      <!-- Video Plane - displays video on marker plane (bottom right) -->
+      <a-plane id="sharkVideoPlane"
+        visible="false"
+        position="1.2 0.04 -1.2"
+        rotation="-90 0 0"
+        width="1.5" height="1.5"
+        material="shader: flat; src: #videoTexture; transparent: false">
+      </a-plane>
+      
       <!-- Shark Model -->
       <a-entity id="sharkEntity" 
         gltf-model="#sharkModel"
@@ -1666,6 +1712,7 @@ AFRAME.registerComponent("shark-controller", {
     `;
 
     // Cache nodes
+    this.sharkVideoPlane = this.root.querySelector("#sharkVideoPlane");
     this.sharkEntity = this.root.querySelector("#sharkEntity");
 
     // Marker events
@@ -1679,6 +1726,15 @@ AFRAME.registerComponent("shark-controller", {
     this.visible = true;
     window.__markerCourtFound = true;
     updateMarkerGuide();
+    
+    // Show and play video when marker is found
+    if (this.sharkVideoPlane) {
+      this.sharkVideoPlane.setAttribute("visible", true);
+      const videoEl = document.getElementById("videoTexture");
+      if (videoEl) {
+        videoEl.play().catch(e => console.warn("Video play failed:", e));
+      }
+    }
     
     // Only start swim-out if shark isn't already swimming
     if (!this.isSwimming && this.sharkEntity) {
@@ -1745,6 +1801,15 @@ AFRAME.registerComponent("shark-controller", {
     this.visible = false;
     window.__markerCourtFound = false;
     updateMarkerGuide();
+    
+    // Hide and pause video when marker is lost
+    if (this.sharkVideoPlane) {
+      this.sharkVideoPlane.setAttribute("visible", false);
+    }
+    const videoEl = document.getElementById("videoTexture");
+    if (videoEl) {
+      videoEl.pause();
+    }
   },
 
   tick() {
