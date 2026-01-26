@@ -1123,6 +1123,9 @@ AFRAME.registerComponent("evolution-controller", {
     this.holePlane = this.root.querySelector("#holePlane");
     this.videoPlane = this.root.querySelector("#videoPlane");
     this.groundPlane = this.root.querySelector("#groundPlane");
+    
+    // Setup video aspect ratio adjustment
+    this.setupVideoAspectRatio();
     this.courtBallRig = this.root.querySelector("#courtBallRig");
     this.courtBasketball = this.root.querySelector("#courtBasketball");
     this.basketballHoop = this.root.querySelector("#basketballHoop");
@@ -1132,6 +1135,9 @@ AFRAME.registerComponent("evolution-controller", {
 
     // Initialize sounds (verify files are loaded)
     this.initSounds();
+    
+    // Setup video aspect ratio
+    this.setupVideoAspectRatio();
 
     this.ambient = document.getElementById("ambientLight");
     this.dir = document.getElementById("dirLight");
@@ -1215,6 +1221,46 @@ AFRAME.registerComponent("evolution-controller", {
         console.warn("Failed to load flame.wav - check assets folder");
       });
     }
+  },
+  
+  setupVideoAspectRatio() {
+    const videoEl = document.getElementById("videoTexture");
+    if (!videoEl || !this.videoPlane) return;
+    
+    // Function to update aspect ratio
+    const updateAspectRatio = () => {
+      if (!videoEl.videoWidth || !videoEl.videoHeight) return;
+      
+      const aspectRatio = videoEl.videoWidth / videoEl.videoHeight;
+      const baseHeight = 1.5; // Base height in units
+      const calculatedWidth = baseHeight * aspectRatio;
+      
+      // Update both video planes with correct aspect ratio
+      if (this.videoPlane) {
+        this.videoPlane.setAttribute("width", calculatedWidth);
+        this.videoPlane.setAttribute("height", baseHeight);
+      }
+      
+      // Also update shark video plane if it exists
+      const sharkVideoPlane = document.getElementById("sharkVideoPlane");
+      if (sharkVideoPlane) {
+        sharkVideoPlane.setAttribute("width", calculatedWidth);
+        sharkVideoPlane.setAttribute("height", baseHeight);
+      }
+      
+      console.log('[Video] Aspect ratio adjusted:', calculatedWidth.toFixed(2), 'x', baseHeight, '(', aspectRatio.toFixed(2), ':1)');
+    };
+    
+    // Try to update immediately if video is already loaded
+    if (videoEl.readyState >= 2) { // HAVE_CURRENT_DATA
+      updateAspectRatio();
+    }
+    
+    // Update when video metadata is loaded
+    videoEl.addEventListener('loadedmetadata', updateAspectRatio);
+    
+    // Fallback: update when video can play
+    videoEl.addEventListener('canplay', updateAspectRatio);
   },
 
   playSound(soundId, volume = 1.0) {
@@ -1714,12 +1760,40 @@ AFRAME.registerComponent("shark-controller", {
     // Cache nodes
     this.sharkVideoPlane = this.root.querySelector("#sharkVideoPlane");
     this.sharkEntity = this.root.querySelector("#sharkEntity");
+    
+    // Setup video aspect ratio (will be handled by evolution-controller, but ensure it's set)
+    this.setupSharkVideoAspectRatio();
 
     // Marker events
     if (this.marker) {
       this.marker.addEventListener("markerFound", () => this.onFound());
       this.marker.addEventListener("markerLost", () => this.onLost());
     }
+  },
+  
+  setupSharkVideoAspectRatio() {
+    const videoEl = document.getElementById("videoTexture");
+    if (!videoEl || !this.sharkVideoPlane) return;
+    
+    const updateAspectRatio = () => {
+      if (!videoEl.videoWidth || !videoEl.videoHeight) return;
+      
+      const aspectRatio = videoEl.videoWidth / videoEl.videoHeight;
+      const baseHeight = 1.5;
+      const calculatedWidth = baseHeight * aspectRatio;
+      
+      if (this.sharkVideoPlane) {
+        this.sharkVideoPlane.setAttribute("width", calculatedWidth);
+        this.sharkVideoPlane.setAttribute("height", baseHeight);
+      }
+    };
+    
+    if (videoEl.readyState >= 2) {
+      updateAspectRatio();
+    }
+    
+    videoEl.addEventListener('loadedmetadata', updateAspectRatio);
+    videoEl.addEventListener('canplay', updateAspectRatio);
   },
 
   onFound: function() {
