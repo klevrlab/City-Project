@@ -1795,6 +1795,90 @@ AFRAME.registerComponent("shark-controller", {
       this.marker.addEventListener("markerFound", () => this.onFound());
       this.marker.addEventListener("markerLost", () => this.onLost());
     }
+
+    // Debug mode: Keyboard shortcut to test shark animation (press 'S' key)
+    this.debugMode = false;
+    this.onKeyDown = this.onKeyDown.bind(this);
+    window.addEventListener("keydown", this.onKeyDown);
+  },
+
+  onKeyDown: function(e) {
+    // Press 'S' key to trigger shark animation (debug mode)
+    if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // Only trigger if not already in an input field
+      if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        console.log('[Shark Debug] Manual trigger - starting shark animation');
+        this.enableDebugMode();
+      }
+    }
+    // Press 'X' key to stop shark animation (debug mode)
+    if (e.key.toLowerCase() === 'x' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        console.log('[Shark Debug] Stopping shark animation');
+        this.disableDebugMode();
+      }
+    }
+  },
+
+  enableDebugMode: function() {
+    this.debugMode = true;
+    
+    // Make the marker visible for debug mode (simulate marker detection)
+    if (this.marker) {
+      this.marker.object3D.visible = true;
+      // Position marker at origin for testing
+      this.marker.object3D.position.set(0, 0, -2);
+      this.marker.object3D.rotation.set(0, 0, 0);
+    }
+    
+    // Make the root visible even without marker detection
+    if (this.root) {
+      this.root.object3D.visible = true;
+    }
+    
+    // Show video plane in debug mode
+    if (this.sharkVideoPlane) {
+      this.sharkVideoPlane.setAttribute("visible", true);
+      const videoEl = document.getElementById("videoTexture");
+      if (videoEl) {
+        videoEl.play().catch(e => console.warn("Video play failed:", e));
+      }
+    }
+    
+    // Start cycling animation if not already active
+    if (!this.cyclingActive) {
+      this.startCyclingAnimation();
+    }
+    
+    console.log('[Shark Debug] Debug mode enabled - sharks should be visible');
+  },
+
+  disableDebugMode: function() {
+    this.debugMode = false;
+    this.stopCyclingAnimation();
+    
+    // Hide video plane
+    if (this.sharkVideoPlane) {
+      this.sharkVideoPlane.setAttribute("visible", false);
+    }
+    const videoEl = document.getElementById("videoTexture");
+    if (videoEl) {
+      videoEl.pause();
+    }
+    
+    // Hide marker if not actually detected
+    if (this.marker && !this.visible) {
+      this.marker.object3D.visible = false;
+    }
+    
+    // Hide root if marker is not detected
+    if (this.root && !this.visible) {
+      this.root.object3D.visible = false;
+    }
+    
+    console.log('[Shark Debug] Debug mode disabled');
   },
   
   setupSharkVideoAspectRatio() {
@@ -1963,8 +2047,10 @@ AFRAME.registerComponent("shark-controller", {
     window.__markerCourtFound = false;
     updateMarkerGuide();
     
-    // Stop cycling animation
-    this.stopCyclingAnimation();
+    // Stop cycling animation (unless in debug mode)
+    if (!this.debugMode) {
+      this.stopCyclingAnimation();
+    }
     
     // Hide and pause video when marker is lost
     if (this.sharkVideoPlane) {
