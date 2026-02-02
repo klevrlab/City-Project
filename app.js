@@ -1122,6 +1122,9 @@ AFRAME.registerComponent("evolution-controller", {
     this.cracksPlane = this.root.querySelector("#cracksPlane");
     this.holePlane = this.root.querySelector("#holePlane");
     this.videoPlane = this.root.querySelector("#videoPlane");
+    if (this.videoPlane) {
+      this.videoPlane.setAttribute("video-fact-cycle", "intervalMs: 8000; visibleMs: 4000; animMs: 500; videoId: videoTexture");
+    }
     this.groundPlane = this.root.querySelector("#groundPlane");
     
     // Setup video aspect ratio adjustment
@@ -1147,6 +1150,7 @@ AFRAME.registerComponent("evolution-controller", {
     this.stickyVisible = false;
     this.hideTimer = null;
     this.scoreboardInterval = null; // Countdown update interval
+    this.videoFactInterval = null;
 
     // Auto mode only
     this.mode = "auto";
@@ -1261,6 +1265,18 @@ AFRAME.registerComponent("evolution-controller", {
     
     // Fallback: update when video can play
     videoEl.addEventListener('canplay', updateAspectRatio);
+  },
+
+  playVideoFactOnce() {
+    if (!this.videoPlane) return;
+    const cycle = this.videoPlane.components["video-fact-cycle"];
+    if (cycle) cycle.playOnce();
+  },
+
+  stopVideoFactCycle() {
+    if (!this.videoPlane) return;
+    const cycle = this.videoPlane.components["video-fact-cycle"];
+    if (cycle) cycle.stop();
   },
 
   playSound(soundId, volume = 1.0) {
@@ -1410,6 +1426,8 @@ AFRAME.registerComponent("evolution-controller", {
         if (videoEl) {
           videoEl.play().catch(e => console.warn("Video play failed:", e));
         }
+      } else {
+        this.stopVideoFactCycle();
       }
     }
 
@@ -1673,6 +1691,7 @@ AFRAME.registerComponent("evolution-controller", {
     if (videoEl && this.videoPlane && this.videoPlane.getAttribute("visible")) {
       videoEl.play().catch(e => console.warn("Video play failed:", e));
     }
+    this.playVideoFactOnce();
 
     // Show 3D scoreboard
     if (this.scoreboard3d) {
@@ -1714,6 +1733,7 @@ AFRAME.registerComponent("evolution-controller", {
     if (videoEl) {
       videoEl.pause();
     }
+    this.stopVideoFactCycle();
     
     // Grace period then hide hole and hoop when not found (optional)
     if (this.hideTimer) clearTimeout(this.hideTimer);
@@ -1724,6 +1744,63 @@ AFRAME.registerComponent("evolution-controller", {
         this.basketballHoop.setAttribute("visible", false);
       }
     }, GRACE_MS);
+  }
+});
+
+AFRAME.registerComponent("video-fact-cycle", {
+  schema: {
+    intervalMs: { type: "number", default: 8000 },
+    visibleMs: { type: "number", default: 4000 },
+    animMs: { type: "number", default: 500 },
+    videoId: { type: "string", default: "videoTexture" }
+  },
+  init() {
+    this._timer = null;
+    this._cycle = this._cycle.bind(this);
+  },
+  playOnce() {
+    this._cycle();
+  },
+  stop() {
+    if (this._timer) {
+      clearInterval(this._timer);
+      this._timer = null;
+    }
+    this.el.removeAttribute("animation__factIn");
+    this.el.removeAttribute("animation__factOut");
+    this.el.setAttribute("scale", "0.001 0.001 0.001");
+    const videoEl = document.getElementById(this.data.videoId);
+    if (videoEl) videoEl.pause();
+  },
+  _cycle() {
+    const videoEl = document.getElementById(this.data.videoId);
+    if (videoEl) {
+      const duration = Number.isFinite(videoEl.duration) ? videoEl.duration : 0;
+      if (duration > 4) {
+        const maxStart = Math.max(duration - 4, 0.1);
+        const startTime = Math.random() * maxStart;
+        videoEl.currentTime = startTime;
+      }
+      videoEl.play().catch(() => {});
+    }
+    this.el.setAttribute("scale", "0.001 0.001 0.001");
+    this.el.setAttribute("animation__factIn", {
+      property: "scale",
+      from: "0.001 0.001 0.001",
+      to: "1 1 1",
+      dur: this.data.animMs,
+      easing: "easeOutBack"
+    });
+    setTimeout(() => {
+      this.el.setAttribute("animation__factOut", {
+        property: "scale",
+        from: "1 1 1",
+        to: "0.001 0.001 0.001",
+        dur: this.data.animMs,
+        easing: "easeInCubic"
+      });
+      if (videoEl) videoEl.pause();
+    }, this.data.visibleMs);
   }
 });
 
@@ -1755,6 +1832,12 @@ AFRAME.registerComponent("shark-controller", {
         position="0 0 0"
         rotation="0 0 0"
         scale="0.33 0.33 0.33">
+        <a-circle class="shark-shadow"
+          radius="0.75"
+          position="0 0.01 0"
+          rotation="-90 0 0"
+          material="color: #000000; opacity: 0.25; transparent: true; side: double">
+        </a-circle>
         <a-entity class="shark-model-1"
           gltf-model="#sharkModel1"
           rotation="0 -90 0"
@@ -1768,6 +1851,12 @@ AFRAME.registerComponent("shark-controller", {
         position="0 0 0"
         rotation="0 0 0"
         scale="0.33 0.33 0.33">
+        <a-circle class="shark-shadow"
+          radius="0.75"
+          position="0 0.01 3"
+          rotation="-90 0 0"
+          material="color: #000000; opacity: 0.25; transparent: true; side: double">
+        </a-circle>
         <a-entity class="shark-model-2"
           gltf-model="#sharkModel2"
           rotation="0 180 0"
@@ -1778,6 +1867,9 @@ AFRAME.registerComponent("shark-controller", {
 
     // Cache nodes
     this.sharkVideoPlane = this.root.querySelector(".shark-video-plane");
+    if (this.sharkVideoPlane) {
+      this.sharkVideoPlane.setAttribute("video-fact-cycle", "intervalMs: 8000; visibleMs: 4000; animMs: 500; videoId: videoTexture");
+    }
     // Rigs: we animate these (position/rotation)
     this.sharkRigs = [
       this.root.querySelector(".shark-rig-1"),
@@ -1979,6 +2071,8 @@ AFRAME.registerComponent("shark-controller", {
       if (videoEl) {
         videoEl.play().catch(e => console.warn("Video play failed:", e));
       }
+      const cycle = this.sharkVideoPlane.components["video-fact-cycle"];
+      if (cycle) cycle.playOnce();
     }
     
     // Start cycling animation if not already active
@@ -2087,6 +2181,13 @@ AFRAME.registerComponent("shark-controller", {
       });
     }
 
+    // Fade out near the end of the exit
+    if (modelEl) {
+      setTimeout(() => {
+        this.fadeModel(modelEl, 1, 0, 450);
+      }, Math.max(swimDuration - 450, 0));
+    }
+
     // After the dive completes, hide shark and start the other one
     const hideTimer = setTimeout(() => {
       rig.setAttribute("visible", false);
@@ -2132,6 +2233,8 @@ AFRAME.registerComponent("shark-controller", {
     // Hide and pause video when marker is lost
     if (this.sharkVideoPlane) {
       this.sharkVideoPlane.setAttribute("visible", false);
+      const cycle = this.sharkVideoPlane.components["video-fact-cycle"];
+      if (cycle) cycle.stop();
     }
     const videoEl = document.getElementById("videoTexture");
     if (videoEl) {
