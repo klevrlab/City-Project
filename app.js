@@ -92,10 +92,10 @@ function preloadResources() {
   const urls = [
     "assets/cracks.png",
     "assets/hole.png",
-    "assets/flame.png",
     "assets/half-court.png",
     "assets/basketball.glb",
-    "assets/shark.glb",
+    "assets/shark1.glb",
+    "assets/shark2.glb",
     "assets/bounce.mp3",
     "markers/sjsu-logo.patt",
     "markers/pattern-court.patt"
@@ -1231,9 +1231,9 @@ AFRAME.registerComponent("evolution-controller", {
     const updateAspectRatio = () => {
       if (!videoEl.videoWidth || !videoEl.videoHeight) return;
       
-      const aspectRatio = videoEl.videoWidth / videoEl.videoHeight;
       const baseHeight = 1.5; // Base height in units
-      const calculatedWidth = baseHeight * aspectRatio;
+      // Force 1:1 (square) aspect ratio for the plane
+      const calculatedWidth = baseHeight;
       
       // Update both video planes with correct aspect ratio
       if (this.videoPlane) {
@@ -1248,7 +1248,7 @@ AFRAME.registerComponent("evolution-controller", {
         sharkVideoPlane.setAttribute("height", baseHeight);
       }
       
-      console.log('[Video] Aspect ratio adjusted:', calculatedWidth.toFixed(2), 'x', baseHeight, '(', aspectRatio.toFixed(2), ':1)');
+      console.log('[Video] Aspect ratio forced to 1:1:', calculatedWidth.toFixed(2), 'x', baseHeight);
     };
     
     // Try to update immediately if video is already loaded
@@ -1730,17 +1730,18 @@ AFRAME.registerComponent("evolution-controller", {
 // ---------- Shark Controller Component (Pattern Court Marker) ----------
 AFRAME.registerComponent("shark-controller", {
   init: function () {
-    this.marker = document.getElementById("sharkMarker");
+    this.marker = this.el.closest("a-marker") || document.getElementById("sharkMarker");
     this.root = this.el;
     this.visible = false;
     this.cyclingActive = false; // Track if cycling animation is active
-    this.currentSharkIndex = 0; // Track which shark is currently active (0, 1, or 2)
+    this.currentSharkIndex = 0; // Track which shark is currently active (0 or 1)
     this.sharkTimers = []; // Store timers for each shark
+    this.groundY = 0.0; // Ground plane height (local space)
 
-    // Build shark content
+    // Build shark content (use classes so multiple markers can host sharks)
     this.root.innerHTML = `
       <!-- Video Plane - displays video on marker plane (bottom right) -->
-      <a-plane id="sharkVideoPlane"
+      <a-plane class="shark-video-plane"
         visible="false"
         position="1.2 0.04 -1.2"
         rotation="-90 0 0"
@@ -1748,44 +1749,70 @@ AFRAME.registerComponent("shark-controller", {
         material="shader: flat; src: #videoTexture; transparent: false">
       </a-plane>
       
-      <!-- Shark 1 -->
-      <a-entity id="sharkEntity1" 
-        gltf-model="#sharkModel"
+      <!-- Shark 1 (rig controls motion/rotation; child plays GLB animation) -->
+      <a-entity class="shark-rig-1"
         visible="false"
-        position="0 -2 2"
-        rotation="0 -90 0"
-        scale="0.33 0.33 0.33"
-        animation-mixer="clip: 1; loop: repeat; timeScale: 1.0">
+        position="0 0 0"
+        rotation="0 0 0"
+        scale="0.33 0.33 0.33">
+        <a-entity class="shark-model-1"
+          gltf-model="#sharkModel1"
+          rotation="0 -90 0"
+          animation-mixer="loop: repeat; timeScale: 1.0">
+        </a-entity>
       </a-entity>
       
-      <!-- Shark 2 -->
-      <a-entity id="sharkEntity2" 
-        gltf-model="#sharkModel"
+      <!-- Shark 2 (rig controls motion/rotation; child plays GLB animation) -->
+      <a-entity class="shark-rig-2"
         visible="false"
-        position="0 -2 2"
-        rotation="0 -90 0"
-        scale="0.33 0.33 0.33"
-        animation-mixer="clip: 1; loop: repeat; timeScale: 1.0">
-      </a-entity>
-      
-      <!-- Shark 3 -->
-      <a-entity id="sharkEntity3" 
-        gltf-model="#sharkModel"
-        visible="false"
-        position="0 -2 2"
-        rotation="0 -90 0"
-        scale="0.33 0.33 0.33"
-        animation-mixer="clip: 1; loop: repeat; timeScale: 1.0">
+        position="0 0 0"
+        rotation="0 0 0"
+        scale="0.33 0.33 0.33">
+        <a-entity class="shark-model-2"
+          gltf-model="#sharkModel2"
+          rotation="0 180 0"
+          animation-mixer="loop: repeat; timeScale: 1.0">
+        </a-entity>
       </a-entity>
     `;
 
     // Cache nodes
-    this.sharkVideoPlane = this.root.querySelector("#sharkVideoPlane");
-    this.sharkEntities = [
-      this.root.querySelector("#sharkEntity1"),
-      this.root.querySelector("#sharkEntity2"),
-      this.root.querySelector("#sharkEntity3")
+    this.sharkVideoPlane = this.root.querySelector(".shark-video-plane");
+    // Rigs: we animate these (position/rotation)
+    this.sharkRigs = [
+      this.root.querySelector(".shark-rig-1"),
+      this.root.querySelector(".shark-rig-2")
     ];
+    // Models: these play GLB animation; render/clipping settings applied here
+    this.sharkModels = [
+      this.root.querySelector(".shark-model-1"),
+      this.root.querySelector(".shark-model-2")
+    ];
+
+    // Per-shark base rotations come from the rigs (so GLB animation can't override them)
+    this.sharkBaseRotations = this.sharkRigs.map((el) => {
+      const r = el ? el.getAttribute("rotation") : null;
+      if (!r) return { x: 0, y: 0, z: 0 };
+      return { x: r.x || 0, y: r.y || 0, z: r.z || 0 };
+    });
+    
+    // Setup first animation clip on the MODEL entities
+    this.sharkModels.forEach((modelEl) => {
+      if (!modelEl) return;
+      modelEl.addEventListener('model-loaded', () => {
+        const mesh = modelEl.getObject3D('mesh');
+        if (!mesh) return;
+
+        // Force first animation clip from the GLB (if present)
+        try {
+          const clips = mesh.animations || [];
+          if (clips.length > 0) {
+            const firstClipName = clips[0].name || '*';
+            modelEl.setAttribute('animation-mixer', `clip: ${firstClipName}; loop: repeat; timeScale: 1.0`);
+          }
+        } catch (_) {}
+      });
+    });
     
     // Setup video aspect ratio (will be handled by evolution-controller, but ensure it's set)
     this.setupSharkVideoAspectRatio();
@@ -1838,6 +1865,7 @@ AFRAME.registerComponent("shark-controller", {
       this.root.object3D.visible = true;
     }
     
+    
     // Show video plane in debug mode
     if (this.sharkVideoPlane) {
       this.sharkVideoPlane.setAttribute("visible", true);
@@ -1888,9 +1916,9 @@ AFRAME.registerComponent("shark-controller", {
     const updateAspectRatio = () => {
       if (!videoEl.videoWidth || !videoEl.videoHeight) return;
       
-      const aspectRatio = videoEl.videoWidth / videoEl.videoHeight;
       const baseHeight = 1.5;
-      const calculatedWidth = baseHeight * aspectRatio;
+      // Force 1:1 (square) aspect ratio for the plane
+      const calculatedWidth = baseHeight;
       
       if (this.sharkVideoPlane) {
         this.sharkVideoPlane.setAttribute("width", calculatedWidth);
@@ -1906,9 +1934,42 @@ AFRAME.registerComponent("shark-controller", {
     videoEl.addEventListener('canplay', updateAspectRatio);
   },
 
+  setModelOpacity(modelEl, opacity) {
+    const mesh = modelEl ? modelEl.getObject3D('mesh') : null;
+    if (!mesh) return;
+    mesh.traverse((child) => {
+      if (child.isMesh && child.material) {
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach((mat) => {
+          mat.transparent = true;
+          mat.opacity = opacity;
+          mat.needsUpdate = true;
+        });
+      }
+    });
+  },
+
+  fadeModel(modelEl, from, to, duration = 600) {
+    const start = performance.now();
+    const step = (now) => {
+      const t = Math.min((now - start) / duration, 1);
+      const value = from + (to - from) * t;
+      this.setModelOpacity(modelEl, value);
+      if (t < 1) {
+        requestAnimationFrame(step);
+      }
+    };
+    this.setModelOpacity(modelEl, from);
+    requestAnimationFrame(step);
+  },
+
   onFound: function() {
     this.visible = true;
-    window.__markerCourtFound = true;
+    if (this.marker && this.marker.id === "courtMarker") {
+      window.__markerSjsuFound = true;
+    } else {
+      window.__markerCourtFound = true;
+    }
     updateMarkerGuide();
     
     // Show and play video when marker is found
@@ -1944,95 +2005,107 @@ AFRAME.registerComponent("shark-controller", {
     });
     this.sharkTimers = [];
     
-    // Hide all sharks
-    this.sharkEntities.forEach(shark => {
-      if (shark) {
-        shark.setAttribute("visible", false);
-        // Remove all animations
-        shark.removeAttribute("animation__swimOut");
-        shark.removeAttribute("animation__swimRotate");
-        shark.removeAttribute("animation__swimForward");
-      }
+    // Hide all shark rigs (and remove motion animations)
+    (this.sharkRigs || []).forEach(rig => {
+      if (!rig) return;
+      rig.setAttribute("visible", false);
+      rig.removeAttribute("animation__swimOut");
+      rig.removeAttribute("animation__swimRotate");
+      rig.removeAttribute("animation__swimForward");
     });
   },
 
   animateShark: function(sharkIndex) {
     if (!this.cyclingActive) return;
     
-    const shark = this.sharkEntities[sharkIndex];
-    if (!shark) return;
+    const rig = (this.sharkRigs || [])[sharkIndex];
+    const modelEl = (this.sharkModels || [])[sharkIndex];
+    if (!rig) return;
 
-    // Reset shark to starting position (behind the marker)
-    // Starting position: behind marker (z: 2), below ground (y: -2)
-    shark.setAttribute("position", "0 -2 2");
-    shark.setAttribute("rotation", "0 -90 0");
-    shark.setAttribute("visible", true);
+    // Reset shark to starting position (behind the marker, under ground)
+    // Ground plane is y = 0 in local space.
+    // Start at the marker's origin (x=0, z=0), under ground.
+    const start = { x: 0, y: 0.0, z: 0.0 };
+    // Arch upward while beginning to move forward.
+    const mid   = { x: 0, y:  0.9, z: -1.0 };  // arch apex (smooth emerge)
+    // Dive back into the ground further forward.
+    const end   = { x: 0, y: 0.0, z: -4.0 };   // return to ground level (further forward)
 
-    // Animation: swim up from behind (y: -2 to y: 0.5) and forward (z: 2 to z: -3)
-    // Duration: 2 seconds
-    // Note: Shark is rotated -90° on Y axis, so positive Z is behind, negative Z is forward
-    shark.setAttribute("animation__swimOut", {
+    rig.setAttribute("position", `${start.x} ${start.y} ${start.z}`);
+    const baseRot = this.sharkBaseRotations?.[sharkIndex] || { x: 0, y: 0, z: 0 };
+    rig.setAttribute("rotation", `${baseRot.x} ${baseRot.y} ${baseRot.z}`);
+    rig.setAttribute("visible", true);
+    // Subsurface fade-in: start transparent and fade to solid as it rises
+    if (modelEl) {
+      this.fadeModel(modelEl, 0, 1, 700);
+    }
+
+    // Segment 1: emerge in a smooth arch (start -> mid)
+    rig.setAttribute("animation__swimOut", {
       property: "position",
-      from: "0 -2 2",
-      to: "0 0.5 -3",
-      dur: 2000,
+      from: `${start.x} ${start.y} ${start.z}`,
+      to: `${mid.x} ${mid.y} ${mid.z}`,
+      dur: 1400,
       easing: "easeOutCubic"
     });
 
-    // Rotate slightly downward as it swims forward (more natural swimming motion)
-    shark.setAttribute("animation__swimRotate", {
-      property: "rotation",
-      from: "0 -90 0",
-      to: "-15 -90 0",
-      dur: 2000,
-      easing: "easeOutCubic"
-    });
 
-    // After swimming out, continue swimming forward until it disappears
+    // Segment 2: swim forward and dive back into the ground (mid -> end)
     const continueTimer = setTimeout(() => {
-      this.continueSwimming(sharkIndex);
-    }, 2000);
+      this.continueSwimming(sharkIndex, mid, end);
+    }, 1400);
     
     this.sharkTimers[sharkIndex] = continueTimer;
   },
 
-  continueSwimming: function(sharkIndex) {
+  continueSwimming: function(sharkIndex, mid, end) {
     if (!this.cyclingActive) return;
     
-    const shark = this.sharkEntities[sharkIndex];
-    if (!shark) return;
+    const rig = (this.sharkRigs || [])[sharkIndex];
+    const modelEl = (this.sharkModels || [])[sharkIndex];
+    if (!rig) return;
 
-    const currentPos = shark.getAttribute("position");
-    const forwardDistance = 10; // Swim 10 units forward to disappear
-    const swimDuration = 3000; // 3 seconds
-    
-    shark.setAttribute("animation__swimForward", {
+    const swimDuration = 2000;
+    rig.setAttribute("animation__swimForward", {
       property: "position",
-      from: `${currentPos.x} ${currentPos.y} ${currentPos.z}`,
-      to: `${currentPos.x} ${currentPos.y} ${currentPos.z - forwardDistance}`,
+      from: `${mid.x} ${mid.y} ${mid.z}`,
+      to: `${end.x} ${end.y} ${end.z}`,
       dur: swimDuration,
-      easing: "linear"
+      easing: "easeInOutSine"
     });
 
-    // After swimming forward completes, hide shark and start next one
+    // Add a gentle bob on the MODEL (so it doesn't fight forward motion)
+    if (modelEl) {
+      modelEl.setAttribute("animation__bob", {
+        property: "position",
+        dir: "alternate",
+        loop: true,
+        dur: 600,
+        easing: "easeInOutSine",
+        from: `0 -0.06 0`,
+        to: `0 0.06 0`
+      });
+    }
+
+    // After the dive completes, hide shark and start the other one
     const hideTimer = setTimeout(() => {
-      if (shark) {
-        shark.setAttribute("visible", false);
-        // Remove all animations
-        shark.removeAttribute("animation__swimOut");
-        shark.removeAttribute("animation__swimRotate");
-        shark.removeAttribute("animation__swimForward");
+      rig.setAttribute("visible", false);
+      rig.removeAttribute("animation__swimOut");
+      rig.removeAttribute("animation__swimRotate");
+      rig.removeAttribute("animation__swimForward");
+      if (modelEl) {
+        modelEl.removeAttribute("animation__bob");
       }
       
-      // Move to next shark (cycle: 0 -> 1 -> 2 -> 0)
-      this.currentSharkIndex = (this.currentSharkIndex + 1) % 3;
+      // Alternate sharks (0 <-> 1)
+      this.currentSharkIndex = (this.currentSharkIndex + 1) % 2;
       
-      // Start next shark after a short delay (0.5 seconds)
+      // Start next shark after a short delay
       const nextTimer = setTimeout(() => {
         if (this.cyclingActive) {
           this.animateShark(this.currentSharkIndex);
         }
-      }, 500);
+      }, 250);
       
       // Store timer for the next shark
       const nextSharkIndex = this.currentSharkIndex;
@@ -2044,7 +2117,11 @@ AFRAME.registerComponent("shark-controller", {
 
   onLost: function() {
     this.visible = false;
-    window.__markerCourtFound = false;
+    if (this.marker && this.marker.id === "courtMarker") {
+      window.__markerSjsuFound = false;
+    } else {
+      window.__markerCourtFound = false;
+    }
     updateMarkerGuide();
     
     // Stop cycling animation (unless in debug mode)

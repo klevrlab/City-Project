@@ -47,47 +47,9 @@
   <div id="hud">
     <div id="status">Loading�</div>
     <div id="controls">
-      <button class="btn active" data-mode="auto">Auto</button>
-      <button class="btn" data-mode="1">Phase 1</button>
-      <button class="btn" data-mode="2">Phase 2</button>
-      <button class="btn" data-mode="3">Phase 3</button>
-      <button id="calibrate-flat" class="btn" type="button">Calibrate Flat</button>
+      <button class="btn" id="debug-shark" type="button">Shark Debug (S/X)</button>
     </div>
-    <div id="note">Scan both markers: SJSU logo (court) and Pattern Court (shark). Auto phases are based on March 28, 2026. <strong>Debug: Press 'S' to test shark animation, 'X' to stop.</strong></div>
-  </div>
-
-  <!-- Basketball Game UI -->
-  <div id="basketball-game">
-    <div id="game-score">Score: 0/0</div>
-    <div id="game-stats">
-      <span id="accuracy">Accuracy: --</span> | 
-      <span id="streak">Streak: 0</span>
-    </div>
-    <div id="power-meter-container">
-      <div id="power-meter-label">Hold to charge power</div>
-      <div id="power-meter">
-        <div id="power-meter-fill"></div>
-      </div>
-    </div>
-    </div>
-  
-  <!-- Shot Feedback -->
-  <div id="shot-feedback"></div>
-  
-  <!-- Game Instructions -->
-  <div id="game-instructions">
-    ?? Tap/Click to shoot! Hold longer for more power ??
-  </div>
-
-  <!-- Scoreboard Countdown -->
-  <div id="scoreboard">
-    <div id="scoreboard-label">Time Until Event</div>
-    <div id="scoreboard-time">
-      <span id="days">00</span><span class="unit">D</span>
-      <span id="hours">00</span><span class="unit">H</span>
-      <span id="minutes">00</span><span class="unit">M</span>
-      <span id="seconds">00</span><span class="unit">S</span>
-    </div>
+    <div id="note">Scan both markers: SJSU logo (court) and Pattern Court (shark) to see the sharks.</div>
   </div>
 
   <a-scene
@@ -103,7 +65,8 @@
       <img id="texHalfCourt" src="assets/half-court.png" crossorigin="anonymous" />
       
       <!-- 3D Models -->
-      <a-asset-item id="basketballModel" src="assets/basketball.glb"></a-asset-item>`n      <a-asset-item id="sharkModel" src="assets/shark.glb"></a-asset-item>
+      <a-asset-item id="basketballModel" src="assets/basketball.glb"></a-asset-item>`n      <a-asset-item id="sharkModel1" src="assets/shark1.glb"></a-asset-item>
+      <a-asset-item id="sharkModel2" src="assets/shark2.glb"></a-asset-item>
       
       <!-- Sound assets -->
       <audio id="bounceSound" src="assets/bounce.mp3" preload="auto"></audio>
@@ -122,7 +85,7 @@
     <a-entity id="ambientLight" light="type: ambient; intensity: 0.9; color: #ffffff"></a-entity>
     <a-entity id="dirLight" light="type: directional; intensity: 1.1; color: #ffffff" position="1 2 1"></a-entity>
 
-    <!-- Court Marker (Half Court) - SJSU Logo (swapped for testing) -->
+    <!-- Court Marker (SJSU Logo) -->
     <a-marker
       id="courtMarker"
       type="pattern"
@@ -133,8 +96,8 @@
     smoothTolerance="0.01"
     smoothThreshold="2"
     >
-      <!-- Root that we show/hide by phase -->
-      <a-entity id="evoRoot" evolution-controller></a-entity>
+      <!-- Shark content -->
+      <a-entity id="courtSharkRoot" shark-controller></a-entity>
     </a-marker>
 
     <!-- Shark Marker - Pattern Court -->
