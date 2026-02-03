@@ -98,7 +98,11 @@ function preloadResources() {
     "assets/shark2.glb",
     "assets/bounce.mp3",
     "markers/sjsu-logo.patt",
-    "markers/pattern-court.patt"
+    "markers/pattern-court.patt",
+    "markers/pattern-Shark-A.patt",
+    "markers/pattern-Shark-B.patt",
+    "markers/pattern-Shark-C.patt",
+    "markers/pattern-Shark-D.patt"
   ];
 
   let completed = 0;
