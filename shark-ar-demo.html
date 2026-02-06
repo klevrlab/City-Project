@@ -504,6 +504,7 @@
             recentScores: [],
             ROLLING_N: 5,
             sharkVisible: false,
+            dismissedAt: 0,
             currentEventIndex: 0,
             visitedStops: new Set()
         };
@@ -810,6 +811,8 @@
 
         function dismissAll() {
             STATE.sharkVisible = false;
+            STATE.dismissedAt = performance.now();
+            STATE.recentScores = [];
             ui.modelOverlay.classList.remove('visible');
             ui.sharkLabel.classList.remove('visible');
             hideEvent();
@@ -829,7 +832,8 @@
                 const rawMatch = bestMatch(embedding);
                 const smoothed = rollingScore(rawMatch);
 
-                if (smoothed.name && smoothed.score >= THRESHOLD && smoothed.confidence >= 0.4) {
+                const cooldownOver = performance.now() - STATE.dismissedAt > 3000;
+                if (cooldownOver && smoothed.name && smoothed.score >= THRESHOLD && smoothed.confidence >= 0.4) {
                     STATE.lastMatchTime = performance.now();
                     onSharkFound(smoothed.name, smoothed.score);
                 } else {
