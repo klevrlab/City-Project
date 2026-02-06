@@ -1026,9 +1026,16 @@ AFRAME.registerComponent("evolution-controller", {
       </a-plane>
 
       <!-- Video Plane - displays video on marker plane (bottom right) -->
+      <a-plane class="video-shadow"
+        visible="false"
+        position="1.2 0.01 -1.2"
+        rotation="-90 0 0"
+        width="2.0" height="2.0"
+        material="color: #000000; opacity: 1; transparent: false">
+      </a-plane>
       <a-plane id="videoPlane"
         visible="false"
-        position="1.2 0.04 -1.2"
+        position="1.2 0.06 -1.2"
         rotation="-90 0 0"
         width="1.5" height="1.5"
         material="shader: flat; src: #videoTexture; transparent: false">
@@ -1822,9 +1829,16 @@ AFRAME.registerComponent("shark-controller", {
     // Build shark content (use classes so multiple markers can host sharks)
     this.root.innerHTML = `
       <!-- Video Plane - displays video on marker plane (bottom right) -->
+      <a-plane class="video-shadow"
+        visible="false"
+        position="1.2 0.01 -1.2"
+        rotation="-90 0 0"
+        width="2.0" height="2.0"
+        material="color: #000000; opacity: 1; transparent: false">
+      </a-plane>
       <a-plane class="shark-video-plane"
         visible="false"
-        position="1.2 0.04 -1.2"
+        position="1.2 0.06 -1.2"
         rotation="-90 0 0"
         width="1.5" height="1.5"
         material="shader: flat; src: #videoTexture; transparent: false">
@@ -2122,12 +2136,10 @@ AFRAME.registerComponent("shark-controller", {
 
     // Reset shark to starting position (behind the marker, under ground)
     // Ground plane is y = 0 in local space.
-    // Start at the marker's origin (x=0, z=0), under ground.
-    const start = { x: 0, y: 0.0, z: 0.0 };
-    // Arch upward while beginning to move forward.
-    const mid   = { x: 0, y:  0.9, z: -1.0 };  // arch apex (smooth emerge)
-    // Dive back into the ground further forward.
-    const end   = { x: 0, y: 0.0, z: -4.0 };   // return to ground level (further forward)
+    // Start far back and swim straight forward (no vertical arc).
+    const start = { x: 0, y: 0.0, z: 4.0 };
+    const mid   = { x: 0, y: 0.0, z: 2.0 };
+    const end   = { x: 0, y: 0.0, z: -4.0 };
 
     rig.setAttribute("position", `${start.x} ${start.y} ${start.z}`);
     const baseRot = this.sharkBaseRotations?.[sharkIndex] || { x: 0, y: 0, z: 0 };
@@ -2138,12 +2150,12 @@ AFRAME.registerComponent("shark-controller", {
       this.fadeModel(modelEl, 0, 1, 700);
     }
 
-    // Segment 1: emerge in a smooth arch (start -> mid)
+    // Segment 1: swim forward (start -> mid)
     rig.setAttribute("animation__swimOut", {
       property: "position",
       from: `${start.x} ${start.y} ${start.z}`,
       to: `${mid.x} ${mid.y} ${mid.z}`,
-      dur: 1400,
+      dur: 2600,
       easing: "easeOutCubic"
     });
 
@@ -2151,7 +2163,7 @@ AFRAME.registerComponent("shark-controller", {
     // Segment 2: swim forward and dive back into the ground (mid -> end)
     const continueTimer = setTimeout(() => {
       this.continueSwimming(sharkIndex, mid, end);
-    }, 1400);
+    }, 2600);
     
     this.sharkTimers[sharkIndex] = continueTimer;
   },
@@ -2163,7 +2175,7 @@ AFRAME.registerComponent("shark-controller", {
     const modelEl = (this.sharkModels || [])[sharkIndex];
     if (!rig) return;
 
-    const swimDuration = 2000;
+    const swimDuration = 3600;
     rig.setAttribute("animation__swimForward", {
       property: "position",
       from: `${mid.x} ${mid.y} ${mid.z}`,
@@ -2183,6 +2195,16 @@ AFRAME.registerComponent("shark-controller", {
         from: `0 -0.06 0`,
         to: `0 0.06 0`
       });
+      // Subtle side-to-side wobble
+      modelEl.setAttribute("animation__wobble", {
+        property: "position",
+        dir: "alternate",
+        loop: true,
+        dur: 900,
+        easing: "easeInOutSine",
+        from: `-0.05 0 0`,
+        to: `0.05 0 0`
+      });
     }
 
     // Fade out near the end of the exit
@@ -2200,6 +2222,7 @@ AFRAME.registerComponent("shark-controller", {
       rig.removeAttribute("animation__swimForward");
       if (modelEl) {
         modelEl.removeAttribute("animation__bob");
+        modelEl.removeAttribute("animation__wobble");
       }
       
       // Alternate sharks (0 <-> 1)
