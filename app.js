@@ -378,6 +378,42 @@ function benchmarkFrameRate() {
   });
 }
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getResponsiveScale() {
+  const minDim = Math.min(window.innerWidth || 0, window.innerHeight || 0);
+  if (minDim <= 420) return 0.6;
+  if (minDim <= 720) return 0.8;
+  return 1.0;
+}
+
+function applyVideoPlaneLayout({ videoEl, planeEl, shadowEl }) {
+  if (!planeEl) return;
+  const scale = getResponsiveScale();
+  const baseHeight = 1.0 * scale;
+  const aspect = (videoEl && videoEl.videoWidth && videoEl.videoHeight)
+    ? (videoEl.videoWidth / videoEl.videoHeight)
+    : 1;
+  const width = clamp(baseHeight * aspect, 0.9 * scale, 1.6 * scale);
+  const posX = 0.85 * scale;
+  const posZ = -0.85 * scale;
+  const videoY = 0.12 * scale;
+  const shadowY = 0.01;
+  const shadowPad = 0.18 * scale;
+
+  planeEl.setAttribute("position", `${posX} ${videoY} ${posZ}`);
+  planeEl.setAttribute("width", width);
+  planeEl.setAttribute("height", baseHeight);
+
+  if (shadowEl) {
+    shadowEl.setAttribute("position", `${posX} ${shadowY} ${posZ}`);
+    shadowEl.setAttribute("width", width + shadowPad);
+    shadowEl.setAttribute("height", baseHeight + shadowPad);
+  }
+}
+
 // ---------- Flat Lock Component ----------
 // Keeps a plane flat/horizontal regardless of marker rotation
 AFRAME.registerComponent("flat-lock", {
@@ -1028,16 +1064,16 @@ AFRAME.registerComponent("evolution-controller", {
       <!-- Video Plane - displays video on marker plane (bottom right) -->
       <a-plane class="video-shadow"
         visible="false"
-        position="1.2 0.01 -1.2"
+        position="0.85 0.01 -0.85"
         rotation="-90 0 0"
-        width="2.0" height="2.0"
-        material="color: #000000; opacity: 1; transparent: false">
+        width="1.2" height="1.2"
+        material="color: #000000; opacity: 0.22; transparent: true; depthWrite: false">
       </a-plane>
       <a-plane id="videoPlane"
         visible="false"
-        position="1.2 0.06 -1.2"
+        position="0.85 0.05 -0.85"
         rotation="-90 0 0"
-        width="1.5" height="1.5"
+        width="1.0" height="1.0"
         material="shader: flat; src: #videoTexture; transparent: false">
       </a-plane>
 
@@ -1133,6 +1169,7 @@ AFRAME.registerComponent("evolution-controller", {
     this.cracksPlane = this.root.querySelector("#cracksPlane");
     this.holePlane = this.root.querySelector("#holePlane");
     this.videoPlane = this.root.querySelector("#videoPlane");
+    this.videoShadow = this.root.querySelector(".video-shadow");
     if (this.videoPlane) {
       this.videoPlane.setAttribute("video-fact-cycle", "intervalMs: 8000; visibleMs: 4000; animMs: 500; videoId: videoTexture");
     }
@@ -1140,6 +1177,15 @@ AFRAME.registerComponent("evolution-controller", {
     
     // Setup video aspect ratio adjustment
     this.setupVideoAspectRatio();
+    this.updateVideoLayout = () => {
+      applyVideoPlaneLayout({
+        videoEl: document.getElementById("videoTexture"),
+        planeEl: this.videoPlane,
+        shadowEl: this.videoShadow
+      });
+    };
+    this.updateVideoLayout();
+    window.addEventListener("resize", this.updateVideoLayout);
     this.courtBallRig = this.root.querySelector("#courtBallRig");
     this.courtBasketball = this.root.querySelector("#courtBasketball");
     this.basketballHoop = this.root.querySelector("#basketballHoop");
@@ -1241,29 +1287,13 @@ AFRAME.registerComponent("evolution-controller", {
   setupVideoAspectRatio() {
     const videoEl = document.getElementById("videoTexture");
     if (!videoEl || !this.videoPlane) return;
-    
-    // Function to update aspect ratio
     const updateAspectRatio = () => {
       if (!videoEl.videoWidth || !videoEl.videoHeight) return;
-      
-      const baseHeight = 1.5; // Base height in units
-      // Force 1:1 (square) aspect ratio for the plane
-      const calculatedWidth = baseHeight;
-      
-      // Update both video planes with correct aspect ratio
-      if (this.videoPlane) {
-        this.videoPlane.setAttribute("width", calculatedWidth);
-        this.videoPlane.setAttribute("height", baseHeight);
-      }
-      
-      // Also update shark video plane if it exists
-      const sharkVideoPlane = document.getElementById("sharkVideoPlane");
-      if (sharkVideoPlane) {
-        sharkVideoPlane.setAttribute("width", calculatedWidth);
-        sharkVideoPlane.setAttribute("height", baseHeight);
-      }
-      
-      console.log('[Video] Aspect ratio forced to 1:1:', calculatedWidth.toFixed(2), 'x', baseHeight);
+      applyVideoPlaneLayout({
+        videoEl,
+        planeEl: this.videoPlane,
+        shadowEl: this.videoShadow
+      });
     };
     
     // Try to update immediately if video is already loaded
@@ -1273,8 +1303,6 @@ AFRAME.registerComponent("evolution-controller", {
     
     // Update when video metadata is loaded
     videoEl.addEventListener('loadedmetadata', updateAspectRatio);
-    
-    // Fallback: update when video can play
     videoEl.addEventListener('canplay', updateAspectRatio);
   },
 
@@ -1430,6 +1458,9 @@ AFRAME.registerComponent("evolution-controller", {
       // Set to true to show video, false to hide
       // You can make this phase-specific or always visible when marker is found
       this.videoPlane.setAttribute("visible", showContent);
+      if (this.videoShadow) {
+        this.videoShadow.setAttribute("visible", showContent);
+      }
       
       // Auto-play video when shown
       if (showContent) {
@@ -1637,6 +1668,12 @@ AFRAME.registerComponent("evolution-controller", {
     }
   },
 
+  remove() {
+    if (this.updateVideoLayout) {
+      window.removeEventListener("resize", this.updateVideoLayout);
+    }
+  },
+
   snapAngle90(rad) {
     const step = Math.PI / 2;
     return Math.round(rad / step) * step;
@@ -1763,11 +1800,17 @@ AFRAME.registerComponent("video-fact-cycle", {
     intervalMs: { type: "number", default: 8000 },
     visibleMs: { type: "number", default: 4000 },
     animMs: { type: "number", default: 500 },
-    videoId: { type: "string", default: "videoTexture" }
+    videoId: { type: "string", default: "videoTexture" },
+    shadowSelector: { type: "string", default: ".video-shadow" }
   },
   init() {
     this._timer = null;
     this._cycle = this._cycle.bind(this);
+    this.shadowEl = null;
+    const parent = this.el ? this.el.parentElement : null;
+    if (parent && this.data.shadowSelector) {
+      this.shadowEl = parent.querySelector(this.data.shadowSelector);
+    }
   },
   playOnce() {
     this._cycle();
@@ -1780,6 +1823,11 @@ AFRAME.registerComponent("video-fact-cycle", {
     this.el.removeAttribute("animation__factIn");
     this.el.removeAttribute("animation__factOut");
     this.el.setAttribute("scale", "0.001 0.001 0.001");
+    if (this.shadowEl) {
+      this.shadowEl.removeAttribute("animation__shadowIn");
+      this.shadowEl.removeAttribute("animation__shadowOut");
+      this.shadowEl.setAttribute("scale", "0.001 0.001 0.001");
+    }
     const videoEl = document.getElementById(this.data.videoId);
     if (videoEl) videoEl.pause();
   },
@@ -1802,6 +1850,16 @@ AFRAME.registerComponent("video-fact-cycle", {
       dur: this.data.animMs,
       easing: "easeOutBack"
     });
+    if (this.shadowEl) {
+      this.shadowEl.setAttribute("scale", "0.001 0.001 0.001");
+      this.shadowEl.setAttribute("animation__shadowIn", {
+        property: "scale",
+        from: "0.001 0.001 0.001",
+        to: "1 1 1",
+        dur: this.data.animMs,
+        easing: "easeOutBack"
+      });
+    }
     setTimeout(() => {
       this.el.setAttribute("animation__factOut", {
         property: "scale",
@@ -1810,6 +1868,15 @@ AFRAME.registerComponent("video-fact-cycle", {
         dur: this.data.animMs,
         easing: "easeInCubic"
       });
+      if (this.shadowEl) {
+        this.shadowEl.setAttribute("animation__shadowOut", {
+          property: "scale",
+          from: "1 1 1",
+          to: "0.001 0.001 0.001",
+          dur: this.data.animMs,
+          easing: "easeInCubic"
+        });
+      }
       if (videoEl) videoEl.pause();
     }, this.data.visibleMs);
   }
@@ -1831,16 +1898,16 @@ AFRAME.registerComponent("shark-controller", {
       <!-- Video Plane - displays video on marker plane (bottom right) -->
       <a-plane class="video-shadow"
         visible="false"
-        position="1.2 0.01 -1.2"
+        position="0.85 0.01 -0.85"
         rotation="-90 0 0"
-        width="2.0" height="2.0"
-        material="color: #000000; opacity: 1; transparent: false">
+        width="1.2" height="1.2"
+        material="color: #000000; opacity: 0.22; transparent: true; depthWrite: false">
       </a-plane>
       <a-plane class="shark-video-plane"
         visible="false"
-        position="1.2 0.06 -1.2"
+        position="0.85 0.05 -0.85"
         rotation="-90 0 0"
-        width="1.5" height="1.5"
+        width="1.0" height="1.0"
         material="shader: flat; src: #videoTexture; transparent: false">
       </a-plane>
       
@@ -1885,6 +1952,7 @@ AFRAME.registerComponent("shark-controller", {
 
     // Cache nodes
     this.sharkVideoPlane = this.root.querySelector(".shark-video-plane");
+    this.sharkVideoShadow = this.root.querySelector(".video-shadow");
     if (this.sharkVideoPlane) {
       this.sharkVideoPlane.setAttribute("video-fact-cycle", "intervalMs: 8000; visibleMs: 4000; animMs: 500; videoId: videoTexture");
     }
@@ -1926,6 +1994,15 @@ AFRAME.registerComponent("shark-controller", {
     
     // Setup video aspect ratio (will be handled by evolution-controller, but ensure it's set)
     this.setupSharkVideoAspectRatio();
+    this.updateVideoLayout = () => {
+      applyVideoPlaneLayout({
+        videoEl: document.getElementById("videoTexture"),
+        planeEl: this.sharkVideoPlane,
+        shadowEl: this.sharkVideoShadow
+      });
+    };
+    this.updateVideoLayout();
+    window.addEventListener("resize", this.updateVideoLayout);
 
     // Marker events
     if (this.marker) {
@@ -2025,15 +2102,11 @@ AFRAME.registerComponent("shark-controller", {
     
     const updateAspectRatio = () => {
       if (!videoEl.videoWidth || !videoEl.videoHeight) return;
-      
-      const baseHeight = 1.5;
-      // Force 1:1 (square) aspect ratio for the plane
-      const calculatedWidth = baseHeight;
-      
-      if (this.sharkVideoPlane) {
-        this.sharkVideoPlane.setAttribute("width", calculatedWidth);
-        this.sharkVideoPlane.setAttribute("height", baseHeight);
-      }
+      applyVideoPlaneLayout({
+        videoEl,
+        planeEl: this.sharkVideoPlane,
+        shadowEl: this.sharkVideoShadow
+      });
     };
     
     if (videoEl.readyState >= 2) {
@@ -2085,6 +2158,9 @@ AFRAME.registerComponent("shark-controller", {
     // Show and play video when marker is found
     if (this.sharkVideoPlane) {
       this.sharkVideoPlane.setAttribute("visible", true);
+      if (this.sharkVideoShadow) {
+        this.sharkVideoShadow.setAttribute("visible", true);
+      }
       const videoEl = document.getElementById("videoTexture");
       if (videoEl) {
         videoEl.play().catch(e => console.warn("Video play failed:", e));
@@ -2137,9 +2213,11 @@ AFRAME.registerComponent("shark-controller", {
     // Reset shark to starting position (behind the marker, under ground)
     // Ground plane is y = 0 in local space.
     // Start far back and swim straight forward (no vertical arc).
-    const start = { x: 0, y: 0.0, z: 4.0 };
-    const mid   = { x: 0, y: 0.0, z: 2.0 };
-    const end   = { x: 0, y: 0.0, z: -4.0 };
+    const swimRange = 3.5 * getResponsiveScale();
+    const shark2ForwardShift = (sharkIndex === 1) ? (-1.0 * getResponsiveScale()) : 0;
+    const start = { x: 0, y: 0.0, z: swimRange + shark2ForwardShift };
+    const mid   = { x: 0, y: 0.0, z: swimRange * 0.5 + shark2ForwardShift };
+    const end   = { x: 0, y: 0.0, z: -swimRange + shark2ForwardShift };
 
     rig.setAttribute("position", `${start.x} ${start.y} ${start.z}`);
     const baseRot = this.sharkBaseRotations?.[sharkIndex] || { x: 0, y: 0, z: 0 };
@@ -2260,6 +2338,9 @@ AFRAME.registerComponent("shark-controller", {
     // Hide and pause video when marker is lost
     if (this.sharkVideoPlane) {
       this.sharkVideoPlane.setAttribute("visible", false);
+      if (this.sharkVideoShadow) {
+        this.sharkVideoShadow.setAttribute("visible", false);
+      }
       const cycle = this.sharkVideoPlane.components["video-fact-cycle"];
       if (cycle) cycle.stop();
     }
@@ -2277,6 +2358,12 @@ AFRAME.registerComponent("shark-controller", {
       if (this.root && !this.root.object3D.visible) {
         this.root.object3D.visible = true;
       }
+    }
+  },
+
+  remove() {
+    if (this.updateVideoLayout) {
+      window.removeEventListener("resize", this.updateVideoLayout);
     }
   }
 });
