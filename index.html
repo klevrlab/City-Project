@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sharks Way AR Tour - Immersion 2026</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #006D75 0%, #00A9E0 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 500px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            color: #006D75;
+            font-size: 32px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .subtitle {
+            color: #00A9E0;
+            font-size: 18px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .demo-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0, 109, 117, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .demo-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 109, 117, 0.2);
+        }
+        .demo-card h2 {
+            color: #006D75;
+            font-size: 22px;
+            margin-bottom: 12px;
+        }
+        .demo-card p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+        .demo-link {
+            display: inline-block;
+            background: linear-gradient(135deg, #006D75, #00A9E0);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform 0.2s ease;
+        }
+        .demo-link:active {
+            transform: scale(0.95);
+        }
+        .requirements {
+            background: rgba(0, 169, 224, 0.1);
+            border-left: 4px solid #00A9E0;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+        .requirements h3 {
+            color: #006D75;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        .requirements ul {
+            color: #666;
+            padding-left: 20px;
+            line-height: 1.8;
+        }
+        .icon {
+            width: 50px;
+            height: 50px;
+            margin: 0 auto 16px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="./the-big-game.svg" alt="Sharks" class="icon">
+        <h1>Sharks Way AR Tour</h1>
+        <p class="subtitle">Immersion 2026 Experience</p>
+        
+        <div class="demo-card">
+            <h2>🎯 Marker-Based Demo</h2>
+            <p>Point your camera at the Hiro marker to see Sharkey and explore event information.</p>
+            <a href="./marker-demo.html" class="demo-link">Launch Marker Demo</a>
+        </div>
+        
+        <div class="demo-card">
+            <h2>🦈 Shark AR Experience</h2>
+            <p>Point your camera at any shark sidewalk painting to see Sharkey appear with event info. Full AR experience powered by AI detection.</p>
+            <a href="./shark-ar-demo.html" class="demo-link">Launch Shark AR</a>
+        </div>
+
+        <div class="demo-card">
+            <h2> Location-Based Tour</h2>
+            <p>Walk around San Jose and discover AR experiences at SAP Center, Downtown, and San Pedro Square.</p>
+            <a href="./location-tour.html" class="demo-link">Launch Location Tour</a>
+        </div>
+        
+        <div class="requirements">
+            <h3>Requirements:</h3>
+            <ul>
+                <li>HTTPS connection (GitHub Pages ✓)</li>
+                <li>Camera permissions</li>
+                <li>GPS enabled (for location tour)</li>
+                <li>iOS Safari or Chrome Android</li>
+                <li><a href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png" target="_blank" style="color: #00A9E0;">Download Hiro Marker</a> (for marker demo)</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

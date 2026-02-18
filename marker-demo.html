@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Sharks Way AR - Marker Demo</title>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: none;
+        }
+        #info-panel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 109, 117, 0.15);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            color: white;
+            padding: 18px 16px;
+            border-radius: 20px;
+            z-index: 1000;
+            width: 140px;
+            border: 1px solid rgba(0, 169, 224, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+        #info-panel h2 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            font-weight: 700;
+            color: #FFFFFF;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            letter-spacing: 0.3px;
+            line-height: 1.3;
+            word-wrap: break-word;
+        }
+        #info-panel p {
+            margin: 6px 0;
+            font-size: 12px;
+            line-height: 1.4;
+            color: rgba(255, 255, 255, 0.85);
+        }
+        #info-panel .marker-hint {
+            font-size: 10px;
+            opacity: 0.7;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(0, 169, 224, 0.2);
+            line-height: 1.3;
+        }
+        #event-info {
+            position: fixed;
+            top: 120px;
+            left: -460px;
+            transform: translateY(-50%);
+            background: rgba(0, 109, 117, 0.15);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            color: white;
+            padding: 16px 20px;
+            border-radius: 16px;
+            z-index: 1000;
+            max-width: 280px;
+            border: 1px solid rgba(0, 169, 224, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transition: left 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+        #event-info.visible {
+            left: 20px;
+        }
+        #event-info h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        #event-info .event-details {
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        #event-info .event-details p {
+            margin: 6px 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        #event-info .event-description {
+            display: none;
+        }
+        #sharkey-message {
+            display: none;
+        }
+        #tap-hint {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 109, 117, 0.2);
+            backdrop-filter: blur(15px) saturate(180%);
+            -webkit-backdrop-filter: blur(15px) saturate(180%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 999;
+            display: none;
+            border: 1px solid rgba(0, 169, 224, 0.4);
+            box-shadow: 0 4px 16px rgba(0, 109, 117, 0.3);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        #tap-hint.visible {
+            display: block;
+        }
+        #progress-tracker {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 109, 117, 0.15);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            padding: 16px 18px;
+            border-radius: 16px;
+            color: white;
+            font-size: 11px;
+            z-index: 1000;
+            border: 1px solid rgba(0, 169, 224, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            max-width: 140px;
+        }
+        #progress-tracker .stop-item {
+            margin: 6px 0;
+            opacity: 0.5;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        #progress-tracker .stop-item.visited {
+            opacity: 1;
+            color: #00A9E0;
+        }
+        #progress-tracker .stop-item .check-icon {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+            stroke-width: 2.5;
+            fill: none;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: translateX(-50%) scale(1); opacity: 1; }
+            50% { transform: translateX(-50%) scale(1.05); opacity: 0.9; }
+        }
+        .cta-button {
+            background: rgba(0, 169, 224, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 169, 224, 0.5);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 169, 224, 0.3),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            display: block;
+            width: 100%;
+        }
+        .cta-button:active {
+            transform: scale(0.95);
+            background: rgba(0, 169, 224, 0.5);
+        }
+        #event-icon {
+            width: 45px;
+            height: 45px;
+            margin: 0 auto 10px;
+            display: block;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+            object-fit: contain;
+        }
+        .icon {
+            width: 16px;
+            height: 16px;
+            vertical-align: middle;
+            margin-right: 6px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+        }
+        @media (max-width: 480px) {
+            #info-panel {
+                bottom: 10px;
+                right: 10px;
+                width: 120px;
+                padding: 14px 12px;
+            }
+            #info-panel h2 {
+                font-size: 13px;
+            }
+            #info-panel p {
+                font-size: 11px;
+            }
+            #event-info {
+                max-width: 90%;
+                padding: 14px 16px;
+            }
+            #event-info.visible {
+                left: 10px;
+            }
+            #event-info h3 {
+                font-size: 15px;
+            }
+            #event-info .event-details {
+                font-size: 12px;
+            }
+            #progress-tracker {
+                top: 10px;
+                right: 10px;
+                max-width: 120px;
+                padding: 12px 14px;
+                font-size: 10px;
+            }
+            #tap-hint {
+                bottom: 20px;
+                font-size: 12px;
+                padding: 10px 20px;
+            }
+            .cta-button {
+                padding: 10px 16px;
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="info-panel">
+        <img id="event-icon" src="./the-big-game.svg" alt="Event" onerror="this.style.display='none'">
+        <h2>Sharks Way Tour</h2>
+        <p>Point camera at Hiro marker</p>
+        <!-- <p class="marker-hint">Get marker: bit.ly/hiro-marker</p> -->
+    </div>
+
+    <!-- <div id="tap-hint">
+        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 5v14m7-7H5"/></svg>
+        Tap marker to learn more
+    </div> -->
+
+    <div id="progress-tracker">
+        <div style="font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+            Tour Progress
+        </div>
+        <div class="stop-item" data-stop="0">
+            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>
+            SAP Center
+        </div>
+        <div class="stop-item" data-stop="1">
+            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>
+            Downtown SJ
+        </div>
+        <div class="stop-item" data-stop="2">
+            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>
+            San Pedro Sq
+        </div>
+    </div>
+
+    <div id="event-info">
+        <h3 id="event-title">Event Loading...</h3>
+        <div class="event-details">
+            <p id="event-date"></p>
+            <p id="event-location"></p>
+            <p class="event-description" id="event-description"></p>
+        </div>
+        <div id="sharkey-message"></div>
+        <button class="cta-button" id="learn-more">
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><path d="M17 2 12 7 7 2"/></svg>
+            Learn More
+        </button>
+    </div>
+
+    <a-scene
+        embedded
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+        vr-mode-ui="enabled: false"
+        renderer="logarithmicDepthBuffer: true; precision: medium;">
+        
+        <a-assets>
+            <a-asset-item id="shark-model" src="./plushie_shark.glb"></a-asset-item>
+        </a-assets>
+
+        <a-marker type="pattern" url="./pattern-shark.patt" id="hiro-marker" class="clickable">
+            <!-- Sharkey 3D Model -->
+            <a-entity 
+                id="sharkey"
+                gltf-model="#shark-model"
+                position="0 0.5 0"
+                rotation="0 180 0"
+                scale="0.5 0.5 0.5"
+                animation="property: rotation; to: 0 190 0; dir: alternate; loop: true; dur: 3000; easing: easeInOutSine"
+                animation__float="property: position; to: 0 0.6 0; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine">
+            </a-entity>
+            
+            <!-- Fallback box (visible if model doesn't load) -->
+            <a-box 
+                id="fallback-shark"
+                position="0 0.5 0" 
+                width="0.3" 
+                height="0.2" 
+                depth="0.6" 
+                color="#006D75"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 3000">
+            </a-box>
+            
+            <!-- Tour stop platform -->
+            <a-cylinder 
+                position="0 0 0" 
+                radius="0.6" 
+                height="0.1" 
+                color="#F4901E"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 20000; easing: linear">
+            </a-cylinder>
+            
+            <!-- Floating text with background -->
+            <a-plane 
+                position="0 1.2 0" 
+                width="1.2" 
+                height="0.3" 
+                color="#006D75" 
+                opacity="0.7"
+                animation="property: position; to: 0 1.35 0; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine">
+            </a-plane>
+            <a-text 
+                value="Sharkey's\nTour Stop" 
+                align="center" 
+                color="#FFFFFF" 
+                position="0 1.21 0.01"
+                scale="0.4 0.4 0.4"
+                animation="property: position; to: 0 1.36 0.01; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine">
+            </a-text>
+            
+            <!-- Orbiting rings -->
+            <a-torus 
+                position="0 0.5 0" 
+                radius="0.5" 
+                radius-tubular="0.03" 
+                color="#00A9E0"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear">
+            </a-torus>
+            
+            <a-torus 
+                position="0 0.5 0" 
+                radius="0.7" 
+                radius-tubular="0.02" 
+                color="#F4901E"
+                rotation="90 0 0"
+                animation="property: rotation; to: 90 360 0; loop: true; dur: 6000; easing: linear">
+            </a-torus>
+            
+            <!-- Particle effects (stars) -->
+            <a-entity id="particles">
+                <a-sphere position="0.5 1.2 0.3" radius="0.03" color="#FFD700" animation="property: position; to: 0.5 1.5 0.3; dir: alternate; loop: true; dur: 1500"></a-sphere>
+                <a-sphere position="-0.4 1.0 -0.2" radius="0.03" color="#FFD700" animation="property: position; to: -0.4 1.3 -0.2; dir: alternate; loop: true; dur: 1800"></a-sphere>
+                <a-sphere position="0.3 1.4 -0.4" radius="0.03" color="#FFD700" animation="property: position; to: 0.3 1.7 -0.4; dir: alternate; loop: true; dur: 2000"></a-sphere>
+            </a-entity>
+        </a-marker>
+
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+        const dummyEvents = [
+            {
+                title: "The Big Game",
+                date: "February 9, 2026",
+                time: "3:30 PM PST",
+                location: "SAP Center, San Jose",
+                description: "Experience the ultimate showdown! Join thousands of fans for an unforgettable game day.",
+                sharkeyMessage: "Hey there! I'm Sharkey, and this is where the magic happens! SAP Center hosts over 200 events per year. Arrive early to grab some teal gear!",
+                icon: "./the-big-game.svg"
+            },
+            {
+                title: "March Madness Watch Party",
+                date: "March 15-April 6, 2026",
+                time: "Various Times",
+                location: "Downtown San Jose",
+                description: "Catch all the tournament action on giant screens across downtown venues.",
+                sharkeyMessage: "Downtown SJ is buzzing! Over 40 restaurants and bars showing the games. San Pedro Square Market has the best viewing atmosphere!",
+                icon: "./march-madness.svg"
+            },
+            {
+                title: "World Cup Viewing",
+                date: "June-July 2026",
+                time: "Match Times Vary",
+                location: "San Pedro Square Market",
+                description: "Cheer for your team with fans from around the world in the heart of SJ.",
+                sharkeyMessage: "¡Hola! This historic market has been a gathering place since 1863. Try food from different countries while watching their teams play!",
+                icon: "./world-cup.svg"
+            }
+        ];
+
+        let currentEventIndex = 0;
+        let visitedStops = new Set();
+        const eventInfo = document.getElementById('event-info');
+        const marker = document.querySelector('#hiro-marker');
+        const tapHint = document.getElementById('tap-hint');
+        let markerVisible = false;
+        let soundEnabled = true;
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            if (type === 'found') {
+                oscillator.frequency.value = 800;
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.3);
+            } else if (type === 'tap') {
+                oscillator.frequency.value = 1200;
+                gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.1);
+            }
+        }
+
+        function showEvent(event) {
+            document.getElementById('event-title').textContent = event.title;
+            document.getElementById('event-date').innerHTML = `<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>${event.date} &bull; ${event.time}`;
+            document.getElementById('event-location').innerHTML = `<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${event.location}`;
+            document.getElementById('event-description').textContent = event.description;
+            document.getElementById('sharkey-message').textContent = event.sharkeyMessage;
+            document.getElementById('event-icon').src = event.icon;
+            if (eventInfo) eventInfo.classList.add('visible');
+            
+            visitedStops.add(currentEventIndex);
+            updateProgress();
+        }
+
+        function updateProgress() {
+            visitedStops.forEach(index => {
+                const stopItem = document.querySelector(`.stop-item[data-stop="${index}"]`);
+                if (stopItem) {
+                    stopItem.classList.add('visited');
+                    const checkIcon = stopItem.querySelector('.check-icon');
+                    if (checkIcon) {
+                        checkIcon.innerHTML = '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>';
+                    }
+                }
+            });
+        }
+
+        marker.addEventListener('markerFound', () => {
+            console.log('Marker detected!');
+            markerVisible = true;
+            const event = dummyEvents[currentEventIndex];
+            showEvent(event);
+            playSound('found');
+            
+            setTimeout(() => {
+                if (markerVisible && tapHint) {
+                    tapHint.classList.add('visible');
+                }
+            }, 2000);
+        });
+
+        marker.addEventListener('markerLost', () => {
+            console.log('Marker lost');
+            markerVisible = false;
+            if (eventInfo) eventInfo.classList.remove('visible');
+            if (tapHint) tapHint.classList.remove('visible');
+        });
+
+        document.getElementById('learn-more').addEventListener('click', () => {
+            playSound('tap');
+            alert(`Ready to attend ${dummyEvents[currentEventIndex].title}?\n\nIn the full version, this would:\n- Show ticket options\n- Add to calendar\n- Share with friends\n- Get directions`);
+            
+            currentEventIndex = (currentEventIndex + 1) % dummyEvents.length;
+            const event = dummyEvents[currentEventIndex];
+            showEvent(event);
+        });
+
+        const scene = document.querySelector('a-scene');
+        scene.addEventListener('click', (e) => {
+            if (markerVisible && e.target.closest('#hiro-marker')) {
+                playSound('tap');
+                tapHint.classList.remove('visible');
+            }
+        });
+
+        // Model loading debug
+        const sharkModel = document.querySelector('#shark-model');
+        if (sharkModel) {
+            sharkModel.addEventListener('loaded', () => {
+                console.log('✅ Shark GLB model loaded successfully');
+                const fallback = document.querySelector('#fallback-shark');
+                if (fallback) fallback.setAttribute('visible', 'false');
+            });
+            sharkModel.addEventListener('error', (e) => {
+                console.error('❌ Error loading shark model:', e);
+                console.log('Make sure plushie-shark.glb is in the same folder as marker-demo.html');
+            });
+        }
+
+        const sharkEntity = document.querySelector('#sharkey');
+        if (sharkEntity) {
+            sharkEntity.addEventListener('model-loaded', () => {
+                console.log('✅ Shark entity model loaded');
+                const fallback = document.querySelector('#fallback-shark');
+                if (fallback) fallback.setAttribute('visible', 'false');
+            });
+            sharkEntity.addEventListener('model-error', (e) => {
+                console.error('❌ Shark entity error:', e);
+            });
+        }
+
+        window.addEventListener('load', () => {
+            console.log('Sharks Way AR Demo Enhanced Version loaded');
+            console.log('Print Hiro marker from: https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png');
+            console.log('Looking for: ./plushie-shark.glb');
+        });
+    </script>
+</body>
+</html>
