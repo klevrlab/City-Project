@@ -1,0 +1,2097 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Sharks Way AR - Location Tour</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe@1.6.0/dist/aframe-master.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Mobile debugging console -->
+    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+    <script>eruda.init();</script>
+    <script>
+        // Global variables for touch rotation and zoom
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let isDragging = false;
+        let nearestSharkId = null;
+        let sharkRotations = {};
+        let sharkZoomLevels = {};
+
+        // Global variables for shark tracking and celebration
+        let tourStops = [];
+        let sharkData = null;
+        let userLat = null;
+        let userLng = null;
+        let currentStopIndex = 0;
+        let mapExpanded = false;
+        let visitedStops = new Set();
+        let lastDistance = null;
+        let celebratedSharks = new Set();
+        let lastVisibleShark = null;
+    </script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: none;
+        }
+
+        #ui-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        #header {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 109, 117, 0.15);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            color: white;
+            padding: 15px;
+            border-radius: 20px;
+            width: 140px;
+            border: 1px solid rgba(0, 169, 224, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        #header h2 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            font-weight: 700;
+            color: #00A9E0;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            letter-spacing: 0.3px;
+            line-height: 1.3;
+            word-wrap: break-word;
+        }
+
+        #gps-status {
+            font-size: 11px;
+            opacity: 0.8;
+            margin: 8px 0 0 0;
+            line-height: 1.4;
+        }
+
+        #event-icon-header {
+            width: 45px;
+            height: 45px;
+            margin: 0 auto 10px;
+            display: block;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+            object-fit: contain;
+        }
+
+        .icon {
+            width: 16px;
+            height: 16px;
+            vertical-align: middle;
+            margin-right: 6px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        @media (max-width: 480px) {
+            #header {
+                top: 20px;
+                left: 10px;
+                width: 110px;
+                padding: 15px;
+            }
+
+            #header h2 {
+                font-size: 13px;
+            }
+
+            #header p {
+                font-size: 10px;
+            }
+
+            #bottom-controls-wrapper {
+                padding: 10px;
+                gap: 10px;
+                flex-wrap: nowrap;
+                justify-content: space-between;
+            }
+
+            #map-container {
+                width: 120px;
+                height: 120px;
+                min-width: 120px;
+            }
+
+            #map-container.expanded {
+                width: 85vw;
+                height: 50vh;
+                max-width: 400px;
+                max-height: 400px;
+            }
+
+            #rotation-controls {
+                max-width: 50vw;
+                min-width: 0;
+            }
+
+            #compass-indicator {
+                width: 45px;
+                height: 45px;
+                top: 8px;
+                left: 8px;
+            }
+
+            .compass-north-indicator {
+                top: 4px;
+                font-size: 9px;
+            }
+
+            .direction-label {
+                font-size: 14px;
+            }
+
+            #route-info {
+                top: 10px;
+                right: 10px;
+                max-width: 150px;
+                padding: 15px;
+            }
+
+            #route-info h3 {
+                font-size: 14px;
+            }
+
+            #distance {
+                font-size: 28px;
+            }
+
+            #toggle-map {
+                bottom: 8px;
+                right: 8px;
+                padding: 8px 12px;
+                font-size: 11px;
+            }
+
+            #toggle-map .icon {
+                width: 14px;
+                height: 14px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            #bottom-controls-wrapper {
+                padding: 8px;
+                gap: 6px;
+            }
+
+            #map-container {
+                width: 100px;
+                height: 100px;
+                min-width: 100px;
+            }
+
+            #rotation-controls {
+                max-width: 55vw;
+            }
+        }
+
+        @media (max-height: 700px) {
+            #header {
+                top: 10px;
+            }
+        }
+
+        #bottom-controls-wrapper {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            flex-direction: row;
+            align-items: flex-end;
+            justify-content: space-around;
+
+            pointer-events: none;
+            z-index: 1000;
+            gap: 20px;
+        }
+
+        #map-container {
+            width: 180px;
+            height: 180px;
+            background: rgba(0, 109, 117, 0.15);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-radius: 20px;
+            border: 1px solid rgba(0, 169, 224, 0.3);
+            pointer-events: auto;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            flex-shrink: 0;
+        }
+
+        #map-container.expanded {
+            position: fixed;
+            top: 65%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90vw;
+            height: 60vh;
+            max-width: 500px;
+            max-height: 500px;
+            z-index: 2000;
+        }
+
+        #mini-map {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            border: none;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        .leaflet-container {
+            width: 100%;
+            height: 100%;
+            border-radius: 20px;
+        }
+
+        #compass-indicator {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 169, 224, 0.95);
+            backdrop-filter: blur(15px) saturate(180%);
+            -webkit-backdrop-filter: blur(15px) saturate(180%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 16px rgba(0, 109, 117, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            z-index: 1001;
+            pointer-events: none;
+            transition: transform 0.3s ease;
+        }
+
+        .compass-north-indicator {
+            position: absolute;
+            top: 5px;
+            font-size: 10px;
+            font-weight: 900;
+            color: #FF4444;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+
+        .direction-label {
+            font-size: 16px;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+            letter-spacing: 0.5px;
+        }
+
+        @keyframes compassRotate {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Directional Arrow Indicators */
+        .direction-arrow {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            display: none;
+            flex-direction: row;
+            align-items: center;
+            gap: 6px;
+            z-index: 99999;
+            pointer-events: none;
+            background: rgba(0, 109, 117, 0.1);
+            backdrop-filter: blur(12px) saturate(150%);
+            -webkit-backdrop-filter: blur(12px) saturate(150%);
+            padding: 6px 10px;
+            border-radius: 30px;
+            border: 1.5px solid rgba(0, 169, 224, 0.3);
+            box-shadow: 0 2px 8px rgba(0, 109, 117, 0.25);
+        }
+
+        .direction-arrow.left {
+            left: 12px;
+            flex-direction: row;
+        }
+
+        .direction-arrow.right {
+            right: 12px;
+            flex-direction: row-reverse;
+        }
+
+        .direction-arrow.show {
+            display: flex !important;
+            animation: arrowSlideIn 0.3s ease-out;
+        }
+
+        .arrow-icon {
+            width: 32px;
+            height: 32px;
+            background: rgba(0, 169, 224, 0.85);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid rgba(255, 255, 255, 0.75);
+            box-shadow: 0 1px 6px rgba(0, 169, 224, 0.35),
+                inset 0 1px 0 rgba(255, 255, 255, 0.15);
+            animation: arrowPulse 1.5s ease-in-out infinite;
+            flex-shrink: 0;
+        }
+
+        .arrow-icon svg {
+            width: 16px;
+            height: 16px;
+            stroke: white;
+            stroke-width: 2.5;
+            fill: none;
+            filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.15));
+        }
+
+        .arrow-text {
+            color: white;
+            font-size: 10px;
+            font-weight: 600;
+            font-family: 'Montserrat', sans-serif;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+            white-space: nowrap;
+            letter-spacing: 0.2px;
+            opacity: 0.9;
+        }
+
+        @keyframes arrowPulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                box-shadow: 0 1px 6px rgba(0, 169, 224, 0.35),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+            }
+
+            50% {
+                transform: scale(1.08);
+                box-shadow: 0 2px 10px rgba(0, 169, 224, 0.5),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+            }
+        }
+
+        @keyframes arrowSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50%) translateX(-15px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(-50%) translateX(0);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .direction-arrow {
+                padding: 5px 9px;
+                gap: 5px;
+            }
+
+            .direction-arrow.left {
+                left: 10px;
+            }
+
+            .direction-arrow.right {
+                right: 10px;
+            }
+
+            .arrow-icon {
+                width: 30px;
+                height: 30px;
+            }
+
+            .arrow-icon svg {
+                width: 15px;
+                height: 15px;
+            }
+
+            .arrow-text {
+                font-size: 9px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .arrow-text {
+                display: none;
+            }
+
+            .direction-arrow {
+                padding: 5px;
+                background: rgba(0, 109, 117, 0.08);
+                border: 1px solid rgba(0, 169, 224, 0.25);
+            }
+
+            .arrow-icon {
+                width: 28px;
+                height: 28px;
+            }
+        }
+
+        #route-info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 109, 117, 0.15);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            color: white;
+            padding: 20px;
+            border-radius: 20px;
+            width: 140px;
+            border: 1px solid rgba(0, 169, 224, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        #proximity-warning {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(244, 144, 30, 0.95);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            color: white;
+            padding: 20px 25px;
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 8px 32px rgba(244, 144, 30, 0.6);
+            z-index: 3000;
+            display: none;
+            max-width: 250px;
+        }
+
+        #proximity-warning.show {
+            display: block;
+            animation: warningPulse 1s ease-in-out infinite;
+        }
+
+        @keyframes warningPulse {
+
+            0%,
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+
+            50% {
+                transform: translate(-50%, -50%) scale(1.05);
+            }
+        }
+
+        /* Hide A-Frame VR/fullscreen button */
+        .a-enter-vr-button,
+        .a-enter-ar-button,
+        .a-fullscreen-button {
+            display: none !important;
+        }
+
+        #rotation-controls {
+            width: 200px;
+            max-width: 280px;
+            height: 180px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: clamp(4px, 1vw, 8px);
+            pointer-events: auto;
+            background: rgba(0, 109, 117, 0.15);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            padding: clamp(8px, 2vw, 12px);
+            border-radius: 20px;
+            border: 1px solid rgba(0, 169, 224, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+
+        #rotation-controls.active {
+            display: flex;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: row;
+            gap: clamp(4px, 1vw, 8px);
+            align-items: center;
+            justify-content: center;
+            flex-wrap: nowrap;
+        }
+
+        .control-group.vertical {
+            flex-direction: column;
+        }
+
+        .rotation-btn {
+            background: rgba(0, 169, 224, 0.95);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            width: clamp(36px, 9vw, 44px);
+            height: clamp(36px, 9vw, 44px);
+            min-width: 36px;
+            min-height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: clamp(14px, 3.5vw, 18px);
+            font-weight: bold;
+            box-shadow: 0 4px 16px rgba(0, 109, 117, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .rotation-btn svg {
+            width: clamp(16px, 4vw, 20px);
+            height: clamp(16px, 4vw, 20px);
+            stroke: white;
+            stroke-width: 2.5;
+            fill: none;
+        }
+
+        .rotation-btn:active {
+            transform: scale(0.92);
+            background: rgba(0, 169, 224, 1);
+            box-shadow: 0 2px 8px rgba(0, 109, 117, 0.6);
+        }
+
+        .rotation-row {
+            display: flex;
+            gap: clamp(4px, 1vw, 8px);
+            justify-content: center;
+            align-items: center;
+            flex-wrap: nowrap;
+        }
+
+        .zoom-btn {
+            background: rgba(244, 144, 30, 0.95);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .zoom-btn:active {
+            background: rgba(244, 144, 30, 1);
+            box-shadow: 0 2px 8px rgba(244, 144, 30, 0.6);
+        }
+
+        #route-info h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+
+        #distance {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #FFD700;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        #distance.close {
+            animation: distancePulse 1s ease-in-out infinite;
+        }
+
+        @keyframes distancePulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+                color: #00FF00;
+            }
+        }
+
+        #next-stop {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        #toggle-map {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 169, 224, 0.95);
+            backdrop-filter: blur(15px) saturate(180%);
+            -webkit-backdrop-filter: blur(15px) saturate(180%);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 16px;
+            border-radius: 25px;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: 'Montserrat', sans-serif;
+            pointer-events: auto;
+            cursor: pointer;
+            z-index: 1002;
+            box-shadow: 0 4px 16px rgba(0, 109, 117, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        #toggle-map:hover {
+            background: rgba(0, 169, 224, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 109, 117, 0.6);
+        }
+
+        #toggle-map:active {
+            transform: scale(0.95) translateY(0);
+            background: rgba(0, 169, 224, 1);
+        }
+
+        #toggle-map .icon {
+            width: 16px;
+            height: 16px;
+            stroke-width: 2.5;
+        }
+
+        #photo-button {
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 169, 224, 0.95);
+            backdrop-filter: blur(15px) saturate(180%);
+            -webkit-backdrop-filter: blur(15px) saturate(180%);
+            border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 4px 20px rgba(0, 109, 117, 0.6),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        #photo-button:hover {
+            transform: scale(1.1);
+            background: rgba(0, 169, 224, 1);
+            box-shadow: 0 6px 30px rgba(0, 109, 117, 0.8);
+        }
+
+        #photo-button:active {
+            transform: scale(0.95);
+        }
+
+        #photo-button svg {
+            width: 24px;
+            height: 24px;
+            stroke: white;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        #countdown-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            pointer-events: none;
+        }
+
+        #countdown-overlay.show {
+            display: flex;
+        }
+
+        #countdown-number {
+            font-size: 120px;
+            font-weight: 900;
+            color: white;
+            font-family: 'Montserrat', sans-serif;
+            text-shadow: 0 4px 20px rgba(0, 169, 224, 0.8);
+            animation: countdownPulse 1s ease-out;
+        }
+
+        @keyframes countdownPulse {
+            0% {
+                transform: scale(0.5);
+                opacity: 0;
+            }
+
+            50% {
+                transform: scale(1.2);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .ui-hidden {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        @media (max-width: 480px) {
+            #photo-button {
+                width: 45px;
+                height: 45px;
+            }
+
+            #photo-button svg {
+                width: 26px;
+                height: 26px;
+            }
+
+            #countdown-number {
+                font-size: 100px;
+            }
+        }
+
+        #arrival-celebration {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: rgba(0, 169, 224, 0.2);
+            backdrop-filter: blur(25px) saturate(200%);
+            -webkit-backdrop-filter: blur(25px) saturate(200%);
+            color: white;
+            padding: 45px;
+            border-radius: 24px;
+            z-index: 2000;
+            text-align: center;
+            border: 1px solid rgba(0, 208, 132, 0.5);
+            box-shadow: 0 16px 64px rgba(0, 109, 117, 0.6),
+                inset 0 2px 0 rgba(255, 255, 255, 0.3);
+            transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        #arrival-celebration.show {
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        #arrival-celebration h2 {
+            font-size: 28px;
+            margin: 0 0 15px 0;
+        }
+
+        #arrival-celebration p {
+            font-size: 16px;
+            margin: 10px 0;
+        }
+
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background: #FFD700;
+            position: absolute;
+            animation: confettiFall 3s ease-out forwards;
+        }
+
+        @keyframes confettiFall {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="ui-overlay">
+        <!-- Directional Arrow Indicators -->
+        <div class="direction-arrow left" id="arrow-left">
+            <div class="arrow-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+            </div>
+            <div class="arrow-text">Turn</div>
+        </div>
+        <div class="direction-arrow right" id="arrow-right">
+            <div class="arrow-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            </div>
+            <div class="arrow-text">Turn</div>
+        </div>
+
+        <div id="header">
+            <img id="event-icon-header" src="./the-big-game.svg" alt="Event" onerror="this.style.display='none'">
+            <h2>Sharks Way Tour</h2>
+            <p id="gps-status">
+                <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 2v4m0 12v4M2 12h4m12 0h4" />
+                </svg>
+                Acquiring GPS...
+            </p>
+        </div>
+
+
+        <div id="arrival-celebration">
+            <h2 id="celebration-title">
+                <svg class="icon" style="width: 24px; height: 24px;" xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24">
+                    <path
+                        d="M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+                    <path d="m9 16 2 2 4-4" />
+                </svg>
+                You've Arrived!
+            </h2>
+            <p id="celebration-message"></p>
+            <p id="celebration-sharkey"></p>
+        </div>
+
+        <div id="proximity-warning">
+            <svg class="icon" style="width: 20px; height: 20px; margin-bottom: 8px;" xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                <path d="M12 9v4m0 4h.01" />
+            </svg>
+            <div>Too Close!</div>
+            <div style="font-size: 11px; margin-top: 8px; opacity: 0.9;">Step back 8+ meters to view Sharkey</div>
+        </div>
+
+        <!-- Bottom Controls Wrapper with Flexbox -->
+        <div id="bottom-controls-wrapper">
+
+
+            <div id="map-container">
+                <button id="toggle-map">
+                    <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <span id="toggle-text">Expand</span>
+                </button>
+                <div id="compass-indicator">
+                    <div class="compass-north-indicator">N</div>
+                    <span class="direction-label" id="compass-direction">N</span>
+                </div>
+                <div id="mini-map"></div>
+            </div>
+
+            <div id="rotation-controls">
+                <!-- Photo Capture Button -->
+
+                <div class="control-group">
+                    <button id="photo-button" title="Take Photo">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <path
+                                d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                            <circle cx="12" cy="13" r="4" />
+                        </svg>
+                    </button>
+                    <button class="rotation-btn" id="rotate-up" title="Tilt Up">↑</button>
+
+                </div>
+                <div class="control-group">
+                    <button class="rotation-btn" id="rotate-left" title="Rotate Left">←</button>
+                    <button class="rotation-btn zoom-btn" id="zoom-out" title="Zoom Out">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="m21 21-4.35-4.35" />
+                            <line x1="8" y1="11" x2="14" y2="11" />
+                        </svg>
+                    </button>
+                    <button class="rotation-btn zoom-btn" id="zoom-in" title="Zoom In">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="m21 21-4.35-4.35" />
+                            <line x1="11" y1="8" x2="11" y2="14" />
+                            <line x1="8" y1="11" x2="14" y2="11" />
+                        </svg>
+                    </button>
+                    <button class="rotation-btn" id="rotate-right" title="Rotate Right">→</button>
+                </div>
+                <div class="control-group">
+                    <button class="rotation-btn" id="rotate-down" title="Tilt Down">↓</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="route-info">
+            <h3>
+                <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                    <circle cx="12" cy="10" r="3" />
+                </svg>
+                Next Stop
+            </h3>
+            <div id="distance">--m</div>
+            <div id="next-stop">Calculating...</div>
+        </div>
+
+        <!-- Countdown Overlay -->
+        <div id="countdown-overlay">
+            <div id="countdown-number">3</div>
+        </div>
+    </div>
+
+    <a-scene vr-mode-ui="enabled: false"
+        arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false; gpsMinDistance: 10;"
+        renderer="logarithmicDepthBuffer: true; precision: medium; preserveDrawingBuffer: true;"
+        camera="near: 0.1; far: 10000;">
+
+        <a-assets>
+            <a-asset-item id="shark-model" src="./plushie_shark.glb"></a-asset-item>
+        </a-assets>
+
+        <!-- Shark entities will be dynamically created from shark-locations.json -->
+
+        <!-- AR Direction Arrow (points to next stop) -->
+        <a-cone id="direction-arrow" position="0 -0.5 -2" rotation="-90 0 0" radius-bottom="0.2" radius-top="0"
+            height="0.5" color="#00A9E0"
+            animation="property: position; to: 0 -0.3 -2; dir: alternate; loop: true; dur: 800; easing: easeInOutSine">
+        </a-cone>
+
+        <a-camera gps-camera rotation-reader></a-camera>
+    </a-scene>
+
+    <script>
+        // Register custom A-Frame component to enforce minimum distance
+        AFRAME.registerComponent('min-distance-enforcer', {
+            schema: {
+                minDistance: { type: 'number', default: 10 }
+            },
+            init: function () {
+                this.checkDistance = this.checkDistance.bind(this);
+                // Start hidden by default
+                this.el.setAttribute('visible', false);
+            },
+            tick: function () {
+                this.checkDistance();
+            },
+            checkDistance: function () {
+                // Lazy load camera reference
+                if (!this.camera) {
+                    this.camera = document.querySelector('[gps-camera]');
+                    if (!this.camera) return;
+                }
+
+                try {
+                    const cameraPos = this.camera.object3D.position;
+                    const entityPos = this.el.object3D.position;
+                    const distance = cameraPos.distanceTo(entityPos);
+
+                    // Hide if too close (within minimum distance)
+                    if (distance < this.data.minDistance) {
+                        this.el.setAttribute('visible', false);
+                    } else {
+                        this.el.setAttribute('visible', true);
+                    }
+                } catch (e) {
+                    // Silently fail if positions not ready
+                }
+            }
+        });
+
+        // Register component to detect when shark is in camera view
+        AFRAME.registerComponent('shark-visibility-detector', {
+            schema: {
+                sharkId: { type: 'string', default: '' }
+            },
+            init: function () {
+                this.checkVisibility = this.checkVisibility.bind(this);
+                this.wasVisible = false;
+            },
+            tick: function () {
+                this.checkVisibility();
+            },
+            checkVisibility: function () {
+                if (!this.camera) {
+                    this.camera = document.querySelector('[gps-camera]');
+                    if (!this.camera) return;
+                }
+
+                try {
+                    // Check if entity is visible and in front of camera
+                    const isVisible = this.el.getAttribute('visible');
+                    if (!isVisible) {
+                        this.wasVisible = false;
+                        return;
+                    }
+
+                    // Get camera and entity positions
+                    const cameraPos = this.camera.object3D.position;
+                    const entityPos = this.el.object3D.position;
+                    const distance = cameraPos.distanceTo(entityPos);
+
+                    // Get camera direction
+                    const cameraDirection = new THREE.Vector3();
+                    this.camera.object3D.getWorldDirection(cameraDirection);
+
+                    // Get direction to entity
+                    const toEntity = new THREE.Vector3();
+                    toEntity.subVectors(entityPos, cameraPos).normalize();
+
+                    // Calculate angle between camera direction and entity direction
+                    const dotProduct = cameraDirection.dot(toEntity);
+                    const angle = Math.acos(dotProduct) * (180 / Math.PI);
+
+                    // Trigger celebration when within 10 meters
+                    const isClose = distance <= 10 && distance > 0;
+
+                    // Debug logging every 60 frames (~1 second)
+                    if (!this.frameCount) this.frameCount = 0;
+                    this.frameCount++;
+                    if (this.frameCount % 60 === 0) {
+                        console.log(`Shark ${this.data.sharkId}: dist=${distance.toFixed(1)}m, isClose=${isClose}, visible=${isVisible}`);
+                    }
+
+                    // Trigger celebration when shark gets within 10m for the first time
+                    if (isClose && !this.wasVisible && !celebratedSharks.has(this.data.sharkId)) {
+                        console.log(`🎉 Shark ${this.data.sharkId} within 10 meters!`);
+                        celebrateSharkInView(this.data.sharkId);
+                        this.wasVisible = true;
+                    } else if (!isClose) {
+                        this.wasVisible = false;
+                    }
+                } catch (e) {
+                    console.error('Visibility check error:', e);
+                }
+            }
+        });
+
+        // Load shark locations from JSON
+        fetch('./shark-locations.json')
+            .then(response => response.json())
+            .then(data => {
+                sharkData = data;
+                tourStops = data.sharks.map(shark => ({
+                    id: shark.id,
+                    name: shark.title,
+                    event: shark.eventInfo.name,
+                    lat: shark.latitude,
+                    lng: shark.longitude,
+                    description: shark.description,
+                    icon: shark.icon,
+                    sharkeyMessage: shark.sharkeyMessage
+                }));
+                console.log(`✅ Loaded ${tourStops.length} shark locations from JSON`);
+                createSharkEntities();
+                // Initialize map once we have shark locations
+                initializeMap();
+                if (userLat && userLng) {
+                    updateLeafletMap();
+                }
+            })
+            .catch(error => {
+                console.error('❌ Error loading shark locations:', error);
+                // Fallback to default locations if JSON fails
+                tourStops = [
+                    { id: 'stop1', name: "SAP Center", event: "The Big Game", lat: 37.3326, lng: -121.9010 },
+                    { id: 'stop2', name: "Downtown SJ", event: "March Madness", lat: 37.3382, lng: -121.8863 },
+                    { id: 'stop3', name: "San Pedro Square", event: "World Cup", lat: 37.3369, lng: -121.8936 }
+                ];
+                createSharkEntities();
+                // Initialize map once we have shark locations
+                initializeMap();
+                if (userLat && userLng) {
+                    updateLeafletMap();
+                }
+            });
+
+        function createSharkEntities() {
+            const scene = document.querySelector('a-scene');
+
+            tourStops.forEach((stop, index) => {
+                // Create main entity container
+                const entity = document.createElement('a-entity');
+                entity.setAttribute('id', stop.id || `stop${index + 1}`);
+                entity.setAttribute('gps-entity-place', `latitude: ${stop.lat}; longitude: ${stop.lng}`);
+                entity.setAttribute('min-distance-enforcer', 'minDistance: 10');
+                entity.setAttribute('shark-visibility-detector', `sharkId: ${stop.id}`);
+                entity.setAttribute('visible', 'false'); // Start hidden, will show when distance check passes
+
+                // Plushie Shark 3D Model centered on platform (closer to platform)
+                const sharkModel = document.createElement('a-entity');
+                sharkModel.setAttribute('id', `shark-model-${stop.id}`);
+                sharkModel.setAttribute('gltf-model', '#shark-model');
+                sharkModel.setAttribute('position', '0 2 0');
+                sharkModel.setAttribute('rotation', '0 0 0');
+                sharkModel.setAttribute('scale', '0.6 0.6 0.6');
+                sharkModel.setAttribute('animation', 'property: position; to: 0 2.3 0; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine');
+                entity.appendChild(sharkModel);
+
+                // Initialize rotation and zoom tracking
+                sharkRotations[stop.id] = { x: 0, y: 0 };
+                sharkZoomLevels[stop.id] = 0; // Default Z-position (0 = at GPS location)
+
+                // Platform (LARGER)
+                const platform = document.createElement('a-cylinder');
+                platform.setAttribute('position', '0 0 0');
+                platform.setAttribute('radius', '2');
+                platform.setAttribute('height', '0.3');
+                platform.setAttribute('color', '#F4901E');
+                platform.setAttribute('animation', 'property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear');
+                entity.appendChild(platform);
+
+                // Ring (LARGER) - positioned at shark height
+                const ring = document.createElement('a-torus');
+                ring.setAttribute('position', '0 2 0');
+                ring.setAttribute('radius', '1.8');
+                ring.setAttribute('radius-tubular', '0.1');
+                ring.setAttribute('color', '#00A9E0');
+                ring.setAttribute('animation', 'property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear');
+                entity.appendChild(ring);
+
+                // Elegant background panel with teal gradient
+                const textBg = document.createElement('a-plane');
+                textBg.setAttribute('id', `text-bg-${stop.id}`);
+                textBg.setAttribute('position', '0 -3.2 0');
+                textBg.setAttribute('width', '4.8');
+                textBg.setAttribute('height', '1.1');
+                textBg.setAttribute('color', '#006D75');
+                textBg.setAttribute('material', 'shader: flat; transparent: true; opacity: 0.9; side: double');
+                textBg.setAttribute('visible', 'false');
+                entity.appendChild(textBg);
+
+                // Elegant text label with better formatting
+                const text = document.createElement('a-text');
+                text.setAttribute('id', `text-${stop.id}`);
+                text.setAttribute('value', `${stop.name}\n${stop.event}`);
+                text.setAttribute('align', 'center');
+                text.setAttribute('baseline', 'center');
+                text.setAttribute('color', '#FFFFFF');
+                text.setAttribute('font', 'https://cdn.aframe.io/fonts/Roboto-msdf.json');
+                text.setAttribute('letterSpacing', '0');
+                text.setAttribute('lineHeight', '50');
+                text.setAttribute('wrap-count', '25');
+                text.setAttribute('width', '4.2');
+                text.setAttribute('scale', '1.8 1.8 1.8');
+                text.setAttribute('position', '0 -3.2 0.06');
+                text.setAttribute('visible', 'false');
+                entity.appendChild(text);
+
+                scene.appendChild(entity);
+                console.log(`✅ Created shark entity: ${stop.name} at ${stop.lat}, ${stop.lng}`);
+            });
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c;
+        }
+
+        function updateRouteInfo() {
+            if (!userLat || !userLng) return;
+
+            const nextStop = tourStops[currentStopIndex];
+            const distance = calculateDistance(userLat, userLng, nextStop.lat, nextStop.lng);
+
+            const distanceEl = document.getElementById('distance');
+            distanceEl.textContent =
+                distance > 1000
+                    ? `${(distance / 1000).toFixed(1)}km`
+                    : `${Math.round(distance)}m`;
+
+            if (distance < 100) {
+                distanceEl.classList.add('close');
+            } else {
+                distanceEl.classList.remove('close');
+            }
+
+            document.getElementById('next-stop').textContent =
+                `${nextStop.name}\n${nextStop.event}`;
+
+            // Update nearest shark indicator
+            if (userLat && userLng) {
+                let minDist = Infinity;
+                tourStops.forEach(stop => {
+                    const dist = calculateDistance(userLat, userLng, stop.lat, stop.lng);
+                    if (dist < minDist && dist < 50) {
+                        minDist = dist;
+                        nearestSharkId = stop.id;
+                    }
+                });
+            }
+
+            // Check if user is too close to ANY shark
+            let tooCloseToShark = false;
+
+            // Update shark size, text visibility and scale based on GPS distance
+            tourStops.forEach((stop, index) => {
+                const dist = calculateDistance(userLat, userLng, stop.lat, stop.lng);
+                const textEl = document.querySelector(`#text-${stop.id}`);
+                const sharkEl = document.querySelector(`#shark-model-${stop.id}`);
+                const entityEl = document.querySelector(`#${stop.id}`);
+
+                // CRITICAL FIX: Hide entire entity if too close (prevents camera inside model)
+                if (entityEl) {
+                    if (dist < 8) {
+                        // Too close - hide everything to prevent glitch (increased from 3m to 8m)
+                        entityEl.setAttribute('visible', 'false');
+                        tooCloseToShark = true;
+                        return; // Skip rest of processing for this shark
+                    } else {
+                        // Far enough - show entity
+                        entityEl.setAttribute('visible', 'true');
+                    }
+                }
+
+                // Dynamic shark scaling based on distance (zoom effect)
+                if (sharkEl) {
+                    let sharkScale;
+                    if (dist > 100) {
+                        // Far away: very small (0.5x)
+                        sharkScale = 0.5;
+                    } else if (dist > 50) {
+                        // 50-100m: scale from 0.5 to 1.2
+                        sharkScale = 0.5 + ((100 - dist) / 50) * 0.7;
+                    } else if (dist > 20) {
+                        // 20-50m: scale from 1.2 to 2.0
+                        sharkScale = 1.2 + ((50 - dist) / 30) * 0.8;
+                    } else if (dist >= 8) {
+                        // Close (8-20m): scale from 2.0 to 3.0 (visible but not overwhelming)
+                        sharkScale = 2.0 + ((20 - dist) / 12) * 1.0;
+                    }
+                    sharkEl.setAttribute('scale', `${sharkScale} ${sharkScale} ${sharkScale}`);
+                }
+
+                // Text visibility and responsive scaling with background
+                const textBgEl = document.querySelector(`#text-bg-${stop.id}`);
+                if (textEl) {
+                    // Only show text within 50 meters
+                    if (dist < 50) {
+                        textEl.setAttribute('visible', 'true');
+                        if (textBgEl) textBgEl.setAttribute('visible', 'true');
+                        
+                        // Elegant responsive scaling based on distance
+                        const baseScale = 1.8;
+                        // Smooth distance multiplier: 1.0x (far) to 2.2x (close)
+                        const distanceFactor = 1.0 + ((50 - dist) / 50) * 1.2;
+                        let textScale = baseScale * distanceFactor;
+                        textEl.setAttribute('scale', `${textScale} ${textScale} ${textScale}`);
+                        
+                        // Scale background proportionally with padding
+                        const bgScale = textScale / 1.8; // Normalize to base
+                        if (textBgEl) {
+                            textBgEl.setAttribute('scale', `${bgScale * 1.05} ${bgScale * 1.05} 1`);
+                        }
+                    } else {
+                        textEl.setAttribute('visible', 'false');
+                        if (textBgEl) textBgEl.setAttribute('visible', 'false');
+                    }
+                }
+            });
+
+            // Show/hide proximity warning
+            const proximityWarning = document.getElementById('proximity-warning');
+            if (tooCloseToShark) {
+                proximityWarning.classList.add('show');
+            } else {
+                proximityWarning.classList.remove('show');
+            }
+
+            // Checkpoint arrival logic removed - celebration now happens when shark is in view
+
+            lastDistance = distance;
+        }
+
+        function celebrateSharkInView(sharkId) {
+            // Find the shark data
+            const shark = tourStops.find(s => s.id === sharkId);
+            if (!shark || celebratedSharks.has(sharkId)) return;
+
+            celebratedSharks.add(sharkId);
+            visitedStops.add(tourStops.indexOf(shark));
+
+            const celebration = document.getElementById('arrival-celebration');
+            document.getElementById('celebration-title').innerHTML = `🎉 Hooray! You Found Sharkey!`;
+            document.getElementById('celebration-message').textContent = `${shark.name} - ${shark.event}`;
+            document.getElementById('celebration-sharkey').textContent = shark.sharkeyMessage || `Sharkey says: Great job finding me! Enjoy the experience!`;
+
+            celebration.classList.add('show');
+
+            // Hide arrows during celebration
+            arrowsEnabled = false;
+            const arrowLeft = document.getElementById('arrow-left');
+            const arrowRight = document.getElementById('arrow-right');
+            if (arrowLeft) arrowLeft.classList.remove('show');
+            if (arrowRight) arrowRight.classList.remove('show');
+
+            // Vibrate on arrival (only if user has interacted with page)
+            try {
+                if (navigator.vibrate && document.hasFocus()) {
+                    navigator.vibrate([200, 100, 200]);
+                }
+            } catch (e) {
+                // Silently fail if vibration not allowed
+            }
+
+            createConfetti();
+
+            setTimeout(() => {
+                celebration.classList.remove('show');
+                // Re-enable arrows after celebration
+                arrowsEnabled = true;
+                console.log('🎯 Arrows re-enabled after celebration');
+                // Force immediate update
+                setTimeout(() => {
+                    updateDirectionalArrows();
+                    console.log('🎯 Arrow update called after celebration');
+                }, 100);
+            }, 4000);
+        }
+
+        function createConfetti() {
+            const colors = ['#FFD700', '#00A9E0', '#F4901E', '#00D084', '#FF6B9D'];
+            for (let i = 0; i < 30; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.left = Math.random() * 100 + '%';
+                    confetti.style.top = '-10px';
+                    confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.animationDelay = Math.random() * 0.5 + 's';
+                    document.body.appendChild(confetti);
+
+                    setTimeout(() => confetti.remove(), 3000);
+                }, i * 50);
+            }
+        }
+
+        let currentHeading = 0;
+        let map = null;
+        let userMarker = null;
+        let sharkMarkers = [];
+
+        function initializeMap() {
+            if (map) return; // Already initialized
+
+            const mapContainer = document.getElementById('mini-map');
+
+            // Create Leaflet map with OpenStreetMap tiles
+            map = L.map(mapContainer, {
+                zoomControl: false,
+                attributionControl: true
+            }).setView([16.475338, 81.846102], 16);
+
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap',
+                maxZoom: 19
+            }).addTo(map);
+
+            console.log('🗺️ OpenStreetMap initialized');
+        }
+
+        function updateLeafletMap() {
+            if (!userLat || !userLng || tourStops.length === 0) return;
+
+            // Initialize map if not already done
+            if (!map) {
+                initializeMap();
+            }
+
+            const zoom = mapExpanded ? 15 : 16;
+
+            // Center map on user location
+            map.setView([userLat, userLng], zoom);
+
+            // Remove old markers
+            if (userMarker) {
+                map.removeLayer(userMarker);
+            }
+            sharkMarkers.forEach(marker => map.removeLayer(marker));
+            sharkMarkers = [];
+
+            // Find closest shark
+            let closestIndex = 0;
+            let minDistance = Infinity;
+            tourStops.forEach((stop, index) => {
+                const dist = calculateDistance(userLat, userLng, stop.lat, stop.lng);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    closestIndex = index;
+                }
+            });
+
+            // Responsive marker sizes
+            const userSize = mapExpanded ? 32 : 24;
+            const sharkSize = mapExpanded ? 38 : 28;
+            const fontSize = mapExpanded ? 15 : 12;
+
+            // Create custom user icon
+            const userIcon = L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="background: #00A9E0; width: ${userSize}px; height: ${userSize}px; border-radius: 50%; border: 2px solid white; box-shadow: 0 3px 10px rgba(0,169,224,0.5); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: ${fontSize}px;">U</div>`,
+                iconSize: [userSize, userSize],
+                iconAnchor: [userSize / 2, userSize / 2]
+            });
+
+            // Add user marker
+            userMarker = L.marker([userLat, userLng], { icon: userIcon })
+                .addTo(map)
+                .bindPopup('Your Location');
+
+            // Add shark markers - only closest is highlighted
+            tourStops.forEach((stop, index) => {
+                const isClosest = index === closestIndex;
+                const isVisited = visitedStops.has(index);
+
+                // Color scheme: Closest = Orange, Visited = Green, Others = Gray
+                let color, opacity, borderColor;
+                if (isVisited) {
+                    color = '#00D084';
+                    opacity = 0.9;
+                    borderColor = 'white';
+                } else if (isClosest) {
+                    color = '#F4901E';
+                    opacity = 1;
+                    borderColor = 'white';
+                } else {
+                    color = '#9E9E9E';
+                    opacity = 0.6;
+                    borderColor = 'rgba(255,255,255,0.5)';
+                }
+
+                const sharkIcon = L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div style="background: ${color}; width: ${sharkSize}px; height: ${sharkSize}px; border-radius: 50%; border: 2px solid ${borderColor}; box-shadow: 0 3px 10px rgba(0,0,0,${opacity * 0.4}); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: ${fontSize}px; opacity: ${opacity};">${index + 1}</div>`,
+                    iconSize: [sharkSize, sharkSize],
+                    iconAnchor: [sharkSize / 2, sharkSize / 2]
+                });
+
+                const marker = L.marker([stop.lat, stop.lng], { icon: sharkIcon })
+                    .addTo(map)
+                    .bindPopup(`<strong>${stop.name}</strong><br>${stop.event}<br>${isClosest ? '<em>Closest to you!</em>' : ''}`);
+
+                sharkMarkers.push(marker);
+            });
+
+            console.log('📍 Map updated: Closest shark is #' + (closestIndex + 1));
+        }
+
+        function updateCompass(heading) {
+            currentHeading = heading;
+            const compassEl = document.getElementById('compass-indicator');
+            const directionEl = document.getElementById('compass-direction');
+
+            // Rotate compass to show direction
+            compassEl.style.transform = `rotate(${-heading}deg)`;
+
+            // Update direction label (N, NE, E, SE, S, SW, W, NW)
+            const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+            const index = Math.round(heading / 45) % 8;
+            directionEl.textContent = directions[index];
+        }
+
+        // Get device orientation for compass and directional arrows
+        let deviceHeading = 0;
+
+        if (window.DeviceOrientationEvent) {
+            window.addEventListener('deviceorientation', (event) => {
+                if (event.alpha !== null) {
+                    // Alpha gives compass heading (0-360)
+                    deviceHeading = event.alpha;
+                    updateCompass(deviceHeading);
+                    updateDirectionalArrows();
+                }
+            });
+        }
+
+        let arrowsEnabled = true;
+
+        // Handle page visibility to fix mobile initialization issue
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                // Page became visible - force update
+                console.log('📱 Page visible, forcing update');
+                setTimeout(() => {
+                    updateRouteInfo();
+                    updateDirectionalArrows();
+                }, 100);
+            }
+        });
+
+        function updateDirectionalArrows() {
+            if (!arrowsEnabled || !userLat || !userLng || tourStops.length === 0) return;
+
+            const arrowLeft = document.getElementById('arrow-left');
+            const arrowRight = document.getElementById('arrow-right');
+
+            if (!arrowLeft || !arrowRight) return;
+
+            // Find closest unvisited shark
+            let closestShark = null;
+            let minDistance = Infinity;
+
+            tourStops.forEach((stop, index) => {
+                // Skip visited sharks
+                if (visitedStops.has(index)) return;
+
+                const dist = calculateDistance(userLat, userLng, stop.lat, stop.lng);
+                if (dist < minDistance && dist < 300) {
+                    minDistance = dist;
+                    closestShark = stop;
+                }
+            });
+
+            if (!closestShark) {
+                // No unvisited sharks nearby
+                arrowLeft.classList.remove('show');
+                arrowRight.classList.remove('show');
+                arrowLeft.style.display = 'none';
+                arrowRight.style.display = 'none';
+                return;
+            }
+
+            // Show directional arrows based on GPS bearing (hide only when very close < 1m)
+            if (minDistance > 1) {
+                const bearing = calculateBearing(userLat, userLng, closestShark.lat, closestShark.lng);
+                const heading = deviceHeading || 0;
+                let relativeAngle = bearing - heading;
+
+                // Normalize to -180 to 180
+                while (relativeAngle > 180) relativeAngle -= 360;
+                while (relativeAngle < -180) relativeAngle += 360;
+
+                // Show arrow based on direction (±30 degree threshold)
+                if (relativeAngle < -30) {
+                    arrowLeft.classList.add('show');
+                    arrowRight.classList.remove('show');
+                    arrowLeft.style.display = 'flex';
+                    arrowRight.style.display = 'none';
+                } else if (relativeAngle > 30) {
+                    arrowRight.classList.add('show');
+                    arrowLeft.classList.remove('show');
+                    arrowRight.style.display = 'flex';
+                    arrowLeft.style.display = 'none';
+                } else {
+                    // Facing shark - hide arrows
+                    arrowLeft.classList.remove('show');
+                    arrowRight.classList.remove('show');
+                    arrowLeft.style.display = 'none';
+                    arrowRight.style.display = 'none';
+                }
+            } else {
+                // Very close to shark (< 1m) - hide arrows
+                arrowLeft.classList.remove('show');
+                arrowRight.classList.remove('show');
+                arrowLeft.style.display = 'none';
+                arrowRight.style.display = 'none';
+                console.log('🎯 Very close to shark (' + minDistance.toFixed(1) + 'm) - arrows hidden');
+            }
+        }
+
+        function calculateBearing(lat1, lon1, lat2, lon2) {
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const y = Math.sin(Δλ) * Math.cos(φ2);
+            const x = Math.cos(φ1) * Math.sin(φ2) -
+                Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+
+            const θ = Math.atan2(y, x);
+            const bearing = (θ * 180 / Math.PI + 360) % 360; // Convert to degrees and normalize
+
+            return bearing;
+        }
+
+        window.addEventListener('gps-camera-update-position', (e) => {
+            userLat = e.detail.position.latitude;
+            userLng = e.detail.position.longitude;
+
+            document.getElementById('gps-status').innerHTML =
+                `<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>${userLat.toFixed(4)}, ${userLng.toFixed(4)}`;
+
+            updateRouteInfo();
+            updateLeafletMap();
+            updateDirectionalArrows();
+        });
+
+        // Update arrows periodically
+        setInterval(updateDirectionalArrows, 500);
+
+        // Multiple initialization points for mobile reliability
+
+        // 1. Scene loaded event
+        const scene = document.querySelector('a-scene');
+        if (scene) {
+            scene.addEventListener('loaded', () => {
+                console.log('🎯 Scene loaded');
+                setTimeout(() => {
+                    updateRouteInfo();
+                    updateDirectionalArrows();
+                }, 500);
+            });
+        }
+
+        // 2. Window load event
+        window.addEventListener('load', () => {
+            console.log('🎯 Window loaded');
+            setTimeout(() => {
+                updateRouteInfo();
+                updateDirectionalArrows();
+            }, 1000);
+        });
+
+        // 3. Delayed fallback
+        setTimeout(() => {
+            console.log('🎯 Delayed init 2s');
+            updateRouteInfo();
+            updateDirectionalArrows();
+        }, 2000);
+
+        // 4. Extra delayed fallback for slow mobile
+        setTimeout(() => {
+            console.log('🎯 Delayed init 4s');
+            updateRouteInfo();
+            updateDirectionalArrows();
+        }, 4000);
+
+        document.getElementById('toggle-map').addEventListener('click', () => {
+            const mapContainer = document.getElementById('map-container');
+            const toggleText = document.getElementById('toggle-text');
+            const toggleBtn = document.getElementById('toggle-map');
+            const rotationControls = document.getElementById('rotation-controls');
+            mapExpanded = !mapExpanded;
+
+            if (mapExpanded) {
+                mapContainer.classList.add('expanded');
+                toggleText.textContent = 'Collapse';
+                toggleBtn.querySelector('.icon').innerHTML = '<path d="M21 9v-4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v4"/><polyline points="7 14 12 9 17 14"/><line x1="12" y1="9" x2="12" y2="21"/>';
+                // Hide rotation controls when map is expanded
+                if (rotationControls) {
+                    rotationControls.style.display = 'none';
+                }
+            } else {
+                mapContainer.classList.remove('expanded');
+                toggleText.textContent = 'Expand';
+                toggleBtn.querySelector('.icon').innerHTML = '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>';
+                // Show rotation controls when map is collapsed
+                if (rotationControls && nearestSharkId) {
+                    rotationControls.style.display = 'flex';
+                }
+            }
+
+            // Refresh map with new zoom level and invalidate size for Leaflet
+            setTimeout(() => {
+                if (map) {
+                    map.invalidateSize();
+                    updateLeafletMap();
+                }
+            }, 400);
+        });
+
+        window.addEventListener('load', () => {
+            console.log('Sharks Way Location Tour loaded');
+        });
+
+        setInterval(updateRouteInfo, 1000);
+
+        if ('geolocation' in navigator) {
+            navigator.geolocation.watchPosition(
+                (position) => {
+                    userLat = position.coords.latitude;
+                    userLng = position.coords.longitude;
+                    // Update map when GPS position changes
+                    updateLeafletMap();
+                },
+                (error) => {
+                    console.error('Geolocation error:', error);
+                    document.getElementById('gps-status').textContent = '⚠️ GPS unavailable';
+                },
+                {
+                    enableHighAccuracy: true,
+                    maximumAge: 0,
+                    timeout: 27000
+                }
+            );
+        }
+
+        // Touch controls for rotating nearest shark
+        document.addEventListener('touchstart', (evt) => {
+            // Only handle single touch
+            if (evt.touches.length === 1) {
+                isDragging = true;
+                touchStartX = evt.touches[0].clientX;
+                touchStartY = evt.touches[0].clientY;
+
+                // Find nearest shark
+                if (userLat && userLng) {
+                    let minDist = Infinity;
+                    tourStops.forEach(stop => {
+                        const dist = calculateDistance(userLat, userLng, stop.lat, stop.lng);
+                        if (dist < minDist && dist < 50) {
+                            minDist = dist;
+                            nearestSharkId = stop.id;
+                        }
+                    });
+                }
+            }
+        });
+
+        document.addEventListener('touchmove', (evt) => {
+            if (!isDragging || !nearestSharkId || evt.touches.length !== 1) return;
+
+            const deltaX = evt.touches[0].clientX - touchStartX;
+            const deltaY = evt.touches[0].clientY - touchStartY;
+
+            // Update rotation for nearest shark
+            sharkRotations[nearestSharkId].y += deltaX * 0.5;
+            sharkRotations[nearestSharkId].x -= deltaY * 0.3;
+
+            // Clamp vertical rotation
+            sharkRotations[nearestSharkId].x = Math.max(-45, Math.min(45, sharkRotations[nearestSharkId].x));
+
+            // Apply rotation to entire entity (shark + text + platform)
+            const entityEl = document.querySelector(`#${nearestSharkId}`);
+            if (entityEl) {
+                entityEl.setAttribute('rotation', {
+                    x: sharkRotations[nearestSharkId].x,
+                    y: sharkRotations[nearestSharkId].y,
+                    z: 0
+                });
+            }
+
+            touchStartX = evt.touches[0].clientX;
+            touchStartY = evt.touches[0].clientY;
+        });
+
+        document.addEventListener('touchend', () => {
+            isDragging = false;
+        });
+
+        // Rotation control buttons
+        const rotationControls = document.getElementById('rotation-controls');
+
+        document.getElementById('rotate-left').addEventListener('click', () => {
+            if (nearestSharkId && sharkRotations[nearestSharkId]) {
+                sharkRotations[nearestSharkId].y -= 15;
+                updateSharkRotation(nearestSharkId);
+            }
+        });
+
+        document.getElementById('rotate-right').addEventListener('click', () => {
+            if (nearestSharkId && sharkRotations[nearestSharkId]) {
+                sharkRotations[nearestSharkId].y += 15;
+                updateSharkRotation(nearestSharkId);
+            }
+        });
+
+        document.getElementById('rotate-up').addEventListener('click', () => {
+            if (nearestSharkId && sharkRotations[nearestSharkId]) {
+                sharkRotations[nearestSharkId].x = Math.min(45, sharkRotations[nearestSharkId].x + 10);
+                updateSharkRotation(nearestSharkId);
+            }
+        });
+
+        document.getElementById('rotate-down').addEventListener('click', () => {
+            if (nearestSharkId && sharkRotations[nearestSharkId]) {
+                sharkRotations[nearestSharkId].x = Math.max(-45, sharkRotations[nearestSharkId].x - 10);
+                updateSharkRotation(nearestSharkId);
+            }
+        });
+
+        // Zoom controls - scale entire entity to appear closer/farther
+        document.getElementById('zoom-in').addEventListener('click', () => {
+            if (nearestSharkId && sharkZoomLevels[nearestSharkId] !== undefined) {
+                sharkZoomLevels[nearestSharkId] = Math.min(10, sharkZoomLevels[nearestSharkId] + 2);
+                updateSharkZoom(nearestSharkId);
+                console.log(`Zoom in: ${nearestSharkId} level ${sharkZoomLevels[nearestSharkId]}`);
+            }
+        });
+
+        document.getElementById('zoom-out').addEventListener('click', () => {
+            if (nearestSharkId && sharkZoomLevels[nearestSharkId] !== undefined) {
+                sharkZoomLevels[nearestSharkId] = Math.max(-5, sharkZoomLevels[nearestSharkId] - 2);
+                updateSharkZoom(nearestSharkId);
+                console.log(`Zoom out: ${nearestSharkId} level ${sharkZoomLevels[nearestSharkId]}`);
+            }
+        });
+
+        function updateSharkZoom(sharkId) {
+            // Scale the entire entity to simulate zoom (closer/farther)
+            const entityEl = document.querySelector(`#${sharkId}`);
+            if (entityEl && sharkZoomLevels[sharkId] !== undefined) {
+                // Calculate scale factor: 0 = 1x, +10 = 3x, -5 = 0.5x
+                const baseScale = 1.0;
+                const zoomOffset = sharkZoomLevels[sharkId];
+                let scaleFactor;
+
+                if (zoomOffset >= 0) {
+                    // Zoom in: 1x to 3x (0 to +10)
+                    scaleFactor = baseScale + (zoomOffset / 10) * 2; // 1.0 to 3.0
+                } else {
+                    // Zoom out: 1x to 0.5x (0 to -5)
+                    scaleFactor = baseScale + (zoomOffset / 5) * 0.5; // 1.0 to 0.5
+                }
+
+                // Apply scale to entire entity
+                entityEl.setAttribute('scale', `${scaleFactor} ${scaleFactor} ${scaleFactor}`);
+            }
+        }
+
+        function updateSharkRotation(sharkId) {
+            // Rotate the entire entity (shark + text + platform + ring)
+            const entityEl = document.querySelector(`#${sharkId}`);
+            if (entityEl && sharkRotations[sharkId]) {
+                entityEl.setAttribute('rotation', {
+                    x: sharkRotations[sharkId].x,
+                    y: sharkRotations[sharkId].y,
+                    z: 0
+                });
+            }
+        }
+
+        // Show/hide rotation controls based on proximity to sharks
+        setInterval(() => {
+            if (userLat && userLng) {
+                let minDist = Infinity;
+                let closestSharkId = null;
+
+                tourStops.forEach(stop => {
+                    const dist = calculateDistance(userLat, userLng, stop.lat, stop.lng);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closestSharkId = stop.id;
+                    }
+                });
+
+                if (minDist < 50) {
+                    nearestSharkId = closestSharkId;
+                    rotationControls.classList.add('active');
+                } else {
+                    rotationControls.classList.remove('active');
+                }
+            }
+        }, 1000);
+
+        // Photo capture functionality
+        const photoButton = document.getElementById('photo-button');
+        const countdownOverlay = document.getElementById('countdown-overlay');
+        const countdownNumber = document.getElementById('countdown-number');
+        const uiOverlay = document.getElementById('ui-overlay');
+
+        photoButton.addEventListener('click', async () => {
+            console.log('📸 Photo capture initiated');
+
+            // Start countdown
+            await startCountdown();
+
+            // Hide all UI
+            hideUI();
+
+            // Wait a moment for UI to hide
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Capture the photo
+            await capturePhoto();
+
+            // Show UI again
+            showUI();
+        });
+
+        async function startCountdown() {
+            countdownOverlay.classList.add('show');
+
+            for (let i = 3; i > 0; i--) {
+                countdownNumber.textContent = i;
+                // Restart animation
+                countdownNumber.style.animation = 'none';
+                setTimeout(() => {
+                    countdownNumber.style.animation = 'countdownPulse 1s ease-out';
+                }, 10);
+
+                // Vibrate on each count
+                if (navigator.vibrate) {
+                    navigator.vibrate(100);
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+
+            countdownOverlay.classList.remove('show');
+        }
+
+        function hideUI() {
+            // Hide all UI elements
+            const uiElements = uiOverlay.querySelectorAll('#header, #route-info, #map-container, #rotation-controls, #photo-button, .direction-arrow, #proximity-warning, #arrival-celebration');
+            uiElements.forEach(el => {
+                el.classList.add('ui-hidden');
+            });
+        }
+
+        function showUI() {
+            // Show all UI elements again
+            const uiElements = uiOverlay.querySelectorAll('.ui-hidden');
+            uiElements.forEach(el => {
+                el.classList.remove('ui-hidden');
+            });
+        }
+
+        async function capturePhoto() {
+            try {
+                console.log('📸 Capturing photo...');
+
+                // Get the A-Frame scene canvas
+                const scene = document.querySelector('a-scene');
+                if (!scene || !scene.canvas) {
+                    console.error('Scene or canvas not found');
+                    alert('Unable to capture photo. Please try again.');
+                    return;
+                }
+
+                const canvas = scene.canvas;
+                console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
+
+                // Wait for next frame to ensure rendering is complete
+                await new Promise(resolve => requestAnimationFrame(resolve));
+
+                // Try to get the image data directly from the WebGL canvas
+                try {
+                    // Convert canvas to data URL
+                    const dataURL = canvas.toDataURL('image/png');
+
+                    if (!dataURL || dataURL === 'data:,') {
+                        throw new Error('Canvas is empty');
+                    }
+
+                    // Create download link
+                    const link = document.createElement('a');
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                    link.download = `sharkey-photo-${timestamp}.png`;
+                    link.href = dataURL;
+                    link.click();
+
+                    console.log('✅ Photo saved!');
+
+                    // Vibrate to confirm
+                    if (navigator.vibrate) {
+                        navigator.vibrate([100, 50, 100]);
+                    }
+
+                    // Show brief success message
+                    showPhotoSuccess();
+
+                } catch (canvasError) {
+                    console.error('Canvas capture error:', canvasError);
+                    alert('Unable to capture photo. Make sure you have allowed camera access.');
+                }
+
+            } catch (error) {
+                console.error('Error capturing photo:', error);
+                alert('Failed to capture photo. Please try again.');
+            }
+        }
+
+        function showPhotoSuccess() {
+            const successMsg = document.createElement('div');
+            successMsg.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0, 208, 132, 0.95);
+                color: white;
+                padding: 20px 30px;
+                border-radius: 16px;
+                font-family: 'Montserrat', sans-serif;
+                font-size: 16px;
+                font-weight: 700;
+                z-index: 10001;
+                box-shadow: 0 8px 32px rgba(0, 208, 132, 0.6);
+                animation: fadeInOut 2s ease-in-out;
+            `;
+            successMsg.textContent = '📸 Photo Saved!';
+            document.body.appendChild(successMsg);
+
+            setTimeout(() => {
+                successMsg.remove();
+            }, 2000);
+        }
+
+        // Add fadeInOut animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeInOut {
+                0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+                20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+
+</html>
