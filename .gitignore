@@ -1,0 +1,12 @@
+# Retraining / embedding generation tools (keep locally, don't deploy)
+generate-embeddings.html
+shark-image-list.json
+shark-painting-photos-20260203-jpg/
+
+# Dependencies
+node_modules/
+package.json
+package-lock.json
+
+# OS files
+.DS_Store
