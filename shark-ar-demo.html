@@ -15,6 +15,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1"></script>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -460,6 +462,24 @@
             }
         }
 
+        /* Shark + video plane overlay (A-Frame, no AR) */
+        #shark-plane-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+        #shark-plane-overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        #shark-plane-overlay a-scene {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
     </style>
 </head>
 <body>
@@ -693,7 +713,352 @@
         <div id="mini-map"></div>
     </div>
 
+    <!-- Shark animation + video plane (from old-sharkanimation branch) -->
+    <div id="shark-plane-overlay">
+        <a-scene id="mural-shark-scene" embedded vr-mode-ui="enabled: false"
+            renderer="alpha: true; antialias: true; colorManagement: true;"
+            background="color: transparent">
+            <a-assets>
+                <video id="videoTexture" src="./assets/video.mp4" autoplay loop muted playsinline crossorigin="anonymous" preload="auto"></video>
+                <a-asset-item id="sharkModel1" src="./assets/shark1.glb"></a-asset-item>
+                <a-asset-item id="sharkModel2" src="./assets/shark2.glb"></a-asset-item>
+            </a-assets>
+            <a-entity id="mural-shark-root" mural-shark-content></a-entity>
+            <a-entity camera="fov: 50; zoom: 1.2" position="0 2 4" look-controls="enabled: false"></a-entity>
+            <a-entity light="type: ambient; intensity: 0.9; color: #ffffff"></a-entity>
+            <a-entity light="type: directional; intensity: 1.1; color: #ffffff" position="1 2 1"></a-entity>
+        </a-scene>
+    </div>
+
     <script>
+        // ─── Helpers for mural-shark (from old-sharkanimation branch) ───
+        function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+        function getResponsiveScale() {
+            const minDim = Math.min(window.innerWidth || 0, window.innerHeight || 0);
+            if (minDim <= 420) return 0.6;
+            if (minDim <= 720) return 0.8;
+            return 1.0;
+        }
+        function applyVideoPlaneLayout(opts) {
+            const { videoEl, planeEl, shadowEl } = opts || {};
+            if (!planeEl) return;
+            const scale = getResponsiveScale();
+            const baseHeight = 1.0 * scale;
+            const aspect = (videoEl && videoEl.videoWidth && videoEl.videoHeight)
+                ? (videoEl.videoWidth / videoEl.videoHeight) : 1;
+            const width = clamp(baseHeight * aspect, 0.9 * scale, 1.6 * scale);
+            const posX = 0.85 * scale, posZ = -0.85 * scale, videoY = 0.12 * scale;
+            const shadowY = 0.01, shadowPad = 0.18 * scale;
+            planeEl.setAttribute('position', `${posX} ${videoY} ${posZ}`);
+            planeEl.setAttribute('width', width);
+            planeEl.setAttribute('height', baseHeight);
+            if (shadowEl) {
+                shadowEl.setAttribute('position', `${posX} ${shadowY} ${posZ}`);
+                shadowEl.setAttribute('width', width + shadowPad);
+                shadowEl.setAttribute('height', baseHeight + shadowPad);
+            }
+        }
+
+        // ─── A-Frame: video-fact-cycle (simplified for mural overlay) ───
+        if (typeof AFRAME !== 'undefined') {
+            AFRAME.registerComponent('video-fact-cycle', {
+                schema: {
+                    intervalMs: { type: 'number', default: 8000 },
+                    visibleMs: { type: 'number', default: 4000 },
+                    animMs: { type: 'number', default: 500 },
+                    videoId: { type: 'string', default: 'videoTexture' },
+                    shadowSelector: { type: 'string', default: '.video-shadow' }
+                },
+                init: function () {
+                    this._timer = null;
+                    this._cycle = this._cycle.bind(this);
+                    this.shadowEl = this.el.parentElement && this.data.shadowSelector
+                        ? this.el.parentElement.querySelector(this.data.shadowSelector) : null;
+                },
+                playOnce: function () { this._cycle(); },
+                stop: function () {
+                    if (this._timer) { clearInterval(this._timer); this._timer = null; }
+                    this.el.removeAttribute('animation__factIn');
+                    this.el.removeAttribute('animation__factOut');
+                    this.el.setAttribute('scale', '0.001 0.001 0.001');
+                    if (this.shadowEl) {
+                        this.shadowEl.removeAttribute('animation__shadowIn');
+                        this.shadowEl.removeAttribute('animation__shadowOut');
+                        this.shadowEl.setAttribute('scale', '0.001 0.001 0.001');
+                    }
+                    const videoEl = document.getElementById(this.data.videoId);
+                    if (videoEl) videoEl.pause();
+                },
+                _cycle: function () {
+                    const videoEl = document.getElementById(this.data.videoId);
+                    if (videoEl) {
+                        const duration = Number.isFinite(videoEl.duration) ? videoEl.duration : 0;
+                        if (duration > 4) {
+                            const maxStart = Math.max(duration - 4, 0.1);
+                            videoEl.currentTime = Math.random() * maxStart;
+                        }
+                        videoEl.play().catch(function () {});
+                    }
+                    this.el.setAttribute('scale', '0.001 0.001 0.001');
+                    this.el.setAttribute('animation__factIn', {
+                        property: 'scale', from: '0.001 0.001 0.001', to: '1 1 1',
+                        dur: this.data.animMs, easing: 'easeOutBack'
+                    });
+                    if (this.shadowEl) {
+                        this.shadowEl.setAttribute('scale', '0.001 0.001 0.001');
+                        this.shadowEl.setAttribute('animation__shadowIn', {
+                            property: 'scale', from: '0.001 0.001 0.001', to: '1 1 1',
+                            dur: this.data.animMs, easing: 'easeOutBack'
+                        });
+                    }
+                    const self = this;
+                    setTimeout(function () {
+                        self.el.setAttribute('animation__factOut', {
+                            property: 'scale', from: '1 1 1', to: '0.001 0.001 0.001',
+                            dur: self.data.animMs, easing: 'easeInCubic'
+                        });
+                        if (self.shadowEl) {
+                            self.shadowEl.setAttribute('animation__shadowOut', {
+                                property: 'scale', from: '1 1 1', to: '0.001 0.001 0.001',
+                                dur: self.data.animMs, easing: 'easeInCubic'
+                            });
+                        }
+                        if (videoEl) videoEl.pause();
+                    }, this.data.visibleMs);
+                }
+            });
+
+            // ─── A-Frame: mural-shark-content (2 sharks + video plane, triggered by detection) ───
+            AFRAME.registerComponent('mural-shark-content', {
+                init: function () {
+                    const self = this;
+                    self.root = self.el;
+                    self.cyclingActive = false;
+                    self.currentSharkIndex = 0;
+                    self.sharkTimers = [];
+
+                    self.root.innerHTML = [
+                        '<a-plane class="video-shadow" visible="false" position="0.85 0.01 -0.85" rotation="-90 0 0" width="1.2" height="1.2" material="color: #000000; opacity: 0.22; transparent: true; depthWrite: false"></a-plane>',
+                        '<a-plane class="shark-video-plane" visible="false" position="0.85 0.05 -0.85" rotation="-90 0 0" width="1.0" height="1.0" material="shader: flat; src: #videoTexture; transparent: false"></a-plane>',
+                        '<a-entity class="shark-rig-1" visible="false" position="0 0 0" rotation="0 0 0" scale="0.33 0.33 0.33">',
+                        '  <a-circle class="shark-shadow" radius="0.75" position="0 0.01 0" rotation="-90 0 0" material="color: #000000; opacity: 0.25; transparent: true; side: double"></a-circle>',
+                        '  <a-entity class="shark-model-1" gltf-model="#sharkModel1" rotation="0 -90 0" animation-mixer="loop: repeat; timeScale: 1.0"></a-entity>',
+                        '</a-entity>',
+                        '<a-entity class="shark-rig-2" visible="false" position="0 0 0" rotation="0 0 0" scale="0.33 0.33 0.33">',
+                        '  <a-circle class="shark-shadow" radius="0.75" position="0 0.01 3" rotation="-90 0 0" material="color: #000000; opacity: 0.25; transparent: true; side: double"></a-circle>',
+                        '  <a-entity class="shark-model-2" gltf-model="#sharkModel2" rotation="0 180 0" animation-mixer="loop: repeat; timeScale: 1.0"></a-entity>',
+                        '</a-entity>'
+                    ].join('');
+
+                    self.sharkVideoPlane = self.root.querySelector('.shark-video-plane');
+                    self.sharkVideoShadow = self.root.querySelector('.video-shadow');
+                    if (self.sharkVideoPlane) {
+                        self.sharkVideoPlane.setAttribute('video-fact-cycle', 'intervalMs: 8000; visibleMs: 4000; animMs: 500; videoId: videoTexture');
+                    }
+                    self.sharkRigs = [self.root.querySelector('.shark-rig-1'), self.root.querySelector('.shark-rig-2')];
+                    self.sharkModels = [self.root.querySelector('.shark-model-1'), self.root.querySelector('.shark-model-2')];
+                    self.sharkBaseRotations = (self.sharkRigs || []).map(function (el) {
+                        var r = el ? el.getAttribute('rotation') : null;
+                        return r ? { x: r.x || 0, y: r.y || 0, z: r.z || 0 } : { x: 0, y: 0, z: 0 };
+                    });
+
+                    self.sharkModels.forEach(function (modelEl) {
+                        if (!modelEl) return;
+                        modelEl.addEventListener('model-loaded', function () {
+                            var mesh = modelEl.getObject3D('mesh');
+                            if (!mesh) return;
+                            try {
+                                var clips = mesh.animations || [];
+                                if (clips.length > 0) {
+                                    var firstClipName = clips[0].name || '*';
+                                    modelEl.setAttribute('animation-mixer', 'clip: ' + firstClipName + '; loop: repeat; timeScale: 1.0');
+                                }
+                            } catch (e) {}
+                        });
+                    });
+
+                    self.setupSharkVideoAspectRatio = function () {
+                        var videoEl = document.getElementById('videoTexture');
+                        if (!videoEl || !self.sharkVideoPlane) return;
+                        var update = function () {
+                            if (!videoEl.videoWidth || !videoEl.videoHeight) return;
+                            applyVideoPlaneLayout({ videoEl: videoEl, planeEl: self.sharkVideoPlane, shadowEl: self.sharkVideoShadow });
+                        };
+                        if (videoEl.readyState >= 2) update();
+                        videoEl.addEventListener('loadedmetadata', update);
+                        videoEl.addEventListener('canplay', update);
+                    };
+                    self.setupSharkVideoAspectRatio();
+                    self.updateVideoLayout = function () {
+                        applyVideoPlaneLayout({
+                            videoEl: document.getElementById('videoTexture'),
+                            planeEl: self.sharkVideoPlane,
+                            shadowEl: self.sharkVideoShadow
+                        });
+                    };
+                    self.updateVideoLayout();
+                    window.addEventListener('resize', self.updateVideoLayout);
+                },
+
+                setModelOpacity: function (modelEl, opacity) {
+                    var mesh = modelEl ? modelEl.getObject3D('mesh') : null;
+                    if (!mesh) return;
+                    mesh.traverse(function (child) {
+                        if (child.isMesh && child.material) {
+                            var mats = Array.isArray(child.material) ? child.material : [child.material];
+                            mats.forEach(function (mat) {
+                                mat.transparent = true;
+                                mat.opacity = opacity;
+                                mat.needsUpdate = true;
+                            });
+                        }
+                    });
+                },
+                fadeModel: function (modelEl, from, to, duration) {
+                    duration = duration || 600;
+                    var start = performance.now(), self = this;
+                    function step(now) {
+                        var t = Math.min((now - start) / duration, 1);
+                        var value = from + (to - from) * t;
+                        self.setModelOpacity(modelEl, value);
+                        if (t < 1) requestAnimationFrame(step);
+                    }
+                    this.setModelOpacity(modelEl, from);
+                    requestAnimationFrame(step);
+                },
+                show: function () {
+                    var self = this;
+                    if (self.sharkVideoPlane) {
+                        self.sharkVideoPlane.setAttribute('visible', true);
+                        if (self.sharkVideoShadow) self.sharkVideoShadow.setAttribute('visible', true);
+                        var videoEl = document.getElementById('videoTexture');
+                        if (videoEl) videoEl.play().catch(function (e) { console.warn('Video play failed:', e); });
+                        var cycle = self.sharkVideoPlane.components['video-fact-cycle'];
+                        if (cycle) cycle.playOnce();
+                    }
+                    if (!self.cyclingActive) {
+                        self.cyclingActive = true;
+                        self.currentSharkIndex = 0;
+                        self.animateShark(0);
+                    }
+                },
+                hide: function () {
+                    var self = this;
+                    self.cyclingActive = false;
+                    (self.sharkTimers || []).forEach(function (t) { if (t) clearTimeout(t); });
+                    self.sharkTimers = [];
+                    (self.sharkRigs || []).forEach(function (rig) {
+                        if (!rig) return;
+                        rig.setAttribute('visible', false);
+                        rig.removeAttribute('animation__swimOut');
+                        rig.removeAttribute('animation__swimRotate');
+                        rig.removeAttribute('animation__swimForward');
+                    });
+                    if (self.sharkVideoPlane) {
+                        self.sharkVideoPlane.setAttribute('visible', false);
+                        if (self.sharkVideoShadow) self.sharkVideoShadow.setAttribute('visible', false);
+                        var cycle = self.sharkVideoPlane.components['video-fact-cycle'];
+                        if (cycle) cycle.stop();
+                    }
+                    var videoEl = document.getElementById('videoTexture');
+                    if (videoEl) videoEl.pause();
+                },
+                startCyclingAnimation: function () {
+                    if (this.cyclingActive) return;
+                    this.cyclingActive = true;
+                    this.currentSharkIndex = 0;
+                    this.animateShark(0);
+                },
+                stopCyclingAnimation: function () {
+                    this.cyclingActive = false;
+                    var self = this;
+                    (self.sharkTimers || []).forEach(function (t) { if (t) clearTimeout(t); });
+                    self.sharkTimers = [];
+                    (self.sharkRigs || []).forEach(function (rig) {
+                        if (!rig) return;
+                        rig.setAttribute('visible', false);
+                        rig.removeAttribute('animation__swimOut');
+                        rig.removeAttribute('animation__swimRotate');
+                        rig.removeAttribute('animation__swimForward');
+                    });
+                },
+                animateShark: function (sharkIndex) {
+                    var self = this;
+                    if (!self.cyclingActive) return;
+                    var rig = (self.sharkRigs || [])[sharkIndex];
+                    var modelEl = (self.sharkModels || [])[sharkIndex];
+                    if (!rig) return;
+                    var scale = getResponsiveScale();
+                    var swimRange = 3.5 * scale;
+                    var shark2Shift = (sharkIndex === 1) ? (-1.0 * scale) : 0;
+                    var start = { x: 0, y: 0, z: swimRange + shark2Shift };
+                    var mid = { x: 0, y: 0, z: swimRange * 0.5 + shark2Shift };
+                    var end = { x: 0, y: 0, z: -swimRange + shark2Shift };
+                    rig.setAttribute('position', start.x + ' ' + start.y + ' ' + start.z);
+                    var baseRot = (self.sharkBaseRotations || [])[sharkIndex] || { x: 0, y: 0, z: 0 };
+                    rig.setAttribute('rotation', baseRot.x + ' ' + baseRot.y + ' ' + baseRot.z);
+                    rig.setAttribute('visible', true);
+                    if (modelEl) self.fadeModel(modelEl, 0, 1, 700);
+                    rig.setAttribute('animation__swimOut', {
+                        property: 'position',
+                        from: start.x + ' ' + start.y + ' ' + start.z,
+                        to: mid.x + ' ' + mid.y + ' ' + mid.z,
+                        dur: 2600,
+                        easing: 'easeOutCubic'
+                    });
+                    var continueTimer = setTimeout(function () { self.continueSwimming(sharkIndex, mid, end); }, 2600);
+                    self.sharkTimers[sharkIndex] = continueTimer;
+                },
+                continueSwimming: function (sharkIndex, mid, end) {
+                    var self = this;
+                    if (!self.cyclingActive) return;
+                    var rig = (self.sharkRigs || [])[sharkIndex];
+                    var modelEl = (self.sharkModels || [])[sharkIndex];
+                    if (!rig) return;
+                    var swimDuration = 3600;
+                    rig.setAttribute('animation__swimForward', {
+                        property: 'position',
+                        from: mid.x + ' ' + mid.y + ' ' + mid.z,
+                        to: end.x + ' ' + end.y + ' ' + end.z,
+                        dur: swimDuration,
+                        easing: 'easeInOutSine'
+                    });
+                    if (modelEl) {
+                        modelEl.setAttribute('animation__bob', {
+                            property: 'position', dir: 'alternate', loop: true, dur: 600,
+                            easing: 'easeInOutSine', from: '0 -0.06 0', to: '0 0.06 0'
+                        });
+                        modelEl.setAttribute('animation__wobble', {
+                            property: 'position', dir: 'alternate', loop: true, dur: 900,
+                            easing: 'easeInOutSine', from: '-0.05 0 0', to: '0.05 0 0'
+                        });
+                    }
+                    if (modelEl) {
+                        setTimeout(function () { self.fadeModel(modelEl, 1, 0, 450); }, Math.max(swimDuration - 450, 0));
+                    }
+                    var hideTimer = setTimeout(function () {
+                        rig.setAttribute('visible', false);
+                        rig.removeAttribute('animation__swimOut');
+                        rig.removeAttribute('animation__swimRotate');
+                        rig.removeAttribute('animation__swimForward');
+                        if (modelEl) {
+                            modelEl.removeAttribute('animation__bob');
+                            modelEl.removeAttribute('animation__wobble');
+                        }
+                        self.currentSharkIndex = (self.currentSharkIndex + 1) % 2;
+                        var nextTimer = setTimeout(function () {
+                            if (self.cyclingActive) self.animateShark(self.currentSharkIndex);
+                        }, 250);
+                        self.sharkTimers[self.currentSharkIndex] = nextTimer;
+                    }, swimDuration);
+                    self.sharkTimers[sharkIndex] = hideTimer;
+                },
+                remove: function () {
+                    if (this.updateVideoLayout) window.removeEventListener('resize', this.updateVideoLayout);
+                }
+            });
+        }
+
         // ─── CONFIG ───
         const THRESHOLD = 0.55;
         const EMBEDDINGS_URL = './data/shark-embeddings-browser.json';
@@ -707,6 +1072,7 @@
             loading: document.getElementById('loading'),
             loadingStatus: document.getElementById('loading-status'),
             modelOverlay: document.getElementById('model-overlay'),
+            sharkPlaneOverlay: document.getElementById('shark-plane-overlay'),
             sharkLabel: document.getElementById('shark-label'),
             labelName: document.getElementById('labelName'),
             eventInfo: document.getElementById('event-info'),
@@ -1051,6 +1417,13 @@
             // Show 3D model
             ui.modelOverlay.classList.add('visible');
 
+            // Show shark animation + video plane overlay
+            if (ui.sharkPlaneOverlay) ui.sharkPlaneOverlay.classList.add('visible');
+            const muralSharkEl = document.getElementById('mural-shark-root');
+            if (muralSharkEl && muralSharkEl.components && muralSharkEl.components['mural-shark-content']) {
+                muralSharkEl.components['mural-shark-content'].show();
+            }
+
             // Show label
             ui.labelName.textContent = 'Sharkie';
             ui.sharkLabel.classList.add('visible');
@@ -1071,6 +1444,11 @@
             STATE.recentScores = [];
             ui.modelOverlay.classList.remove('visible');
             ui.sharkLabel.classList.remove('visible');
+            const muralSharkEl = document.getElementById('mural-shark-root');
+            if (muralSharkEl && muralSharkEl.components && muralSharkEl.components['mural-shark-content']) {
+                muralSharkEl.components['mural-shark-content'].hide();
+            }
+            if (ui.sharkPlaneOverlay) ui.sharkPlaneOverlay.classList.remove('visible');
             hideEvent();
         }
 
