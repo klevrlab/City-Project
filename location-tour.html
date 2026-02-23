@@ -993,6 +993,29 @@
         </div>
     </div>
 
+    <!-- DEV: GLB Model Switcher -->
+    <div id="dev-switcher" style="position:fixed;top:12px;right:12px;z-index:9999;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:10px;font-family:monospace;font-size:13px;color:#0ff;border:1px solid rgba(0,255,255,0.3);">
+        <span style="font-size:11px;opacity:0.7;white-space:nowrap;">🛠 DEV MODEL</span>
+        <select id="glb-select" style="background:#111;color:#0ff;border:1px solid #0ff;border-radius:6px;padding:4px 8px;font-family:monospace;font-size:13px;cursor:pointer;outline:none;">
+            <option value="./plushie_shark.glb">plushie_shark</option>
+            <option value="./MARIA_SHARK.glb">MARIA_SHARK</option>
+            <option value="./MARIA_SHARK_ANIMATED.glb">MARIA_SHARK_ANIMATED</option>
+            <option value="./SHAUN_SHARK.glb">SHAUN_SHARK</option>
+            <option value="./SHAUN_SHARK_ANIMATED.glb">SHAUN_SHARK_ANIMATED</option>
+            <option value="./STELLA_CAI_SHARK_SJSU_TEST1.glb">STELLA_CAI_SHARK</option>
+        </select>
+    </div>
+    <script>
+        document.getElementById('glb-select').addEventListener('change', function() {
+            var newSrc = this.value;
+            var asset = document.getElementById('shark-model');
+            if (asset) asset.setAttribute('src', newSrc);
+            document.querySelectorAll('[gltf-model="#shark-model"]').forEach(function(el) {
+                el.setAttribute('gltf-model', newSrc);
+            });
+        });
+    </script>
+
     <a-scene vr-mode-ui="enabled: false"
         arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false; gpsMinDistance: 10;"
         renderer="logarithmicDepthBuffer: true; precision: medium; preserveDrawingBuffer: true;"

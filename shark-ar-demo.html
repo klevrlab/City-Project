@@ -402,24 +402,111 @@
         <h1>Sharks Way AR</h1>
     </div>
 
+    <!-- DEV: GLB Model Switcher + Controls -->
+    <div id="dev-switcher" style="position:fixed;top:70px;right:12px;z-index:9999;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;gap:8px;font-family:monospace;font-size:13px;color:#0ff;border:1px solid rgba(0,255,255,0.3);">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:11px;opacity:0.7;white-space:nowrap;">🛠 DEV MODEL</span>
+            <select id="glb-select" style="background:#111;color:#0ff;border:1px solid #0ff;border-radius:6px;padding:4px 8px;font-family:monospace;font-size:13px;cursor:pointer;outline:none;">
+                <option value="./plushie_shark.glb">plushie_shark</option>
+                <option value="./MARIA_SHARK.glb">MARIA_SHARK</option>
+                <option value="./MARIA_SHARK_ANIMATED.glb">MARIA_SHARK_ANIMATED</option>
+                <option value="./SHAUN_SHARK.glb">SHAUN_SHARK</option>
+                <option value="./SHAUN_SHARK_ANIMATED.glb">SHAUN_SHARK_ANIMATED</option>
+                <option value="./STELLA_CAI_SHARK_SJSU_TEST1.glb" selected>STELLA_CAI_SHARK</option>
+                <option value="./mock_up_eoe_map.glb">mock_up_eoe_map</option>
+                <option value="./Pose_sharky_01.glb">Pose_sharky_01</option>
+                <option value="./Pose_sharky_01._no_glass.glb">Pose_sharky_01_no_glass</option>
+                <option value="./Pose_sharky_02.glb">Pose_sharky_02</option>
+            </select>
+        </div>
+        <div style="display:flex;gap:6px;">
+            <button id="dev-trigger-shark" style="flex:1;background:#003333;color:#0ff;border:1px solid #0ff;border-radius:6px;padding:5px 8px;font-family:monospace;font-size:11px;cursor:pointer;">🦈 Mock Found</button>
+            <button id="dev-dismiss-shark" style="flex:1;background:#330000;color:#f55;border:1px solid #f55;border-radius:6px;padding:5px 8px;font-family:monospace;font-size:11px;cursor:pointer;">✕ Dismiss</button>
+            <button id="dev-eoe-map" style="flex:1;background:#002233;color:#0af;border:1px solid #0af;border-radius:6px;padding:5px 8px;font-family:monospace;font-size:11px;cursor:pointer;">🗺 EOE Map</button>
+        </div>
+    </div>
+    <script>
+        document.getElementById('glb-select').addEventListener('change', function() {
+            var viewer = document.getElementById('shark-model-viewer');
+            if (viewer) viewer.setAttribute('src', this.value);
+        });
+        document.getElementById('dev-trigger-shark').addEventListener('click', function() {
+            if (typeof onSharkFound === 'function') onSharkFound('DEV_MOCK', 1.0);
+        });
+        document.getElementById('dev-dismiss-shark').addEventListener('click', function() {
+            if (typeof dismissAll === 'function') dismissAll();
+        });
+    </script>
+
     <!-- 3D Plushie overlay -->
     <div id="model-overlay">
         <div id="model-glow"></div>
         <model-viewer
             id="shark-model-viewer"
-            src="./plushie_shark.glb"
+            src="./STELLA_CAI_SHARK_SJSU_TEST1.glb"
             auto-rotate
             rotation-per-second="30deg"
-            camera-orbit="0deg 75deg 4m"
-            field-of-view="30deg"
-            min-field-of-view="20deg"
-            max-field-of-view="45deg"
+            camera-orbit="0deg 75deg auto"
+            field-of-view="45deg"
+            min-field-of-view="30deg"
+            max-field-of-view="60deg"
             disable-zoom
             interaction-prompt="none"
             environment-image="neutral"
             shadow-intensity="0.5"
             style="background: transparent; overflow: visible;"
         ></model-viewer>
+    </div>
+
+    <!-- EOE Map Overlay -->
+    <div id="eoe-map-overlay" style="display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,10,20,0.92);backdrop-filter:blur(12px);flex-direction:column;align-items:center;justify-content:center;padding:24px;">
+        <div style="width:100%;max-width:420px;background:rgba(0,30,40,0.95);border:1px solid rgba(0,169,224,0.4);border-radius:20px;padding:24px;color:white;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2 style="color:#00A9E0;font-size:20px;margin:0;">🦈 Sharks Way Tour</h2>
+                <button id="eoe-close" style="background:none;border:none;color:#aaa;font-size:22px;cursor:pointer;line-height:1;">✕</button>
+            </div>
+            <p style="color:rgba(255,255,255,0.6);font-size:13px;margin-bottom:20px;">End of Experience — Tour Summary</p>
+            <div style="position:relative;background:rgba(0,109,117,0.15);border-radius:14px;padding:16px;margin-bottom:20px;border:1px solid rgba(0,169,224,0.2);">
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                    <div class="eoe-stop" data-stop="0" style="display:flex;align-items:center;gap:14px;">
+                        <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,169,224,0.2);border:2px solid #00A9E0;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🏟</div>
+                        <div style="flex:1;">
+                            <div style="font-weight:600;font-size:14px;">SAP Center</div>
+                            <div style="font-size:12px;color:rgba(255,255,255,0.5);">The Big Game · Feb 9, 2026</div>
+                        </div>
+                        <div class="eoe-badge" style="font-size:11px;padding:3px 8px;border-radius:20px;background:rgba(0,169,224,0.15);color:#00A9E0;border:1px solid rgba(0,169,224,0.3);">Stop 1</div>
+                    </div>
+                    <div style="height:1px;background:rgba(0,169,224,0.1);"></div>
+                    <div class="eoe-stop" data-stop="1" style="display:flex;align-items:center;gap:14px;">
+                        <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,169,224,0.2);border:2px solid #00A9E0;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🏙</div>
+                        <div style="flex:1;">
+                            <div style="font-weight:600;font-size:14px;">Downtown San Jose</div>
+                            <div style="font-size:12px;color:rgba(255,255,255,0.5);">March Madness · Mar 15–Apr 6</div>
+                        </div>
+                        <div class="eoe-badge" style="font-size:11px;padding:3px 8px;border-radius:20px;background:rgba(0,169,224,0.15);color:#00A9E0;border:1px solid rgba(0,169,224,0.3);">Stop 2</div>
+                    </div>
+                    <div style="height:1px;background:rgba(0,169,224,0.1);"></div>
+                    <div class="eoe-stop" data-stop="2" style="display:flex;align-items:center;gap:14px;">
+                        <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,169,224,0.2);border:2px solid #00A9E0;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🌮</div>
+                        <div style="flex:1;">
+                            <div style="font-weight:600;font-size:14px;">San Pedro Square</div>
+                            <div style="font-size:12px;color:rgba(255,255,255,0.5);">World Cup Viewing · Jun–Jul 2026</div>
+                        </div>
+                        <div class="eoe-badge" style="font-size:11px;padding:3px 8px;border-radius:20px;background:rgba(0,169,224,0.15);color:#00A9E0;border:1px solid rgba(0,169,224,0.3);">Stop 3</div>
+                    </div>
+                </div>
+            </div>
+            <div id="eoe-progress-bar" style="background:rgba(0,169,224,0.1);border-radius:8px;padding:12px 16px;margin-bottom:16px;border:1px solid rgba(0,169,224,0.2);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-size:12px;color:rgba(255,255,255,0.6);">Stops Visited</span>
+                    <span id="eoe-count" style="font-size:13px;font-weight:700;color:#00A9E0;">0 / 3</span>
+                </div>
+                <div style="height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">
+                    <div id="eoe-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#006D75,#00A9E0);border-radius:3px;transition:width 0.5s ease;"></div>
+                </div>
+            </div>
+            <button id="eoe-share" style="width:100%;padding:13px;background:linear-gradient(135deg,#006D75,#00A9E0);color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;">Share My Tour 🦈</button>
+        </div>
     </div>
 
     <!-- Shark label -->
@@ -602,6 +689,40 @@
             playSound('tap');
             dismissAll();
         });
+
+        // ─── EOE MAP ───
+        function openEoeMap() {
+            const overlay = document.getElementById('eoe-map-overlay');
+            const visited = STATE.visitedStops.size;
+            const total = 3;
+            document.getElementById('eoe-count').textContent = `${visited} / ${total}`;
+            document.getElementById('eoe-bar').style.width = `${Math.round((visited / total) * 100)}%`;
+            document.querySelectorAll('.eoe-stop').forEach(el => {
+                const stop = parseInt(el.getAttribute('data-stop'));
+                const badge = el.querySelector('.eoe-badge');
+                if (STATE.visitedStops.has(stop)) {
+                    el.style.opacity = '1';
+                    if (badge) { badge.textContent = '✓ Visited'; badge.style.background = 'rgba(0,200,100,0.2)'; badge.style.color = '#0f9'; badge.style.borderColor = 'rgba(0,200,100,0.4)'; }
+                } else {
+                    el.style.opacity = '0.45';
+                }
+            });
+            overlay.style.display = 'flex';
+        }
+        function closeEoeMap() {
+            document.getElementById('eoe-map-overlay').style.display = 'none';
+        }
+        document.getElementById('eoe-close').addEventListener('click', closeEoeMap);
+        document.getElementById('eoe-share').addEventListener('click', () => {
+            const visited = STATE.visitedStops.size;
+            const msg = `I visited ${visited}/3 stops on the Sharks Way AR Tour! 🦈 #SharksWayAR #Immersion2026`;
+            if (navigator.share) {
+                navigator.share({ title: 'Sharks Way AR Tour', text: msg });
+            } else {
+                navigator.clipboard.writeText(msg).then(() => alert('Copied to clipboard!\n\n' + msg));
+            }
+        });
+        document.getElementById('dev-eoe-map').addEventListener('click', openEoeMap, true);
 
         // ─── EMBEDDING FUNCTIONS ───
         function l2Normalize(vec) {
