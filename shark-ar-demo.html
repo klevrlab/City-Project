@@ -10,6 +10,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1"></script>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
+    <script src="https://unpkg.com/three@0.126.0/examples/js/loaders/GLTFLoader.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -332,6 +335,24 @@
             font-size: 13px;
             font-weight: 600;
         }
+        #topbar .top-btn {
+            background: rgba(0, 169, 224, 0.25);
+            border: 1px solid rgba(0, 169, 224, 0.4);
+            color: #fff;
+            border-radius: 20px;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        #topbar .top-btn:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+        #topbar .top-btn.top-btn--warn {
+            border-color: rgba(255, 177, 0, 0.6);
+            background: rgba(255, 177, 0, 0.18);
+        }
         #trained-badge {
             margin-left: auto;
             background: rgba(0, 169, 224, 0.25);
@@ -380,6 +401,109 @@
                 padding: 10px 16px;
                 font-size: 13px;
             }
+            #topbar .top-btn {
+                padding: 5px 8px;
+                font-size: 10px;
+            }
+        }
+
+        /* Shark + video plane overlay (fallback, no AR) */
+        #shark-plane-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+        #shark-plane-overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        #shark-plane-overlay a-scene {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+        #shark-plane-overlay canvas {
+            background: transparent !important;
+        }
+
+        /* WebXR plane AR surface */
+        #plane-ar-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 45;
+            display: none;
+            pointer-events: none;
+        }
+        #plane-ar-overlay.visible {
+            display: block;
+        }
+        #plane-ar-overlay canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #plane-ar-hint {
+            position: absolute;
+            left: 50%;
+            bottom: 22px;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.62);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 14px;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        #caveman-debug {
+            position: fixed;
+            top: 56px;
+            left: 10px;
+            z-index: 190;
+            width: min(92vw, 360px);
+            background: rgba(0, 0, 0, 0.75);
+            border: 1px solid rgba(0, 255, 255, 0.55);
+            color: #d9ffff;
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-size: 11px;
+            line-height: 1.35;
+            white-space: pre-wrap;
+            pointer-events: none;
+        }
+        #rig0-tuner {
+            position: fixed;
+            top: 176px;
+            left: 10px;
+            z-index: 191;
+            width: min(92vw, 360px);
+            background: rgba(8, 12, 18, 0.84);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #fff;
+            border-radius: 10px;
+            padding: 10px;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+        #rig0-tuner .row {
+            display: grid;
+            grid-template-columns: 16px 1fr 52px;
+            gap: 8px;
+            align-items: center;
+            margin-top: 6px;
+        }
+        #rig0-tuner input[type="range"] {
+            width: 100%;
+        }
+        #rig0-tuner .val {
+            text-align: right;
+            color: #8fefff;
+            font-family: monospace;
         }
     </style>
 </head>
@@ -400,6 +524,16 @@
     <div id="topbar">
         <a href="./index.html" class="back">&larr;</a>
         <h1>Sharks Way AR</h1>
+        <button id="start-plane-ar-btn" class="top-btn" type="button">Start Plane AR</button>
+        <button id="reanchor-btn" class="top-btn top-btn--warn" type="button" style="display:none;">Re-anchor</button>
+        <button id="debug-force-btn" class="top-btn" type="button">Force Animation</button>
+    </div>
+    <div id="caveman-debug" hidden></div>
+    <div id="rig0-tuner" hidden>
+        <strong>Rig0 Position Tuner</strong>
+        <div class="row"><span>X</span><input id="rig0-x" type="range" min="-2.00" max="2.00" step="0.01" value="0.00"><span class="val" id="rig0-x-val">0.00</span></div>
+        <div class="row"><span>Y</span><input id="rig0-y" type="range" min="-1.00" max="2.00" step="0.01" value="0.40"><span class="val" id="rig0-y-val">0.40</span></div>
+        <div class="row"><span>Z</span><input id="rig0-z" type="range" min="-4.00" max="2.00" step="0.01" value="0.00"><span class="val" id="rig0-z-val">0.00</span></div>
     </div>
 
     <!-- 3D Plushie overlay -->
@@ -407,7 +541,7 @@
         <div id="model-glow"></div>
         <model-viewer
             id="shark-model-viewer"
-            src="./plushie_shark.glb"
+            src="./assets/shark.glb"
             auto-rotate
             rotation-per-second="30deg"
             camera-orbit="0deg 75deg 4m"
@@ -471,7 +605,454 @@
         </div>
     </div>
 
+    <!-- Shark animation + video plane (fallback mode) -->
+    <div id="shark-plane-overlay">
+        <a-scene id="mural-shark-scene" embedded vr-mode-ui="enabled: false"
+            renderer="alpha: true; antialias: true; colorManagement: true;">
+            <a-assets>
+                <video id="videoTexture" src="./assets/video.mp4" autoplay loop muted playsinline crossorigin="anonymous" preload="auto"></video>
+                <a-asset-item id="sharkModel1" src="./MARIA_SHARK_ANIMATED.glb"></a-asset-item>
+                <a-asset-item id="sharkModel2" src="./SHAUN_SHARK_ANIMATED.glb"></a-asset-item>
+            </a-assets>
+            <a-entity id="mural-shark-root" mural-shark-content></a-entity>
+            <a-entity camera="fov: 55; zoom: 1.0" position="0 1.35 3.1" look-controls="enabled: false"></a-entity>
+            <a-entity light="type: ambient; intensity: 0.9; color: #ffffff"></a-entity>
+            <a-entity light="type: directional; intensity: 1.1; color: #ffffff" position="1 2 1"></a-entity>
+        </a-scene>
+    </div>
+
+    <!-- WebXR Plane AR canvas -->
+    <div id="plane-ar-overlay">
+        <div id="plane-ar-hint">Move phone slowly to find a surface</div>
+    </div>
+
     <script>
+        const CAVEMAN_DEBUG = true;
+        const CAVEMAN_FREEZE = false;
+        const CAVEMAN_RIG0_TUNER = true;
+
+        function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+        function getResponsiveScale() {
+            const minDim = Math.min(window.innerWidth || 0, window.innerHeight || 0);
+            if (minDim <= 420) return 0.6;
+            if (minDim <= 720) return 0.8;
+            return 1.0;
+        }
+        function applyVideoPlaneLayout(opts) {
+            const { videoEl, planeEl, shadowEl } = opts || {};
+            if (!planeEl) return;
+            const scale = getResponsiveScale();
+            const baseHeight = 1.0 * scale;
+            const aspect = (videoEl && videoEl.videoWidth && videoEl.videoHeight)
+                ? (videoEl.videoWidth / videoEl.videoHeight) : 1;
+            const width = clamp(baseHeight * aspect, 0.9 * scale, 1.6 * scale);
+            const posX = 0.85 * scale, posZ = -0.85 * scale, videoY = 0.12 * scale;
+            const shadowY = 0.01, shadowPad = 0.18 * scale;
+            planeEl.setAttribute('position', `${posX} ${videoY} ${posZ}`);
+            planeEl.setAttribute('width', width);
+            planeEl.setAttribute('height', baseHeight);
+            if (shadowEl) {
+                shadowEl.setAttribute('position', `${posX} ${shadowY} ${posZ}`);
+                shadowEl.setAttribute('width', width + shadowPad);
+                shadowEl.setAttribute('height', baseHeight + shadowPad);
+            }
+        }
+
+        if (typeof AFRAME !== 'undefined') {
+            AFRAME.registerComponent('video-fact-cycle', {
+                schema: {
+                    intervalMs: { type: 'number', default: 8000 },
+                    visibleMs: { type: 'number', default: 4000 },
+                    animMs: { type: 'number', default: 500 },
+                    videoId: { type: 'string', default: 'videoTexture' },
+                    shadowSelector: { type: 'string', default: '.video-shadow' }
+                },
+                init: function () {
+                    this._timer = null;
+                    this._cycle = this._cycle.bind(this);
+                    this.shadowEl = this.el.parentElement && this.data.shadowSelector
+                        ? this.el.parentElement.querySelector(this.data.shadowSelector) : null;
+                },
+                playOnce: function () { this._cycle(); },
+                stop: function () {
+                    if (this._timer) { clearInterval(this._timer); this._timer = null; }
+                    this.el.removeAttribute('animation__factIn');
+                    this.el.removeAttribute('animation__factOut');
+                    this.el.setAttribute('scale', '0.001 0.001 0.001');
+                    if (this.shadowEl) {
+                        this.shadowEl.removeAttribute('animation__shadowIn');
+                        this.shadowEl.removeAttribute('animation__shadowOut');
+                        this.shadowEl.setAttribute('scale', '0.001 0.001 0.001');
+                    }
+                    const videoEl = document.getElementById(this.data.videoId);
+                    if (videoEl) videoEl.pause();
+                },
+                _cycle: function () {
+                    const videoEl = document.getElementById(this.data.videoId);
+                    if (videoEl) {
+                        const duration = Number.isFinite(videoEl.duration) ? videoEl.duration : 0;
+                        if (duration > 4) {
+                            const maxStart = Math.max(duration - 4, 0.1);
+                            videoEl.currentTime = Math.random() * maxStart;
+                        }
+                        videoEl.play().catch(function () {});
+                    }
+                    this.el.setAttribute('scale', '0.001 0.001 0.001');
+                    this.el.setAttribute('animation__factIn', {
+                        property: 'scale', from: '0.001 0.001 0.001', to: '1 1 1',
+                        dur: this.data.animMs, easing: 'easeOutBack'
+                    });
+                    if (this.shadowEl) {
+                        this.shadowEl.setAttribute('scale', '0.001 0.001 0.001');
+                        this.shadowEl.setAttribute('animation__shadowIn', {
+                            property: 'scale', from: '0.001 0.001 0.001', to: '1 1 1',
+                            dur: this.data.animMs, easing: 'easeOutBack'
+                        });
+                    }
+                    const self = this;
+                    setTimeout(function () {
+                        self.el.setAttribute('animation__factOut', {
+                            property: 'scale', from: '1 1 1', to: '0.001 0.001 0.001',
+                            dur: self.data.animMs, easing: 'easeInCubic'
+                        });
+                        if (self.shadowEl) {
+                            self.shadowEl.setAttribute('animation__shadowOut', {
+                                property: 'scale', from: '1 1 1', to: '0.001 0.001 0.001',
+                                dur: self.data.animMs, easing: 'easeInCubic'
+                            });
+                        }
+                        if (videoEl) videoEl.pause();
+                    }, this.data.visibleMs);
+                }
+            });
+
+            AFRAME.registerComponent('mural-shark-content', {
+                init: function () {
+                    const self = this;
+                    self.root = self.el;
+                    self.cyclingActive = false;
+                    self.currentSharkIndex = 0;
+                    self.sharkTimers = [];
+                    self.modelDebug = [{ loaded: false, mesh: false, size: '-' }, { loaded: false, mesh: false, size: '-' }];
+                    self.debugEl = document.getElementById('caveman-debug');
+                    self.debugText = '';
+                    self.root.innerHTML = [
+                        '<a-plane class="video-shadow" visible="false" position="0.85 0.01 -0.85" rotation="-90 0 0" width="1.2" height="1.2" material="color: #000000; opacity: 0.22; transparent: true; depthWrite: false"></a-plane>',
+                        '<a-plane class="shark-video-plane" visible="false" position="0.85 0.05 -0.85" rotation="-90 0 0" width="1.0" height="1.0" material="shader: flat; src: #videoTexture; transparent: true; color: #000000"></a-plane>',
+                        '<a-entity class="shark-rig-1" visible="false" position="0 1.0 0" rotation="0 0 0" scale="0.55 0.55 0.55">',
+                        '  <a-box class="debug-proxy" visible="false" depth="0.8" height="0.35" width="1.6" material="color: #ff00ff; opacity: 0.95"></a-box>',
+                        '  <a-circle class="shark-shadow" radius="0.75" position="4 -1.50 0" rotation="-90 0 0" material="color: #000000; opacity: 0.25; transparent: true; side: double"></a-circle>',
+                        '  <a-entity class="shark-model-1" gltf-model="#sharkModel1" position="0 -0.85 0" rotation="0 -90 0" animation-mixer="loop: repeat; timeScale: 1.0"></a-entity>',
+                        '</a-entity>',
+                        '<a-entity class="shark-rig-2" visible="false" position="0 1.0 0" rotation="0 0 0" scale="0.55 0.55 0.55">',
+                        '  <a-box class="debug-proxy" visible="false" depth="0.8" height="0.35" width="1.6" material="color: #00ff00; opacity: 0.95"></a-box>',
+                        '  <a-circle class="shark-shadow" radius="0.75" position="0 -1.50 -4" rotation="-90 0 0" material="color: #000000; opacity: 0.25; transparent: true; side: double"></a-circle>',
+                        '  <a-entity class="shark-model-2" gltf-model="#sharkModel2" position="0 -0.85 0" rotation="0 180 0" animation-mixer="loop: repeat; timeScale: 1.0"></a-entity>',
+                        '</a-entity>'
+                    ].join('');
+                    self.sharkVideoPlane = self.root.querySelector('.shark-video-plane');
+                    self.sharkVideoShadow = self.root.querySelector('.video-shadow');
+                    if (self.sharkVideoPlane) {
+                        self.sharkVideoPlane.setAttribute('video-fact-cycle', 'intervalMs: 8000; visibleMs: 4000; animMs: 500; videoId: videoTexture');
+                    }
+                    self.sharkRigs = [self.root.querySelector('.shark-rig-1'), self.root.querySelector('.shark-rig-2')];
+                    self.sharkModels = [self.root.querySelector('.shark-model-1'), self.root.querySelector('.shark-model-2')];
+                    self.debugProxies = Array.from(self.root.querySelectorAll('.debug-proxy'));
+                    if (CAVEMAN_DEBUG) {
+                        (self.debugProxies || []).forEach(function (proxy) { proxy.setAttribute('visible', true); });
+                        (self.sharkRigs || []).forEach(function (rig) {
+                            if (!rig || !rig.object3D || typeof THREE === 'undefined') return;
+                            if (rig.object3D.getObjectByName('debug-axes')) return;
+                            var axes = new THREE.AxesHelper(0.8);
+                            axes.name = 'debug-axes';
+                            rig.object3D.add(axes);
+                        });
+                        if (self.debugEl) self.debugEl.hidden = false;
+                    }
+                    self.updateDebug = function (extra) {
+                        if (!CAVEMAN_DEBUG || !self.debugEl) return;
+                        var r0 = (self.sharkRigs && self.sharkRigs[0]) ? self.sharkRigs[0].getAttribute('position') : null;
+                        var r1 = (self.sharkRigs && self.sharkRigs[1]) ? self.sharkRigs[1].getAttribute('position') : null;
+                        var lines = [
+                            'CAVEMAN DEBUG ON',
+                            'cycling=' + self.cyclingActive + ' idx=' + self.currentSharkIndex,
+                            'rig0 vis=' + !!(self.sharkRigs && self.sharkRigs[0] && self.sharkRigs[0].getAttribute('visible')) + ' pos=' + (r0 ? `${r0.x.toFixed(2)},${r0.y.toFixed(2)},${r0.z.toFixed(2)}` : '-'),
+                            'rig1 vis=' + !!(self.sharkRigs && self.sharkRigs[1] && self.sharkRigs[1].getAttribute('visible')) + ' pos=' + (r1 ? `${r1.x.toFixed(2)},${r1.y.toFixed(2)},${r1.z.toFixed(2)}` : '-'),
+                            `m1 loaded=${self.modelDebug[0].loaded} mesh=${self.modelDebug[0].mesh} bbox=${self.modelDebug[0].size}`,
+                            `m2 loaded=${self.modelDebug[1].loaded} mesh=${self.modelDebug[1].mesh} bbox=${self.modelDebug[1].size}`,
+                            extra || ''
+                        ];
+                        self.debugEl.textContent = lines.filter(Boolean).join('\n');
+                    };
+                    self.sharkModels.forEach(function (modelEl, idx) {
+                        if (!modelEl) return;
+                        modelEl.addEventListener('model-loaded', function () {
+                            var mesh = modelEl.getObject3D('mesh');
+                            self.modelDebug[idx].loaded = true;
+                            self.modelDebug[idx].mesh = !!mesh;
+                            if (mesh && typeof THREE !== 'undefined') {
+                                try {
+                                    var box = new THREE.Box3().setFromObject(mesh);
+                                    var size = new THREE.Vector3();
+                                    box.getSize(size);
+                                    self.modelDebug[idx].size = `${size.x.toFixed(2)}x${size.y.toFixed(2)}x${size.z.toFixed(2)}`;
+
+                                    // Recenter model around rig origin once so rig coords are meaningful.
+                                    if (!modelEl.dataset.centered) {
+                                        var center = new THREE.Vector3();
+                                        box.getCenter(center);
+                                        var basePos = modelEl.getAttribute('position') || { x: 0, y: 0, z: 0 };
+                                        var px = Number(basePos.x || 0) - center.x;
+                                        var py = Number(basePos.y || 0) - center.y;
+                                        var pz = Number(basePos.z || 0) - center.z;
+                                        modelEl.setAttribute('position', `${px} ${py} ${pz}`);
+                                        modelEl.dataset.centered = 'true';
+                                    }
+                                } catch (e) {
+                                    self.modelDebug[idx].size = 'bbox_err';
+                                }
+                            }
+                            console.log('[CAVEMAN] model-loaded', idx, self.modelDebug[idx]);
+                            self.updateDebug('model-loaded ' + idx);
+                        });
+                        modelEl.addEventListener('model-error', function (e) {
+                            self.modelDebug[idx].loaded = false;
+                            self.modelDebug[idx].mesh = false;
+                            self.modelDebug[idx].size = 'load_err';
+                            console.warn('[CAVEMAN] model-error', idx, e && e.detail);
+                            self.updateDebug('model-error ' + idx);
+                        });
+                    });
+                    self.updateVideoLayout = function () {
+                        applyVideoPlaneLayout({
+                            videoEl: document.getElementById('videoTexture'),
+                            planeEl: self.sharkVideoPlane,
+                            shadowEl: self.sharkVideoShadow
+                        });
+                    };
+                    self.updateVideoLayout();
+                    window.addEventListener('resize', self.updateVideoLayout);
+                    self.updateDebug('init');
+                },
+                show: function () {
+                    var self = this;
+                    if (CAVEMAN_DEBUG && CAVEMAN_RIG0_TUNER) {
+                        if (self.sharkVideoPlane) self.sharkVideoPlane.setAttribute('visible', false);
+                        if (self.sharkVideoShadow) self.sharkVideoShadow.setAttribute('visible', false);
+                        (self.sharkRigs || []).forEach(function (rig) {
+                            if (!rig) return;
+                            rig.removeAttribute('animation__swimPass');
+                            rig.removeAttribute('animation__bob');
+                            rig.setAttribute('visible', false);
+                        });
+                        self.cyclingActive = false;
+                        var rig0 = (self.sharkRigs || [])[0];
+                        if (rig0) {
+                            if (self.rig0TunerHideTimer) clearTimeout(self.rig0TunerHideTimer);
+                            rig0.setAttribute('visible', true);
+                            rig0.setAttribute('rotation', '0 270 0');
+                            rig0.setAttribute('scale', '0.85 0.85 0.85');
+                            rig0.setAttribute('position', `${RIG0_TUNER.x.toFixed(2)} ${RIG0_TUNER.y.toFixed(2)} 2.50`);
+                            rig0.setAttribute('animation__swimPass', {
+                                property: 'position',
+                                from: `${RIG0_TUNER.x.toFixed(2)} ${RIG0_TUNER.y.toFixed(2)} 2.50`,
+                                to: `${RIG0_TUNER.x.toFixed(2)} ${RIG0_TUNER.y.toFixed(2)} -15.00`,
+                                dur: 3600,
+                                easing: 'easeInOutSine'
+                            });
+                            var model0 = (self.sharkModels || [])[0];
+                            if (model0) {
+                                var mesh0 = model0.getObject3D('mesh');
+                                if (mesh0) {
+                                    mesh0.traverse(function (child) {
+                                        if (!child.isMesh || !child.material) return;
+                                        var mats = Array.isArray(child.material) ? child.material : [child.material];
+                                        mats.forEach(function (mat) {
+                                            mat.transparent = true;
+                                            mat.opacity = 1.0;
+                                            mat.needsUpdate = true;
+                                        });
+                                    });
+                                }
+                            }
+                            setTimeout(function () {
+                                var modelAtFade = (self.sharkModels || [])[0];
+                                if (!modelAtFade) return;
+                                var meshAtFade = modelAtFade.getObject3D('mesh');
+                                if (!meshAtFade) return;
+                                var fadeStart = performance.now();
+                                var fadeDuration = 650;
+                                function fadeStep(now) {
+                                    var t = Math.min((now - fadeStart) / fadeDuration, 1);
+                                    var opacity = 1 - t;
+                                    meshAtFade.traverse(function (child) {
+                                        if (!child.isMesh || !child.material) return;
+                                        var mats = Array.isArray(child.material) ? child.material : [child.material];
+                                        mats.forEach(function (mat) {
+                                            mat.transparent = true;
+                                            mat.opacity = opacity;
+                                            mat.needsUpdate = true;
+                                        });
+                                    });
+                                    if (t < 1) requestAnimationFrame(fadeStep);
+                                }
+                                requestAnimationFrame(fadeStep);
+                            }, 3400);
+                            self.rig0TunerHideTimer = setTimeout(function () {
+                                rig0.removeAttribute('animation__swimPass');
+                                rig0.setAttribute('visible', false);
+                                var modelAtHide = (self.sharkModels || [])[0];
+                                if (modelAtHide) {
+                                    var meshAtHide = modelAtHide.getObject3D('mesh');
+                                    if (meshAtHide) {
+                                        meshAtHide.traverse(function (child) {
+                                            if (!child.isMesh || !child.material) return;
+                                            var mats = Array.isArray(child.material) ? child.material : [child.material];
+                                            mats.forEach(function (mat) {
+                                                mat.transparent = true;
+                                                mat.opacity = 1.0;
+                                                mat.needsUpdate = true;
+                                            });
+                                        });
+                                    }
+                                }
+                            }, 4100);
+                        }
+                        self.updateDebug('show: rig0 tuner mode');
+                        return;
+                    }
+                    if (CAVEMAN_DEBUG && CAVEMAN_FREEZE) {
+                        if (self.sharkVideoPlane) self.sharkVideoPlane.setAttribute('visible', false);
+                        if (self.sharkVideoShadow) self.sharkVideoShadow.setAttribute('visible', false);
+                        (self.sharkRigs || []).forEach(function (rig, i) {
+                            if (!rig) return;
+                            rig.removeAttribute('animation__swimPass');
+                            rig.removeAttribute('animation__bob');
+                            if (i === 0) {
+                                rig.setAttribute('visible', true);
+                                rig.setAttribute('position', '0 0 -1');
+                                rig.setAttribute('scale', '2 2 2');
+                            } else {
+                                rig.setAttribute('visible', false);
+                            }
+                        });
+                        self.cyclingActive = false;
+                        self.updateDebug('show: freeze rig0 center');
+                        return;
+                    }
+                    if (self.sharkVideoPlane) {
+                        var videoEl = document.getElementById('videoTexture');
+                        var showPlane = function () {
+                            self.sharkVideoPlane.setAttribute('visible', true);
+                            if (self.sharkVideoShadow) self.sharkVideoShadow.setAttribute('visible', true);
+                            var cycle = self.sharkVideoPlane.components['video-fact-cycle'];
+                            if (cycle) cycle.playOnce();
+                        };
+                        var hidePlane = function () {
+                            self.sharkVideoPlane.setAttribute('visible', false);
+                            if (self.sharkVideoShadow) self.sharkVideoShadow.setAttribute('visible', false);
+                        };
+
+                        if (videoEl) {
+                            if (videoEl.readyState >= 2) {
+                                showPlane();
+                            } else {
+                                hidePlane();
+                                videoEl.addEventListener('loadeddata', showPlane, { once: true });
+                            }
+                            var playPromise = videoEl.play();
+                            if (playPromise && typeof playPromise.catch === 'function') {
+                                playPromise.catch(function () {
+                                    hidePlane();
+                                });
+                            }
+                        } else {
+                            hidePlane();
+                        }
+                    }
+                    if (self.cyclingActive) return;
+                    self.cyclingActive = true;
+                    self.currentSharkIndex = 0;
+                    self.animateNextShark();
+                    self.updateDebug('show: cycling start');
+                },
+                hide: function () {
+                    var self = this;
+                    self.cyclingActive = false;
+                    (self.sharkTimers || []).forEach(function (t) { if (t) clearTimeout(t); });
+                    self.sharkTimers = [];
+                    (self.sharkRigs || []).forEach(function (rig) {
+                        if (!rig) return;
+                        rig.removeAttribute('animation__swimPass');
+                        rig.removeAttribute('animation__bob');
+                        rig.setAttribute('visible', false);
+                    });
+                    if (self.sharkVideoPlane) {
+                        self.sharkVideoPlane.setAttribute('visible', false);
+                        if (self.sharkVideoShadow) self.sharkVideoShadow.setAttribute('visible', false);
+                        var cycle = self.sharkVideoPlane.components['video-fact-cycle'];
+                        if (cycle) cycle.stop();
+                    }
+                    self.updateDebug('hide');
+                },
+                animateNextShark: function () {
+                    var self = this;
+                    if (!self.cyclingActive) return;
+                    var sharkIndex = self.currentSharkIndex % 2;
+                    var rig = (self.sharkRigs || [])[sharkIndex];
+                    if (!rig) return;
+
+                    var startY = sharkIndex === 0 ? 0.50 : 0.35;
+                    var startZ = sharkIndex === 0 ? 0.0 : -2.0;
+                    var endZ = sharkIndex === 0 ? -2.0 : -4.0;
+                    var passDuration = 3400;
+
+                    rig.setAttribute('visible', true);
+                    if (sharkIndex === 0) {
+                        rig.setAttribute('rotation', '0 270 0');
+                    } else {
+                        rig.setAttribute('rotation', '0 0 0');
+                    }
+                    rig.setAttribute('position', `0 ${startY} ${startZ}`);
+                    rig.setAttribute('animation__swimPass', {
+                        property: 'position',
+                        from: `0 ${startY} ${startZ}`,
+                        to: `0 ${startY} ${endZ}`,
+                        dur: passDuration,
+                        easing: 'easeInOutSine'
+                    });
+                    rig.setAttribute('animation__bob', {
+                        property: 'position',
+                        from: `0 ${startY - 0.08} ${startZ}`,
+                        to: `0 ${startY + 0.08} ${startZ}`,
+                        dir: 'alternate',
+                        dur: 500,
+                        easing: 'easeInOutSine',
+                        loop: true
+                    });
+
+                    var hideTimer = setTimeout(function () {
+                        rig.removeAttribute('animation__swimPass');
+                        rig.removeAttribute('animation__bob');
+                        rig.setAttribute('visible', false);
+                        self.currentSharkIndex = (self.currentSharkIndex + 1) % 2;
+                        if (self.cyclingActive) {
+                            var nextTimer = setTimeout(function () {
+                                self.animateNextShark();
+                            }, 220);
+                            self.sharkTimers.push(nextTimer);
+                        }
+                    }, passDuration + 40);
+                    self.sharkTimers.push(hideTimer);
+                    self.updateDebug('animate idx=' + sharkIndex);
+                },
+                remove: function () {
+                    this.hide();
+                    if (this.updateVideoLayout) window.removeEventListener('resize', this.updateVideoLayout);
+                }
+            });
+        }
+
         // ─── CONFIG ───
         const THRESHOLD = 0.55;
         const EMBEDDINGS_URL = './shark-embeddings-browser.json';
@@ -485,11 +1066,45 @@
             loading: document.getElementById('loading'),
             loadingStatus: document.getElementById('loading-status'),
             modelOverlay: document.getElementById('model-overlay'),
+            sharkPlaneOverlay: document.getElementById('shark-plane-overlay'),
             sharkLabel: document.getElementById('shark-label'),
             labelName: document.getElementById('labelName'),
+            startPlaneArBtn: document.getElementById('start-plane-ar-btn'),
+            reanchorBtn: document.getElementById('reanchor-btn'),
+            debugForceBtn: document.getElementById('debug-force-btn'),
+            planeArOverlay: document.getElementById('plane-ar-overlay'),
+            planeArHint: document.getElementById('plane-ar-hint'),
+            rig0Tuner: document.getElementById('rig0-tuner'),
+            rig0X: document.getElementById('rig0-x'),
+            rig0Y: document.getElementById('rig0-y'),
+            rig0Z: document.getElementById('rig0-z'),
+            rig0XVal: document.getElementById('rig0-x-val'),
+            rig0YVal: document.getElementById('rig0-y-val'),
+            rig0ZVal: document.getElementById('rig0-z-val'),
             eventInfo: document.getElementById('event-info'),
             infoPanel: document.getElementById('info-panel')
         };
+
+        const muralSceneEl = document.getElementById('mural-shark-scene');
+        if (muralSceneEl) {
+            muralSceneEl.addEventListener('render-target-loaded', function () {
+                if (muralSceneEl.renderer) {
+                    muralSceneEl.renderer.setClearColor(0x000000, 0);
+                }
+                if (muralSceneEl.canvas) {
+                    muralSceneEl.canvas.style.background = 'transparent';
+                }
+                if (CAVEMAN_DEBUG && muralSceneEl.object3D && typeof THREE !== 'undefined') {
+                    var existingWorldAxes = muralSceneEl.object3D.getObjectByName('debug-world-axes');
+                    if (!existingWorldAxes) {
+                        var worldAxes = new THREE.AxesHelper(1.2);
+                        worldAxes.name = 'debug-world-axes';
+                        worldAxes.position.set(0, 0, 0);
+                        muralSceneEl.object3D.add(worldAxes);
+                    }
+                }
+            });
+        }
 
         // ─── STATE ───
         const STATE = {
@@ -506,8 +1121,57 @@
             sharkVisible: false,
             dismissedAt: 0,
             currentEventIndex: 0,
-            visitedStops: new Set()
+            visitedStops: new Set(),
+            planeArStarted: false
         };
+
+        const PLANE_AR = {
+            supported: false,
+            session: null,
+            renderer: null,
+            scene: null,
+            camera: null,
+            refSpace: null,
+            viewerSpace: null,
+            hitTestSource: null,
+            currentHitPose: null,
+            reticle: null,
+            sharkRoot: null,
+            sharksPlaced: false,
+            startedAt: 0
+        };
+
+        const RIG0_TUNER = { x: 0.00, y: 0.40, z: 0.00 };
+        const RIG0_TUNER_Z_ORIGIN_SHIFT = -4.00;
+
+        function applyRig0TunerPosition() {
+            const muralSharkEl = document.getElementById('mural-shark-root');
+            const comp = muralSharkEl && muralSharkEl.components && muralSharkEl.components['mural-shark-content'];
+            const rig = comp && comp.sharkRigs ? comp.sharkRigs[0] : null;
+            if (!rig) return;
+            const zWorld = RIG0_TUNER.z + RIG0_TUNER_Z_ORIGIN_SHIFT;
+            rig.setAttribute('visible', true);
+            rig.setAttribute('position', `${RIG0_TUNER.x.toFixed(2)} ${RIG0_TUNER.y.toFixed(2)} ${zWorld.toFixed(2)}`);
+            rig.setAttribute('rotation', '0 270 0');
+            rig.setAttribute('scale', '0.85 0.85 0.85');
+            if (comp.sharkRigs && comp.sharkRigs[1]) comp.sharkRigs[1].setAttribute('visible', false);
+        }
+
+        function setupRig0TunerUi() {
+            if (!CAVEMAN_DEBUG || !CAVEMAN_RIG0_TUNER || !ui.rig0Tuner) return;
+            ui.rig0Tuner.hidden = false;
+            const sync = function () {
+                RIG0_TUNER.x = Number(ui.rig0X.value);
+                RIG0_TUNER.y = Number(ui.rig0Y.value);
+                RIG0_TUNER.z = Number(ui.rig0Z.value);
+                ui.rig0XVal.textContent = RIG0_TUNER.x.toFixed(2);
+                ui.rig0YVal.textContent = RIG0_TUNER.y.toFixed(2);
+                ui.rig0ZVal.textContent = RIG0_TUNER.z.toFixed(2);
+                applyRig0TunerPosition();
+            };
+            [ui.rig0X, ui.rig0Y, ui.rig0Z].forEach(function (el) { if (el) el.addEventListener('input', sync); });
+            sync();
+        }
 
         // ─── EVENT DATA (from marker-demo) ───
         const dummyEvents = [
@@ -602,6 +1266,235 @@
             playSound('tap');
             dismissAll();
         });
+
+        function setPlaneHint(text) {
+            if (ui.planeArHint) ui.planeArHint.textContent = text;
+        }
+
+        function showFallbackSharks() {
+            if (ui.sharkPlaneOverlay) ui.sharkPlaneOverlay.classList.add('visible');
+            const muralSharkEl = document.getElementById('mural-shark-root');
+            if (muralSharkEl && muralSharkEl.components && muralSharkEl.components['mural-shark-content']) {
+                muralSharkEl.components['mural-shark-content'].show();
+            }
+        }
+
+        function hideFallbackSharks() {
+            const muralSharkEl = document.getElementById('mural-shark-root');
+            if (muralSharkEl && muralSharkEl.components && muralSharkEl.components['mural-shark-content']) {
+                muralSharkEl.components['mural-shark-content'].hide();
+            }
+            if (ui.sharkPlaneOverlay) ui.sharkPlaneOverlay.classList.remove('visible');
+        }
+
+        async function setupPlaneArSupport() {
+            if (!ui.startPlaneArBtn) return;
+            if (!navigator.xr || !window.THREE || !THREE.GLTFLoader) {
+                ui.startPlaneArBtn.textContent = 'Plane AR Unsupported';
+                ui.startPlaneArBtn.disabled = true;
+                return;
+            }
+            try {
+                PLANE_AR.supported = await navigator.xr.isSessionSupported('immersive-ar');
+            } catch (e) {
+                PLANE_AR.supported = false;
+            }
+            if (!PLANE_AR.supported) {
+                ui.startPlaneArBtn.textContent = 'Plane AR Unsupported';
+                ui.startPlaneArBtn.disabled = true;
+                return;
+            }
+            ui.startPlaneArBtn.disabled = false;
+            ui.startPlaneArBtn.textContent = 'Start Plane AR';
+        }
+
+        async function loadGltf(loader, url) {
+            return new Promise((resolve, reject) => {
+                loader.load(url, resolve, undefined, reject);
+            });
+        }
+
+        async function ensurePlaneArScene() {
+            if (PLANE_AR.renderer) return;
+            PLANE_AR.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            PLANE_AR.renderer.setPixelRatio(window.devicePixelRatio || 1);
+            PLANE_AR.renderer.setSize(window.innerWidth, window.innerHeight);
+            PLANE_AR.renderer.xr.enabled = true;
+            if (ui.planeArOverlay) ui.planeArOverlay.appendChild(PLANE_AR.renderer.domElement);
+
+            PLANE_AR.scene = new THREE.Scene();
+            PLANE_AR.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 40);
+            PLANE_AR.scene.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.4));
+            const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            keyLight.position.set(1, 2, 1);
+            PLANE_AR.scene.add(keyLight);
+
+            const reticleGeo = new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
+            const reticleMat = new THREE.MeshBasicMaterial({ color: 0x00a9e0, transparent: true, opacity: 0.9 });
+            PLANE_AR.reticle = new THREE.Mesh(reticleGeo, reticleMat);
+            PLANE_AR.reticle.matrixAutoUpdate = false;
+            PLANE_AR.reticle.visible = false;
+            PLANE_AR.scene.add(PLANE_AR.reticle);
+
+            PLANE_AR.sharkRoot = new THREE.Group();
+            PLANE_AR.sharkRoot.visible = false;
+            PLANE_AR.scene.add(PLANE_AR.sharkRoot);
+
+            const loader = new THREE.GLTFLoader();
+            const sharkDefs = [
+                { url: './MARIA_SHARK_ANIMATED.glb', scale: 0.35, x: -0.6, y: 0.0, z: -0.35 },
+                { url: './SHAUN_SHARK_ANIMATED.glb', scale: 0.35, x: 0.6, y: 0.0, z: 0.35 }
+            ];
+            for (const def of sharkDefs) {
+                try {
+                    const gltf = await loadGltf(loader, def.url);
+                    const mesh = gltf.scene;
+                    mesh.scale.setScalar(def.scale);
+                    mesh.position.set(def.x, def.y, def.z);
+                    PLANE_AR.sharkRoot.add(mesh);
+                } catch (e) {
+                    console.warn('Failed to load', def.url, e);
+                }
+            }
+
+            window.addEventListener('resize', () => {
+                if (!PLANE_AR.renderer || !PLANE_AR.camera) return;
+                PLANE_AR.camera.aspect = window.innerWidth / window.innerHeight;
+                PLANE_AR.camera.updateProjectionMatrix();
+                PLANE_AR.renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        function placeSharksAtPose(pose) {
+            if (!PLANE_AR.sharkRoot || !pose) return;
+            const matrix = new THREE.Matrix4().fromArray(pose.transform.matrix);
+            matrix.decompose(PLANE_AR.sharkRoot.position, PLANE_AR.sharkRoot.quaternion, PLANE_AR.sharkRoot.scale);
+            PLANE_AR.sharkRoot.scale.setScalar(1);
+            PLANE_AR.sharkRoot.visible = true;
+            PLANE_AR.sharksPlaced = true;
+            setPlaneHint('Sharks anchored to surface');
+        }
+
+        function clearPlanePlacement() {
+            PLANE_AR.sharksPlaced = false;
+            if (PLANE_AR.sharkRoot) PLANE_AR.sharkRoot.visible = false;
+            setPlaneHint('Move phone slowly to find a surface');
+        }
+
+        function onPlaneArFrame(time, frame) {
+            const session = PLANE_AR.session;
+            if (!session || !PLANE_AR.renderer || !PLANE_AR.scene || !PLANE_AR.camera) return;
+            if (frame && PLANE_AR.hitTestSource && PLANE_AR.refSpace) {
+                const hitResults = frame.getHitTestResults(PLANE_AR.hitTestSource);
+                if (hitResults.length > 0) {
+                    const hit = hitResults[0];
+                    const pose = hit.getPose(PLANE_AR.refSpace);
+                    PLANE_AR.currentHitPose = pose;
+                    if (PLANE_AR.reticle && pose) {
+                        PLANE_AR.reticle.visible = true;
+                        PLANE_AR.reticle.matrix.fromArray(pose.transform.matrix);
+                    }
+                    if (!PLANE_AR.sharksPlaced) setPlaneHint('Surface found - tap screen to place sharks');
+                } else {
+                    PLANE_AR.currentHitPose = null;
+                    if (PLANE_AR.reticle) PLANE_AR.reticle.visible = false;
+                }
+            }
+
+            if (PLANE_AR.sharkRoot && PLANE_AR.sharksPlaced) {
+                const t = (time - PLANE_AR.startedAt) / 1000;
+                PLANE_AR.sharkRoot.rotation.y += 0.003;
+                PLANE_AR.sharkRoot.children.forEach((child, i) => {
+                    child.position.y = (i === 0 ? 0 : 0.05) + Math.sin(t * 2.0 + i) * 0.04;
+                    child.rotation.y += 0.005 * (i % 2 === 0 ? 1 : -1);
+                });
+            }
+
+            PLANE_AR.renderer.render(PLANE_AR.scene, PLANE_AR.camera);
+        }
+
+        async function stopPlaneArSession() {
+            if (PLANE_AR.session) {
+                await PLANE_AR.session.end();
+            }
+        }
+
+        function onPlaneArEnded() {
+            PLANE_AR.session = null;
+            PLANE_AR.refSpace = null;
+            PLANE_AR.viewerSpace = null;
+            PLANE_AR.hitTestSource = null;
+            PLANE_AR.currentHitPose = null;
+            PLANE_AR.sharksPlaced = false;
+            if (PLANE_AR.reticle) PLANE_AR.reticle.visible = false;
+            if (PLANE_AR.sharkRoot) PLANE_AR.sharkRoot.visible = false;
+            if (PLANE_AR.renderer) PLANE_AR.renderer.setAnimationLoop(null);
+            if (ui.planeArOverlay) ui.planeArOverlay.classList.remove('visible');
+            if (ui.reanchorBtn) ui.reanchorBtn.style.display = 'none';
+            if (ui.startPlaneArBtn) ui.startPlaneArBtn.textContent = 'Start Plane AR';
+            STATE.planeArStarted = false;
+            setPlaneHint('Move phone slowly to find a surface');
+        }
+
+        async function startPlaneArSession() {
+            if (PLANE_AR.session) {
+                await stopPlaneArSession();
+                return;
+            }
+            if (!PLANE_AR.supported) return;
+
+            await ensurePlaneArScene();
+            try {
+                const session = await navigator.xr.requestSession('immersive-ar', {
+                    requiredFeatures: ['hit-test'],
+                    optionalFeatures: ['local-floor', 'anchors', 'plane-detection', 'dom-overlay'],
+                    domOverlay: { root: document.body }
+                });
+                PLANE_AR.session = session;
+                STATE.planeArStarted = true;
+                PLANE_AR.startedAt = performance.now();
+                if (ui.planeArOverlay) ui.planeArOverlay.classList.add('visible');
+                if (ui.reanchorBtn) ui.reanchorBtn.style.display = 'inline-block';
+                if (ui.startPlaneArBtn) ui.startPlaneArBtn.textContent = 'Stop Plane AR';
+                setPlaneHint('Move phone slowly to find a surface');
+
+                PLANE_AR.renderer.xr.setSession(session);
+                PLANE_AR.refSpace = await session.requestReferenceSpace('local');
+                PLANE_AR.viewerSpace = await session.requestReferenceSpace('viewer');
+                PLANE_AR.hitTestSource = await session.requestHitTestSource({ space: PLANE_AR.viewerSpace });
+
+                session.addEventListener('end', onPlaneArEnded);
+                session.addEventListener('select', () => {
+                    if (PLANE_AR.currentHitPose) placeSharksAtPose(PLANE_AR.currentHitPose);
+                });
+
+                PLANE_AR.renderer.setAnimationLoop(onPlaneArFrame);
+            } catch (e) {
+                console.error('Unable to start plane AR:', e);
+                onPlaneArEnded();
+            }
+        }
+
+        if (ui.startPlaneArBtn) {
+            ui.startPlaneArBtn.addEventListener('click', () => {
+                startPlaneArSession();
+            });
+        }
+        if (ui.reanchorBtn) {
+            ui.reanchorBtn.addEventListener('click', () => {
+                clearPlanePlacement();
+            });
+        }
+        if (ui.debugForceBtn) {
+            ui.debugForceBtn.addEventListener('click', () => {
+                playSound('tap');
+                if (PLANE_AR.session && PLANE_AR.currentHitPose) {
+                    placeSharksAtPose(PLANE_AR.currentHitPose);
+                    return;
+                }
+                if (!STATE.sharkVisible) onSharkFound('Debug Force', 1.0);
+            });
+        }
 
         // ─── EMBEDDING FUNCTIONS ───
         function l2Normalize(vec) {
@@ -792,11 +1685,16 @@
             STATE.sharkVisible = true;
             STATE.lastMatchTime = performance.now();
 
-            // Show 3D model
-            ui.modelOverlay.classList.add('visible');
+            // Prefer plane-anchored sharks when WebXR session is active.
+            if (PLANE_AR.session) {
+                if (PLANE_AR.currentHitPose && !PLANE_AR.sharksPlaced) placeSharksAtPose(PLANE_AR.currentHitPose);
+                if (!PLANE_AR.sharksPlaced) setPlaneHint('Find a surface and tap to place sharks');
+            } else {
+                showFallbackSharks();
+            }
 
             // Show label
-            ui.labelName.textContent = 'Sharkey';
+            ui.labelName.textContent = 'Sharks Activated';
             ui.sharkLabel.classList.add('visible');
 
             // Show event info + sound
@@ -813,8 +1711,9 @@
             STATE.sharkVisible = false;
             STATE.dismissedAt = performance.now();
             STATE.recentScores = [];
-            ui.modelOverlay.classList.remove('visible');
             ui.sharkLabel.classList.remove('visible');
+            hideFallbackSharks();
+            if (PLANE_AR.session) clearPlanePlacement();
             hideEvent();
         }
 
@@ -852,6 +1751,8 @@
                 await loadModel();
                 await loadEmbeddings();
                 await startCamera();
+                await setupPlaneArSupport();
+                setupRig0TunerUi();
 
                 ui.loading.classList.add('hidden');
 
