@@ -530,7 +530,7 @@
     </div>
     <div id="caveman-debug" hidden></div>
     <div id="rig0-tuner" hidden>
-        <strong>Rig0 Position Tuner</strong>
+        <strong>Rig1 Position Tuner</strong>
         <div class="row"><span>X</span><input id="rig0-x" type="range" min="-2.00" max="2.00" step="0.01" value="0.00"><span class="val" id="rig0-x-val">0.00</span></div>
         <div class="row"><span>Y</span><input id="rig0-y" type="range" min="-1.00" max="2.00" step="0.01" value="0.40"><span class="val" id="rig0-y-val">0.40</span></div>
         <div class="row"><span>Z</span><input id="rig0-z" type="range" min="-4.00" max="2.00" step="0.01" value="0.00"><span class="val" id="rig0-z-val">0.00</span></div>
@@ -611,7 +611,7 @@
             renderer="alpha: true; antialias: true; colorManagement: true;">
             <a-assets>
                 <video id="videoTexture" src="./assets/video.mp4" autoplay loop muted playsinline crossorigin="anonymous" preload="auto"></video>
-                <a-asset-item id="sharkModel1" src="./MARIA_SHARK_ANIMATED.glb"></a-asset-item>
+                <a-asset-item id="sharkModel1" src="./STELLA_CAI_SHARK_SJSU_TEST1.glb"></a-asset-item>
                 <a-asset-item id="sharkModel2" src="./SHAUN_SHARK_ANIMATED.glb"></a-asset-item>
             </a-assets>
             <a-entity id="mural-shark-root" mural-shark-content></a-entity>
@@ -627,9 +627,10 @@
     </div>
 
     <script>
-        const CAVEMAN_DEBUG = true;
+        const CAVEMAN_DEBUG = false;
         const CAVEMAN_FREEZE = false;
-        const CAVEMAN_RIG0_TUNER = true;
+        const CAVEMAN_RIG0_TUNER = false;
+        const CAVEMAN_TUNER_RIG_INDEX = 1;
 
         function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
         function getResponsiveScale() {
@@ -742,11 +743,11 @@
                         '<a-entity class="shark-rig-1" visible="false" position="0 1.0 0" rotation="0 0 0" scale="0.55 0.55 0.55">',
                         '  <a-box class="debug-proxy" visible="false" depth="0.8" height="0.35" width="1.6" material="color: #ff00ff; opacity: 0.95"></a-box>',
                         '  <a-circle class="shark-shadow" radius="0.75" position="4 -1.50 0" rotation="-90 0 0" material="color: #000000; opacity: 0.25; transparent: true; side: double"></a-circle>',
-                        '  <a-entity class="shark-model-1" gltf-model="#sharkModel1" position="0 -0.85 0" rotation="0 -90 0" animation-mixer="loop: repeat; timeScale: 1.0"></a-entity>',
+                        '  <a-entity class="shark-model-1" gltf-model="#sharkModel1" position="0 -0.85 0" rotation="0 0 0" animation-mixer="loop: repeat; timeScale: 1.0"></a-entity>',
                         '</a-entity>',
                         '<a-entity class="shark-rig-2" visible="false" position="0 1.0 0" rotation="0 0 0" scale="0.55 0.55 0.55">',
                         '  <a-box class="debug-proxy" visible="false" depth="0.8" height="0.35" width="1.6" material="color: #00ff00; opacity: 0.95"></a-box>',
-                        '  <a-circle class="shark-shadow" radius="0.75" position="0 -1.50 -4" rotation="-90 0 0" material="color: #000000; opacity: 0.25; transparent: true; side: double"></a-circle>',
+                        '  <a-circle class="shark-shadow" radius="0.75" position="0 -2.5 -0.5" rotation="-90 0 0" material="color: #000000; opacity: 0.25; transparent: true; side: double"></a-circle>',
                         '  <a-entity class="shark-model-2" gltf-model="#sharkModel2" position="0 -0.85 0" rotation="0 180 0" animation-mixer="loop: repeat; timeScale: 1.0"></a-entity>',
                         '</a-entity>'
                     ].join('');
@@ -846,21 +847,22 @@
                             rig.setAttribute('visible', false);
                         });
                         self.cyclingActive = false;
-                        var rig0 = (self.sharkRigs || [])[0];
-                        if (rig0) {
-                            if (self.rig0TunerHideTimer) clearTimeout(self.rig0TunerHideTimer);
-                            rig0.setAttribute('visible', true);
-                            rig0.setAttribute('rotation', '0 270 0');
-                            rig0.setAttribute('scale', '0.85 0.85 0.85');
-                            rig0.setAttribute('position', `${RIG0_TUNER.x.toFixed(2)} ${RIG0_TUNER.y.toFixed(2)} 2.50`);
-                            rig0.setAttribute('animation__swimPass', {
+                        var rigIndex = CAVEMAN_TUNER_RIG_INDEX;
+                        var rig = (self.sharkRigs || [])[rigIndex];
+                        if (rig) {
+                            if (self.rigTunerHideTimer) clearTimeout(self.rigTunerHideTimer);
+                            rig.setAttribute('visible', true);
+                            rig.setAttribute('rotation', rigIndex === 0 ? '0 270 0' : '0 0 0');
+                            rig.setAttribute('scale', '0.85 0.85 0.85');
+                            rig.setAttribute('position', `${RIG0_TUNER.x.toFixed(2)} ${RIG0_TUNER.y.toFixed(2)} 2.50`);
+                            rig.setAttribute('animation__swimPass', {
                                 property: 'position',
                                 from: `${RIG0_TUNER.x.toFixed(2)} ${RIG0_TUNER.y.toFixed(2)} 2.50`,
                                 to: `${RIG0_TUNER.x.toFixed(2)} ${RIG0_TUNER.y.toFixed(2)} -15.00`,
                                 dur: 3600,
                                 easing: 'easeInOutSine'
                             });
-                            var model0 = (self.sharkModels || [])[0];
+                            var model0 = (self.sharkModels || [])[rigIndex];
                             if (model0) {
                                 var mesh0 = model0.getObject3D('mesh');
                                 if (mesh0) {
@@ -876,7 +878,7 @@
                                 }
                             }
                             setTimeout(function () {
-                                var modelAtFade = (self.sharkModels || [])[0];
+                                var modelAtFade = (self.sharkModels || [])[rigIndex];
                                 if (!modelAtFade) return;
                                 var meshAtFade = modelAtFade.getObject3D('mesh');
                                 if (!meshAtFade) return;
@@ -898,10 +900,10 @@
                                 }
                                 requestAnimationFrame(fadeStep);
                             }, 3400);
-                            self.rig0TunerHideTimer = setTimeout(function () {
-                                rig0.removeAttribute('animation__swimPass');
-                                rig0.setAttribute('visible', false);
-                                var modelAtHide = (self.sharkModels || [])[0];
+                            self.rigTunerHideTimer = setTimeout(function () {
+                                rig.removeAttribute('animation__swimPass');
+                                rig.setAttribute('visible', false);
+                                var modelAtHide = (self.sharkModels || [])[rigIndex];
                                 if (modelAtHide) {
                                     var meshAtHide = modelAtHide.getObject3D('mesh');
                                     if (meshAtHide) {
@@ -918,7 +920,7 @@
                                 }
                             }, 4100);
                         }
-                        self.updateDebug('show: rig0 tuner mode');
+                        self.updateDebug('show: rig' + rigIndex + ' tuner mode');
                         return;
                     }
                     if (CAVEMAN_DEBUG && CAVEMAN_FREEZE) {
@@ -987,6 +989,10 @@
                         rig.removeAttribute('animation__bob');
                         rig.setAttribute('visible', false);
                     });
+                    (self.sharkModels || []).forEach(function (modelEl) {
+                        if (!modelEl) return;
+                        modelEl.removeAttribute('animation__bobModel');
+                    });
                     if (self.sharkVideoPlane) {
                         self.sharkVideoPlane.setAttribute('visible', false);
                         if (self.sharkVideoShadow) self.sharkVideoShadow.setAttribute('visible', false);
@@ -1000,12 +1006,14 @@
                     if (!self.cyclingActive) return;
                     var sharkIndex = self.currentSharkIndex % 2;
                     var rig = (self.sharkRigs || [])[sharkIndex];
+                    var modelEl = (self.sharkModels || [])[sharkIndex];
                     if (!rig) return;
 
                     var startY = sharkIndex === 0 ? 0.50 : 0.35;
-                    var startZ = sharkIndex === 0 ? 0.0 : -2.0;
-                    var endZ = sharkIndex === 0 ? -2.0 : -4.0;
-                    var passDuration = 3400;
+                    var startZ = 2.5;
+                    var swimDistance = 20.0;
+                    var endZ = startZ - swimDistance;
+                    var passDuration = 5200;
 
                     rig.setAttribute('visible', true);
                     if (sharkIndex === 0) {
@@ -1021,20 +1029,83 @@
                         dur: passDuration,
                         easing: 'easeInOutSine'
                     });
-                    rig.setAttribute('animation__bob', {
-                        property: 'position',
-                        from: `0 ${startY - 0.08} ${startZ}`,
-                        to: `0 ${startY + 0.08} ${startZ}`,
-                        dir: 'alternate',
-                        dur: 500,
-                        easing: 'easeInOutSine',
-                        loop: true
-                    });
+                    if (modelEl) {
+                        var modelPos = modelEl.getAttribute('position') || { x: 0, y: 0, z: 0 };
+                        var mx = Number(modelPos.x || 0);
+                        var my = Number(modelPos.y || 0);
+                        var mz = Number(modelPos.z || 0);
+                        modelEl.setAttribute('animation__bobModel', {
+                            property: 'position',
+                            from: `${mx.toFixed(3)} ${(my - 0.08).toFixed(3)} ${mz.toFixed(3)}`,
+                            to: `${mx.toFixed(3)} ${(my + 0.08).toFixed(3)} ${mz.toFixed(3)}`,
+                            dir: 'alternate',
+                            dur: 520,
+                            easing: 'easeInOutSine',
+                            loop: true
+                        });
+                    }
+
+                    // Reset model opacity before each swim pass.
+                    if (modelEl) {
+                        var mesh = modelEl.getObject3D('mesh');
+                        if (mesh) {
+                            mesh.traverse(function (child) {
+                                if (!child.isMesh || !child.material) return;
+                                var mats = Array.isArray(child.material) ? child.material : [child.material];
+                                mats.forEach(function (mat) {
+                                    mat.transparent = true;
+                                    mat.opacity = 1.0;
+                                    mat.needsUpdate = true;
+                                });
+                            });
+                        }
+                    }
+
+                    var fadeDuration = 620;
+                    var fadeLeadMs = 700;
+                    var fadeDelay = Math.max(passDuration - fadeLeadMs, 0);
+                    var fadeTimer = setTimeout(function () {
+                        if (!self.cyclingActive || !modelEl) return;
+                        var fadeMesh = modelEl.getObject3D('mesh');
+                        if (!fadeMesh) return;
+                        var fadeStart = performance.now();
+                        function fadeStep(now) {
+                            if (!self.cyclingActive) return;
+                            var t = Math.min((now - fadeStart) / fadeDuration, 1);
+                            var opacity = 1 - t;
+                            fadeMesh.traverse(function (child) {
+                                if (!child.isMesh || !child.material) return;
+                                var mats = Array.isArray(child.material) ? child.material : [child.material];
+                                mats.forEach(function (mat) {
+                                    mat.transparent = true;
+                                    mat.opacity = opacity;
+                                    mat.needsUpdate = true;
+                                });
+                            });
+                            if (t < 1) requestAnimationFrame(fadeStep);
+                        }
+                        requestAnimationFrame(fadeStep);
+                    }, fadeDelay);
+                    self.sharkTimers.push(fadeTimer);
 
                     var hideTimer = setTimeout(function () {
                         rig.removeAttribute('animation__swimPass');
-                        rig.removeAttribute('animation__bob');
                         rig.setAttribute('visible', false);
+                        if (modelEl) {
+                            modelEl.removeAttribute('animation__bobModel');
+                            var meshAtHide = modelEl.getObject3D('mesh');
+                            if (meshAtHide) {
+                                meshAtHide.traverse(function (child) {
+                                    if (!child.isMesh || !child.material) return;
+                                    var mats = Array.isArray(child.material) ? child.material : [child.material];
+                                    mats.forEach(function (mat) {
+                                        mat.transparent = true;
+                                        mat.opacity = 1.0;
+                                        mat.needsUpdate = true;
+                                    });
+                                });
+                            }
+                        }
                         self.currentSharkIndex = (self.currentSharkIndex + 1) % 2;
                         if (self.cyclingActive) {
                             var nextTimer = setTimeout(function () {
@@ -1147,14 +1218,20 @@
         function applyRig0TunerPosition() {
             const muralSharkEl = document.getElementById('mural-shark-root');
             const comp = muralSharkEl && muralSharkEl.components && muralSharkEl.components['mural-shark-content'];
-            const rig = comp && comp.sharkRigs ? comp.sharkRigs[0] : null;
+            const rigIndex = CAVEMAN_TUNER_RIG_INDEX;
+            const rig = comp && comp.sharkRigs ? comp.sharkRigs[rigIndex] : null;
             if (!rig) return;
             const zWorld = RIG0_TUNER.z + RIG0_TUNER_Z_ORIGIN_SHIFT;
             rig.setAttribute('visible', true);
             rig.setAttribute('position', `${RIG0_TUNER.x.toFixed(2)} ${RIG0_TUNER.y.toFixed(2)} ${zWorld.toFixed(2)}`);
-            rig.setAttribute('rotation', '0 270 0');
+            rig.setAttribute('rotation', rigIndex === 0 ? '0 270 0' : '0 0 0');
             rig.setAttribute('scale', '0.85 0.85 0.85');
-            if (comp.sharkRigs && comp.sharkRigs[1]) comp.sharkRigs[1].setAttribute('visible', false);
+            if (comp.sharkRigs) {
+                comp.sharkRigs.forEach(function (candidate, idx) {
+                    if (!candidate || idx === rigIndex) return;
+                    candidate.setAttribute('visible', false);
+                });
+            }
         }
 
         function setupRig0TunerUi() {
@@ -1342,7 +1419,7 @@
 
             const loader = new THREE.GLTFLoader();
             const sharkDefs = [
-                { url: './MARIA_SHARK_ANIMATED.glb', scale: 0.35, x: -0.6, y: 0.0, z: -0.35 },
+                { url: './STELLA_CAI_SHARK_SJSU_TEST1.glb', scale: 0.35, x: -0.6, y: 0.0, z: -0.35 },
                 { url: './SHAUN_SHARK_ANIMATED.glb', scale: 0.35, x: 0.6, y: 0.0, z: 0.35 }
             ];
             for (const def of sharkDefs) {
@@ -1351,6 +1428,7 @@
                     const mesh = gltf.scene;
                     mesh.scale.setScalar(def.scale);
                     mesh.position.set(def.x, def.y, def.z);
+                    if (typeof def.rotY === 'number') mesh.rotation.y = def.rotY;
                     PLANE_AR.sharkRoot.add(mesh);
                 } catch (e) {
                     console.warn('Failed to load', def.url, e);
