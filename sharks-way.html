@@ -9,7 +9,9 @@
     <title>Sharks Way AR - Shark Painting Demo</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1"></script>
+    <!-- Legacy model-viewer (currently disabled, kept for colleague)
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+    -->
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
     <script src="https://unpkg.com/three@0.126.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -219,7 +221,7 @@
             fill: none;
         }
 
-        /* 3D Model overlay */
+        /* Legacy model-viewer overlay (currently disabled)
         #model-overlay {
             position: fixed;
             bottom: 10%;
@@ -244,7 +246,6 @@
             background: transparent;
         }
 
-        /* Glow ring behind the model */
         #model-glow {
             position: absolute;
             inset: -20px;
@@ -257,8 +258,9 @@
             0%, 100% { transform: scale(1); opacity: 0.6; }
             50% { transform: scale(1.1); opacity: 1; }
         }
+        */
 
-        /* Shark name label under model */
+        /* Shark name label */
         #shark-label {
             position: fixed;
             bottom: 5%;
@@ -393,10 +395,6 @@
                 padding: 12px 14px;
                 font-size: 10px;
             }
-            #model-overlay {
-                width: 340px;
-                height: 340px;
-            }
             .cta-button {
                 padding: 10px 16px;
                 font-size: 13px;
@@ -450,12 +448,13 @@
         <h1>Sharks Way AR</h1>
     </div>
 
-    <!-- 3D Plushie overlay -->
+    <!-- Legacy model-viewer overlay (currently disabled, kept for colleague).
+         Uses SHAUN_SHARK_ANIMATED.glb so we don't need a separate assets/shark.glb copy.
     <div id="model-overlay">
         <div id="model-glow"></div>
         <model-viewer
             id="shark-model-viewer"
-            src="./assets/shark.glb"
+            src="./SHAUN_SHARK_ANIMATED.glb"
             auto-rotate
             rotation-per-second="30deg"
             camera-orbit="0deg 75deg 4m"
@@ -469,6 +468,7 @@
             style="background: transparent; overflow: visible;"
         ></model-viewer>
     </div>
+    -->
 
     <!-- Shark label -->
     <div id="shark-label">
@@ -545,6 +545,61 @@
         const CAVEMAN_TUNER_RIG_INDEX = 1;
 
         function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+        function withTimeout(promise, ms, label) {
+            return Promise.race([
+                promise,
+                new Promise(function (_, reject) {
+                    setTimeout(function () {
+                        reject(new Error(label + ' timed out'));
+                    }, ms);
+                })
+            ]);
+        }
+
+        function waitForVideoReady(videoEl, timeoutMs) {
+            return new Promise(function (resolve, reject) {
+                if (!videoEl) {
+                    reject(new Error('Video element not found'));
+                    return;
+                }
+                if (videoEl.readyState >= 1) {
+                    resolve();
+                    return;
+                }
+
+                var settled = false;
+                var timer = setTimeout(function () {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    reject(new Error('Camera metadata timed out'));
+                }, timeoutMs);
+
+                function cleanup() {
+                    clearTimeout(timer);
+                    videoEl.removeEventListener('loadedmetadata', onReady);
+                    videoEl.removeEventListener('loadeddata', onReady);
+                    videoEl.removeEventListener('error', onError);
+                }
+                function onReady() {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    resolve();
+                }
+                function onError() {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    reject(new Error('Camera video failed to load'));
+                }
+
+                videoEl.addEventListener('loadedmetadata', onReady, { once: true });
+                videoEl.addEventListener('loadeddata', onReady, { once: true });
+                videoEl.addEventListener('error', onError, { once: true });
+            });
+        }
+
         function getResponsiveScale() {
             const minDim = Math.min(window.innerWidth || 0, window.innerHeight || 0);
             if (minDim <= 420) return 0.6;
@@ -1067,7 +1122,7 @@
             debugCanvas: document.getElementById('debug-canvas'),
             loading: document.getElementById('loading'),
             loadingStatus: document.getElementById('loading-status'),
-            modelOverlay: document.getElementById('model-overlay'),
+            // modelOverlay: document.getElementById('model-overlay'), // legacy model-viewer overlay (disabled)
             sharkPlaneOverlay: document.getElementById('shark-plane-overlay'),
             sharkLabel: document.getElementById('shark-label'),
             labelName: document.getElementById('labelName'),
@@ -1324,9 +1379,9 @@
 
             // 1. Try static JSON file (normal path)
             try {
-                const resp = await fetch(EMBEDDINGS_URL);
+                const resp = await withTimeout(fetch(EMBEDDINGS_URL), 12000, 'Embeddings fetch');
                 if (resp.ok) {
-                    const data = await resp.json();
+                    const data = await withTimeout(resp.json(), 12000, 'Embeddings parse');
                     if (data && data.length > 0) { applyEmbeddings(data); return; }
                 }
             } catch (e) {}
@@ -1343,24 +1398,36 @@
             throw new Error('Unable to load shark data');
         }
 
+        // Load MobileNet once per page. Duplicate shard entries in Network tab are usually
+        // 302 redirect + 200, or 304 cache revalidation, not a second load from our code.
         async function loadModel() {
-            ui.loadingStatus.textContent = 'Preparing camera...';
-            await tf.ready();
-            STATE.model = await mobilenet.load({ version: 2, alpha: 1.0 });
+            if (STATE.model) return;
+            ui.loadingStatus.textContent = 'Loading detection model (first load can take ~1 minute)...';
+            await withTimeout(tf.ready(), 12000, 'TensorFlow init');
+            STATE.model = await withTimeout(
+                mobilenet.load({ version: 2, alpha: 1.0 }),
+                60000,
+                'MobileNet load'
+            );
         }
 
         async function startCamera() {
             ui.loadingStatus.textContent = 'Starting camera...';
-            STATE.stream = await navigator.mediaDevices.getUserMedia({
+            STATE.stream = await withTimeout(navigator.mediaDevices.getUserMedia({
                 audio: false,
                 video: {
                     facingMode: { ideal: 'environment' },
                     width: { ideal: 1280 },
                     height: { ideal: 720 }
                 }
-            });
+            }), 15000, 'Camera access');
             ui.video.srcObject = STATE.stream;
-            await new Promise(r => { ui.video.onloadedmetadata = r; });
+            try {
+                await ui.video.play();
+            } catch (e) {
+                // Some browsers still allow camera frames without explicit play().
+            }
+            await waitForVideoReady(ui.video, 10000);
         }
 
         async function getFrameEmbedding() {
@@ -1442,16 +1509,16 @@
         // ─── INIT ───
         async function init() {
             try {
-                await loadModel();
-                await loadEmbeddings();
-                await startCamera();
+                await withTimeout(loadModel(), 75000, 'Model initialization');
+                await withTimeout(loadEmbeddings(), 25000, 'Shark data loading');
+                await withTimeout(startCamera(), 25000, 'Camera startup');
 
                 ui.loading.classList.add('hidden');
 
                 STATE.running = true;
                 loop();
             } catch (e) {
-                ui.loadingStatus.textContent = 'Something went wrong. Please refresh.';
+                ui.loadingStatus.textContent = 'Startup failed: ' + (e && e.message ? e.message : 'Unknown error');
                 console.error(e);
             }
         }
