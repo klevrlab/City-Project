@@ -365,21 +365,48 @@
         }
         #selfie-preview-actions {
             display: flex;
-            gap: 14px;
+            gap: 12px;
+            width: 100%;
+            max-width: 400px;
         }
         #selfie-preview-actions button {
-            padding: 13px 28px;
-            border-radius: 28px;
-            font-size: 14px;
+            flex: 1;
+            padding: 16px 20px;
+            border-radius: 12px;
+            font-size: 15px;
             font-weight: 600;
             cursor: pointer;
             border: none;
-            transition: transform 0.1s ease;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
-        #selfie-preview-actions button:active { transform: scale(0.95); }
-        #btn-save { background: linear-gradient(135deg, #006D75, #00A9E0); color: white; }
-        #btn-retake { background: rgba(255,255,255,0.12); color: white; border: 1px solid rgba(255,255,255,0.25) !important; }
-        #btn-share { background: rgba(0,169,224,0.25); color: #00A9E0; border: 1px solid rgba(0,169,224,0.4) !important; }
+        #selfie-preview-actions button:active { 
+            transform: translateY(1px);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        }
+        #btn-retake { 
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border: 1.5px solid rgba(255,255,255,0.3) !important;
+            backdrop-filter: blur(10px);
+        }
+        #btn-retake:hover { background: rgba(255,255,255,0.2); }
+        #btn-save { 
+            background: #00A9E0;
+            color: white;
+        }
+        #btn-save:hover { background: #008FC7; }
+        #btn-share { 
+            background: rgba(0,169,224,0.2);
+            color: #00A9E0;
+            border: 1.5px solid rgba(0,169,224,0.5) !important;
+            backdrop-filter: blur(10px);
+        }
+        #btn-share:hover { background: rgba(0,169,224,0.3); }
 
         /* Loading */
         #selfie-loading {
@@ -538,9 +565,33 @@
         <div id="selfie-preview-label">Your Sharks Way Selfie 🦈</div>
         <img id="selfie-preview-img" src="" alt="Selfie">
         <div id="selfie-preview-actions">
-            <button id="btn-retake">↩ Retake</button>
-            <button id="btn-save">💾 Save</button>
-            <button id="btn-share">↗ Share</button>
+            <button id="btn-retake">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                    <path d="M21 3v5h-5"/>
+                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                    <path d="M3 21v-5h5"/>
+                </svg>
+                Retake
+            </button>
+            <button id="btn-save">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Save
+            </button>
+            <button id="btn-share">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="18" cy="5" r="3"/>
+                    <circle cx="6" cy="12" r="3"/>
+                    <circle cx="18" cy="19" r="3"/>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                </svg>
+                Share
+            </button>
         </div>
     </div>
 
@@ -615,15 +666,15 @@
             var H = window.innerHeight;
             var half = DEV.size / 2;
 
-            // Video is mirrored via CSS scaleX(-1), so flip X
-            var lx = (1 - leftShoulder.x)  * W;
+            // Use coordinates directly (no mirroring)
+            var lx = leftShoulder.x * W;
             var ly = leftShoulder.y  * H;
-            var rx = (1 - rightShoulder.x) * W;
+            var rx = rightShoulder.x * W;
             var ry = rightShoulder.y * H;
 
             var px, py;
-            if (DEV.anchor === 'left')       { px = lx - 30; py = ly; }
-            else if (DEV.anchor === 'right') { px = rx + 90; py = ry; }
+            if (DEV.anchor === 'left')       { px = lx + 30; py = ly; }
+            else if (DEV.anchor === 'right') { px = rx - 90; py = ry; }
             else                             { px = (lx + rx) / 2; py = (ly + ry) / 2; }
 
             py += DEV.yNudge;
@@ -673,24 +724,27 @@
 
             // Composite: draw video frame + model-viewer canvas onto output canvas
             var out = document.createElement('canvas');
-            out.width  = window.innerWidth;
-            out.height = window.innerHeight;
+            out.width  = video.videoWidth;
+            out.height = video.videoHeight;
             var ctx = out.getContext('2d');
+            
+            // Calculate scale factors
+            var scaleX = video.videoWidth / window.innerWidth;
+            var scaleY = video.videoHeight / window.innerHeight;
 
-            // Draw mirrored video
-            ctx.save();
-            ctx.translate(out.width, 0);
-            ctx.scale(-1, 1);
+            // Draw video (not mirrored)
             ctx.drawImage(video, 0, 0, out.width, out.height);
-            ctx.restore();
 
             // Draw model-viewer on top at shoulder position
             if (lastPos) {
                 var mvCanvas = viewer.shadowRoot ? viewer.shadowRoot.querySelector('canvas') : null;
                 if (mvCanvas) {
-                    var x = lastPos.px - DEV.size / 2;
-                    var y = lastPos.py + DEV.yNudge - DEV.size / 2;
-                    ctx.drawImage(mvCanvas, x, y, DEV.size, DEV.size);
+                    // Use position directly
+                    var x = (lastPos.px - DEV.size / 2) * scaleX;
+                    var y = (lastPos.py - DEV.size / 2) * scaleY;
+                    var sharkWidth = DEV.size * scaleX;
+                    var sharkHeight = DEV.size * scaleY;
+                    ctx.drawImage(mvCanvas, x, y, sharkWidth, sharkHeight);
                 }
             }
 
