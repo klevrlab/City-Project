@@ -733,19 +733,31 @@
             var scaleX = video.videoWidth / window.innerWidth;
             var scaleY = video.videoHeight / window.innerHeight;
 
-            // Draw video (not mirrored)
+            // Draw mirrored video to match live view
+            ctx.save();
+            ctx.translate(out.width, 0);
+            ctx.scale(-1, 1);
             ctx.drawImage(video, 0, 0, out.width, out.height);
+            ctx.restore();
 
             // Draw model-viewer on top at shoulder position
             if (lastPos) {
                 var mvCanvas = viewer.shadowRoot ? viewer.shadowRoot.querySelector('canvas') : null;
                 if (mvCanvas) {
-                    // Use position directly
-                    var x = (lastPos.px - DEV.size / 2) * scaleX;
+                    // Draw shark with same mirroring as video
+                    ctx.save();
+                    ctx.translate(out.width, 0);
+                    ctx.scale(-1, 1);
+                    // Flip X position since we're in mirrored coordinate space
+                    var x = (out.width / scaleX - lastPos.px - DEV.size / 2) * scaleX;
                     var y = (lastPos.py - DEV.size / 2) * scaleY;
                     var sharkWidth = DEV.size * scaleX;
                     var sharkHeight = DEV.size * scaleY;
-                    ctx.drawImage(mvCanvas, x, y, sharkWidth, sharkHeight);
+                    // Mirror the shark model itself
+                    ctx.translate(x + sharkWidth, y);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(mvCanvas, 0, 0, sharkWidth, sharkHeight);
+                    ctx.restore();
                 }
             }
 
