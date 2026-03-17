@@ -10,10 +10,13 @@
     <title>Sharks Way AR - Location Tour</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="./css/progress-tracker.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="./JS/shared-map-markers.js"></script>
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/aframe@1.6.0/dist/aframe-master.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="./JS/checkpoint-loader.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <!-- Mobile debugging console -->
@@ -64,21 +67,31 @@
         /* Top bar */
         #topbar {
             position: fixed;
-            top: 0; left: 0; right: 0;
+            top: 0;
+            left: 0;
+            right: 0;
             padding: 12px 14px;
-            background: linear-gradient(to bottom, rgba(0,22,26,0.7) 0%, transparent 100%);
+            background: linear-gradient(to bottom, rgba(0, 22, 26, 0.7) 0%, transparent 100%);
             display: flex;
             align-items: center;
             gap: 10px;
             z-index: 1001;
         }
-        #topbar h1 { font-size: 14px; font-weight: 700; flex: 1; color: white; }
+
+        #topbar h1 {
+            font-size: 14px;
+            font-weight: 700;
+            flex: 1;
+            color: white;
+        }
+
         #topbar .back {
             color: #00A9E0;
             text-decoration: none;
             font-size: 13px;
             font-weight: 600;
         }
+
         #hamburger-btn {
             background: rgba(0, 169, 224, 0.25);
             border: 1px solid rgba(0, 169, 224, 0.4);
@@ -97,10 +110,12 @@
             z-index: 1002;
             -webkit-tap-highlight-color: transparent;
         }
+
         #hamburger-btn:active {
             transform: scale(0.95);
             background: rgba(0, 169, 224, 0.4);
         }
+
         #hamburger-btn svg {
             width: 20px;
             height: 20px;
@@ -108,6 +123,7 @@
             stroke-width: 2;
             fill: none;
         }
+
         /* Navigation Menu */
         #nav-menu {
             position: fixed;
@@ -124,9 +140,11 @@
             padding: 60px 20px 20px;
             overflow-y: auto;
         }
+
         #nav-menu.open {
             right: 0;
         }
+
         #nav-menu .close-btn {
             position: absolute;
             top: 12px;
@@ -146,12 +164,14 @@
             -webkit-tap-highlight-color: transparent;
             padding: 0;
         }
+
         #nav-menu h2 {
             color: #00A9E0;
             font-size: 18px;
             margin-bottom: 20px;
             font-weight: 700;
         }
+
         #nav-menu .nav-link {
             display: flex;
             align-items: center;
@@ -167,12 +187,14 @@
             font-weight: 600;
             transition: all 0.3s ease;
         }
+
         #nav-menu .nav-link:hover,
         #nav-menu .nav-link:active {
             background: rgba(0, 169, 224, 0.25);
             border-color: rgba(0, 169, 224, 0.4);
             transform: translateX(-4px);
         }
+
         #nav-menu .nav-link svg {
             width: 20px;
             height: 20px;
@@ -180,6 +202,7 @@
             stroke-width: 2;
             fill: none;
         }
+
         #nav-overlay {
             position: fixed;
             inset: 0;
@@ -189,6 +212,7 @@
             pointer-events: none;
             transition: opacity 0.3s ease;
         }
+
         #nav-overlay.visible {
             opacity: 1;
             pointer-events: auto;
@@ -233,27 +257,30 @@
             opacity: 1 !important;
             color: #00A9E0 !important;
         }
+
         .stop-item.visited .check-icon circle {
             fill: #00A9E0 !important;
             stroke: #00A9E0 !important;
         }
+
         .stop-item.visited .check-icon path {
             stroke: white !important;
             fill: none !important;
             stroke-width: 2 !important;
         }
+
         .stop-item.active {
             opacity: 1 !important;
             color: #00FF88 !important;
             font-weight: bold !important;
         }
+
         @media (max-width: 480px) {
-            #progress-tracker {
-                bottom: 10px !important;
-                left: 10px !important;
-                max-width: 140px !important;
-                padding: 12px 14px !important;
-                font-size: 10px !important;
+
+            #header {
+                position: absolute;
+                top: 50px;
+                left: 10px;
             }
         }
 
@@ -281,11 +308,12 @@
                 width: 85%;
                 max-width: 320px;
             }
+
             #header {
-                top: 60px;
-                left: 10px;
-                width: 110px;
-                padding: 15px;
+                top: 60px !important;
+                left: 10px !important;
+                width: 110px !important;
+                padding: 15px !important;
             }
 
             #header h2 {
@@ -382,12 +410,6 @@
 
             #rotation-controls {
                 max-width: 55vw;
-            }
-        }
-
-        @media (max-height: 700px) {
-            #header {
-                top: 10px;
             }
         }
 
@@ -1038,9 +1060,9 @@
         <h1>Location Tour</h1>
         <button id="hamburger-btn">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <line x1="3" y1="6" x2="21" y2="6"/>
-                <line x1="3" y1="12" x2="21" y2="12"/>
-                <line x1="3" y1="18" x2="21" y2="18"/>
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
         </button>
     </div>
@@ -1052,32 +1074,39 @@
         <h2>Navigation</h2>
         <a href="./sharks-way.html" class="nav-link">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                <circle cx="12" cy="10" r="3"/>
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
             </svg>
             Sharks Way
         </a>
         <a href="./location-tour.html" class="nav-link">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <circle cx="12" cy="10" r="3"/>
-                <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"/>
+                <circle cx="12" cy="10" r="3" />
+                <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z" />
             </svg>
             Location Tour
         </a>
         <a href="./marker-demo.html" class="nav-link">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                <line x1="8" y1="21" x2="16" y2="21"/>
-                <line x1="12" y1="17" x2="12" y2="21"/>
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
             </svg>
             Marker
         </a>
         <a href="./selfie-ar.html" class="nav-link">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                <circle cx="12" cy="13" r="4"/>
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
             </svg>
-            Selfie AR
+            Selfie with Sammy
+        </a>
+        <a href="./selfie-ar.html?character=sharkey" class="nav-link">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+            </svg>
+            Selfie with Sharkey
         </a>
     </div>
 
@@ -1173,7 +1202,7 @@
 
                 </div>
                 <div class="control-group">
-                    <button class="rotation-btn" id="rotate-left" title="Rotate Left">←</button>
+                    <button class="rotation-btn" id="rotate-left" title="Rotate Left">&larr;</button>
                     <button class="rotation-btn zoom-btn" id="zoom-out" title="Zoom Out">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                             <circle cx="11" cy="11" r="8" />
@@ -1189,10 +1218,10 @@
                             <line x1="8" y1="11" x2="14" y2="11" />
                         </svg>
                     </button>
-                    <button class="rotation-btn" id="rotate-right" title="Rotate Right">→</button>
+                    <button class="rotation-btn" id="rotate-right" title="Rotate Right">&rarr;</button>
                 </div>
                 <div class="control-group">
-                    <button class="rotation-btn" id="rotate-down" title="Tilt Down">↓</button>
+                    <button class="rotation-btn" id="rotate-down" title="Tilt Down">&darr;</button>
                 </div>
             </div>
         </div>
@@ -1216,18 +1245,30 @@
     </div>
 
     <!-- Progress tracker (checkpoint tracker) -->
-    <div id="progress-tracker" style="position: fixed; bottom: 20px; left: 20px; background: rgba(0, 109, 117, 0.15); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); padding: 16px 18px; border-radius: 16px; color: white; font-size: 11px; z-index: 100; border: 1px solid rgba(0, 169, 224, 0.3); box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2); max-width: 160px;">
+    <div id="progress-tracker">
         <div style="font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none;"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none;">
+                <circle cx="12" cy="12" r="10" />
+                <path d="m9 12 2 2 4-4" />
+            </svg>
             Checkpoints
         </div>
-        <div class="stop-item" data-checkpoint="A" id="checkpoint-a" style="margin: 6px 0; opacity: 0.5; display: flex; align-items: center; gap: 6px; transition: all 0.3s ease;">
-            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2.5; fill: none;"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
-            Label A
+        <div class="stop-item" data-checkpoint="A" id="checkpoint-a"
+            style="margin: 6px 0; opacity: 0.5; display: flex; align-items: center; gap: 6px; transition: all 0.3s ease;">
+            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2.5; fill: none;">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="m9 12 2 2 4-4"></path>
+            </svg>
         </div>
-        <div class="stop-item" data-checkpoint="B" id="checkpoint-b" style="margin: 6px 0; opacity: 0.5; display: flex; align-items: center; gap: 6px; transition: all 0.3s ease;">
-            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2.5; fill: none;"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
-            Label B
+        <div class="stop-item" data-checkpoint="B" id="checkpoint-b"
+            style="margin: 6px 0; opacity: 0.5; display: flex; align-items: center; gap: 6px; transition: all 0.3s ease;">
+            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2.5; fill: none;">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="m9 12 2 2 4-4"></path>
+            </svg>
         </div>
     </div>
 
@@ -1244,11 +1285,11 @@
         </select>
     </div> -->
     <script>
-        document.getElementById('glb-select').addEventListener('change', function() {
+        document.getElementById('glb-select').addEventListener('change', function () {
             var newSrc = this.value;
             var asset = document.getElementById('shark-model');
             if (asset) asset.setAttribute('src', newSrc);
-            document.querySelectorAll('[gltf-model="#shark-model"]').forEach(function(el) {
+            document.querySelectorAll('[gltf-model="#shark-model"]').forEach(function (el) {
                 el.setAttribute('gltf-model', newSrc);
             });
         });
@@ -1592,14 +1633,14 @@
                     if (dist < 50) {
                         textEl.setAttribute('visible', 'true');
                         if (textBgEl) textBgEl.setAttribute('visible', 'true');
-                        
+
                         // Elegant responsive scaling based on distance
                         const baseScale = 1.8;
                         // Smooth distance multiplier: 1.0x (far) to 2.2x (close)
                         const distanceFactor = 1.0 + ((50 - dist) / 50) * 1.2;
                         let textScale = baseScale * distanceFactor;
                         textEl.setAttribute('scale', `${textScale} ${textScale} ${textScale}`);
-                        
+
                         // Scale background proportionally with padding
                         const bgScale = textScale / 1.8; // Normalize to base
                         if (textBgEl) {
@@ -1662,11 +1703,11 @@
                 celebration.classList.remove('show');
                 // Re-enable arrows after celebration
                 arrowsEnabled = true;
-                console.log('🎯 Arrows re-enabled after celebration');
+                console.log('Arrows re-enabled after celebration');
                 // Force immediate update
                 setTimeout(() => {
                     updateDirectionalArrows();
-                    console.log('🎯 Arrow update called after celebration');
+                    console.log('Arrow update called after celebration');
                 }, 100);
             }, 4000);
         }
@@ -1691,7 +1732,6 @@
         let currentHeading = 0;
         let map = null;
         let userMarker = null;
-        let sharkMarkers = [];
 
         function initializeMap() {
             if (map) return; // Already initialized
@@ -1710,11 +1750,11 @@
                 maxZoom: 19
             }).addTo(map);
 
-            console.log('🗺️ OpenStreetMap initialized');
+            console.log('OpenStreetMap initialized');
         }
 
         function updateLeafletMap() {
-            if (!userLat || !userLng || tourStops.length === 0) return;
+            if (!userLat || !userLng) return;
 
             // Initialize map if not already done
             if (!map) {
@@ -1726,78 +1766,10 @@
             // Center map on user location
             map.setView([userLat, userLng], zoom);
 
-            // Remove old markers
-            if (userMarker) {
-                map.removeLayer(userMarker);
-            }
-            sharkMarkers.forEach(marker => map.removeLayer(marker));
-            sharkMarkers = [];
+            // Use shared marker system
+            userMarker = updateMapMarkers(map, userLat, userLng, userMarker, mapExpanded);
 
-            // Find closest shark
-            let closestIndex = 0;
-            let minDistance = Infinity;
-            tourStops.forEach((stop, index) => {
-                const dist = calculateDistance(userLat, userLng, stop.lat, stop.lng);
-                if (dist < minDistance) {
-                    minDistance = dist;
-                    closestIndex = index;
-                }
-            });
-
-            // Responsive marker sizes
-            const userSize = mapExpanded ? 32 : 24;
-            const sharkSize = mapExpanded ? 38 : 28;
-            const fontSize = mapExpanded ? 15 : 12;
-
-            // Create custom user icon
-            const userIcon = L.divIcon({
-                className: 'custom-marker',
-                html: `<div style="background: #00A9E0; width: ${userSize}px; height: ${userSize}px; border-radius: 50%; border: 2px solid white; box-shadow: 0 3px 10px rgba(0,169,224,0.5); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: ${fontSize}px;">U</div>`,
-                iconSize: [userSize, userSize],
-                iconAnchor: [userSize / 2, userSize / 2]
-            });
-
-            // Add user marker
-            userMarker = L.marker([userLat, userLng], { icon: userIcon })
-                .addTo(map)
-                .bindPopup('Your Location');
-
-            // Add shark markers - only closest is highlighted
-            tourStops.forEach((stop, index) => {
-                const isClosest = index === closestIndex;
-                const isVisited = visitedStops.has(index);
-
-                // Color scheme: Closest = Orange, Visited = Green, Others = Gray
-                let color, opacity, borderColor;
-                if (isVisited) {
-                    color = '#00D084';
-                    opacity = 0.9;
-                    borderColor = 'white';
-                } else if (isClosest) {
-                    color = '#F4901E';
-                    opacity = 1;
-                    borderColor = 'white';
-                } else {
-                    color = '#9E9E9E';
-                    opacity = 0.6;
-                    borderColor = 'rgba(255,255,255,0.5)';
-                }
-
-                const sharkIcon = L.divIcon({
-                    className: 'custom-marker',
-                    html: `<div style="background: ${color}; width: ${sharkSize}px; height: ${sharkSize}px; border-radius: 50%; border: 2px solid ${borderColor}; box-shadow: 0 3px 10px rgba(0,0,0,${opacity * 0.4}); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: ${fontSize}px; opacity: ${opacity};">${index + 1}</div>`,
-                    iconSize: [sharkSize, sharkSize],
-                    iconAnchor: [sharkSize / 2, sharkSize / 2]
-                });
-
-                const marker = L.marker([stop.lat, stop.lng], { icon: sharkIcon })
-                    .addTo(map)
-                    .bindPopup(`<strong>${stop.name}</strong><br>${stop.event}<br>${isClosest ? '<em>Closest to you!</em>' : ''}`);
-
-                sharkMarkers.push(marker);
-            });
-
-            console.log('📍 Map updated: Closest shark is #' + (closestIndex + 1));
+            console.log('Map updated with shared marker system');
         }
 
         function updateCompass(heading) {
@@ -1908,7 +1880,7 @@
                 arrowRight.classList.remove('show');
                 arrowLeft.style.display = 'none';
                 arrowRight.style.display = 'none';
-                console.log('🎯 Very close to shark (' + minDistance.toFixed(1) + 'm) - arrows hidden');
+                console.log('Very close to shark (' + minDistance.toFixed(1) + 'm) - arrows hidden');
             }
         }
 
@@ -1948,7 +1920,7 @@
         const scene = document.querySelector('a-scene');
         if (scene) {
             scene.addEventListener('loaded', () => {
-                console.log('🎯 Scene loaded');
+                console.log('Scene loaded');
                 setTimeout(() => {
                     updateRouteInfo();
                     updateDirectionalArrows();
@@ -1958,7 +1930,7 @@
 
         // 2. Window load event
         window.addEventListener('load', () => {
-            console.log('🎯 Window loaded');
+            console.log('Window loaded');
             setTimeout(() => {
                 updateRouteInfo();
                 updateDirectionalArrows();
@@ -1967,14 +1939,14 @@
 
         // 3. Delayed fallback
         setTimeout(() => {
-            console.log('🎯 Delayed init 2s');
+            console.log('Delayed init 2s');
             updateRouteInfo();
             updateDirectionalArrows();
         }, 2000);
 
         // 4. Extra delayed fallback for slow mobile
         setTimeout(() => {
-            console.log('🎯 Delayed init 4s');
+            console.log('Delayed init 4s');
             updateRouteInfo();
             updateDirectionalArrows();
         }, 4000);
@@ -2375,24 +2347,24 @@
         }
 
         hamburgerBtn.addEventListener('click', openMenu);
-        hamburgerBtn.addEventListener('touchend', function(e) {
+        hamburgerBtn.addEventListener('touchend', function (e) {
             e.preventDefault();
             openMenu();
         });
-        
+
         closeMenuBtn.addEventListener('click', closeMenu);
-        closeMenuBtn.addEventListener('touchend', function(e) {
-            e.preventDefault();
-            closeMenu();
-        });
-        
-        navOverlay.addEventListener('click', closeMenu);
-        navOverlay.addEventListener('touchend', function(e) {
+        closeMenuBtn.addEventListener('touchend', function (e) {
             e.preventDefault();
             closeMenu();
         });
 
-        document.addEventListener('keydown', function(e) {
+        navOverlay.addEventListener('click', closeMenu);
+        navOverlay.addEventListener('touchend', function (e) {
+            e.preventDefault();
+            closeMenu();
+        });
+
+        document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape' && navMenu.classList.contains('open')) {
                 closeMenu();
             }

@@ -1,0 +1,60 @@
+/* Map Component Styles - Reusable across all pages */
+
+#map-container {
+    width: 140px;
+    height: 100px;
+    background: rgba(0, 109, 117, 0.15);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-radius: 16px;
+    border: 1px solid rgba(0, 169, 224, 0.3);
+    pointer-events: auto;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    position: fixed;
+    right: 10px;
+    bottom: 20px;
+    transition: all 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
+    z-index: 100;
+}
+
+#map-container.expanded {
+    width: 300px;
+    height: 300px;
+    z-index: 2000;
+}
+
+#mini-map {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    border: none;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.leaflet-container {
+    width: 100%;
+    height: 100%;
+    border-radius: 16px;
+}
+
+#toggle-map {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(0, 169, 224, 0.9);
+    border: none;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    font-size: 16px;
+    font-weight: bold;
+}

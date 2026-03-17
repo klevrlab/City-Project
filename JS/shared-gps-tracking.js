@@ -4,11 +4,9 @@
 (function() {
     'use strict';
 
-    // Checkpoint coordinates
-    const CHECKPOINTS = {
-        A: { lat: 37.336861, lng: -121.894361, name: 'Label A' },
-        B: { lat: 37.334222, lng: -121.900417, name: 'Label B' }
-    };
+    // Dynamic checkpoint data loaded from JSON
+    let CHECKPOINTS = [];
+    let checkpointStates = [];
 
     const GPS_CONFIG = {
         proximityThreshold: 50, // meters
@@ -20,10 +18,37 @@
     // State
     const STATE = {
         gpsWatchId: null,
-        currentPosition: null,
-        checkpointA: { visited: false, active: false },
-        checkpointB: { visited: false, active: false }
+        currentPosition: null
     };
+
+    // Load checkpoint data from JSON
+    async function loadCheckpointData() {
+        try {
+            const response = await fetch('./data/shark-locations.json');
+            const data = await response.json();
+            
+            if (data.sharks && data.sharks.length > 0) {
+                CHECKPOINTS = data.sharks.map((shark, index) => ({
+                    id: String.fromCharCode(97 + index), // a, b, c, etc.
+                    lat: shark.latitude,
+                    lng: shark.longitude,
+                    name: shark.title
+                }));
+                
+                // Initialize state for each checkpoint
+                checkpointStates = CHECKPOINTS.map(() => ({
+                    visited: false,
+                    active: false
+                }));
+                
+                console.log('[GPS] Loaded', CHECKPOINTS.length, 'checkpoints from JSON');
+                return true;
+            }
+        } catch (error) {
+            console.error('[GPS] Error loading checkpoint data:', error);
+        }
+        return false;
+    }
 
     // Wait for DOM to be ready
     if (document.readyState === 'loading') {
@@ -32,13 +57,27 @@
         initGPSTracking();
     }
 
-    function initGPSTracking() {
-        const checkpointA = document.getElementById('checkpoint-a');
-        const checkpointB = document.getElementById('checkpoint-b');
-
-        if (!checkpointA || !checkpointB) {
-            console.warn('Checkpoint elements not found');
+    async function initGPSTracking() {
+        // Load checkpoint data first
+        const loaded = await loadCheckpointData();
+        
+        if (!loaded || CHECKPOINTS.length === 0) {
+            console.warn('[GPS] No checkpoints loaded');
             return;
+        }
+
+        // Verify checkpoint elements exist
+        let allFound = true;
+        CHECKPOINTS.forEach((checkpoint) => {
+            const el = document.getElementById('checkpoint-' + checkpoint.id);
+            if (!el) {
+                console.warn('[GPS] Checkpoint element not found:', 'checkpoint-' + checkpoint.id);
+                allFound = false;
+            }
+        });
+
+        if (!allFound) {
+            console.warn('[GPS] Some checkpoint elements not found');
         }
 
         startGPSTracking();
@@ -83,30 +122,22 @@
 
     // Update checkpoint UI
     function updateCheckpointUI() {
-        const checkpointAEl = document.getElementById('checkpoint-a');
-        const checkpointBEl = document.getElementById('checkpoint-b');
+        CHECKPOINTS.forEach((checkpoint, index) => {
+            const el = document.getElementById('checkpoint-' + checkpoint.id);
+            if (!el) return;
+            
+            const state = checkpointStates[index];
+            
+            el.classList.remove('visited', 'active');
+            if (state.visited) {
+                el.classList.add('visited');
+            }
+            if (state.active) {
+                el.classList.add('active');
+            }
+        });
         
-        console.log('[GPS] Updating UI - A visited:', STATE.checkpointA.visited, 'active:', STATE.checkpointA.active, '| B visited:', STATE.checkpointB.visited, 'active:', STATE.checkpointB.active);
-        
-        // Update Checkpoint A
-        checkpointAEl.classList.remove('visited', 'active');
-        if (STATE.checkpointA.visited) {
-            checkpointAEl.classList.add('visited');
-            console.log('[GPS] Checkpoint A marked with checkmark');
-        }
-        if (STATE.checkpointA.active) {
-            checkpointAEl.classList.add('active');
-        }
-        
-        // Update Checkpoint B
-        checkpointBEl.classList.remove('visited', 'active');
-        if (STATE.checkpointB.visited) {
-            checkpointBEl.classList.add('visited');
-            console.log('[GPS] Checkpoint B marked with checkmark');
-        }
-        if (STATE.checkpointB.active) {
-            checkpointBEl.classList.add('active');
-        }
+        console.log('[GPS] UI updated for', CHECKPOINTS.length, 'checkpoints');
     }
 
     // Evaluate checkpoint status based on GPS position
@@ -115,93 +146,72 @@
         
         addGPSLog(`Position: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (±${accuracy.toFixed(1)}m)`);
         
-        // Calculate distances to both checkpoints
-        const distToA = calculateDistance(latitude, longitude, CHECKPOINTS.A.lat, CHECKPOINTS.A.lng);
-        const distToB = calculateDistance(latitude, longitude, CHECKPOINTS.B.lat, CHECKPOINTS.B.lng);
+        // Calculate distances to all checkpoints
+        const distances = CHECKPOINTS.map((checkpoint, index) => ({
+            index,
+            checkpoint,
+            distance: calculateDistance(latitude, longitude, checkpoint.lat, checkpoint.lng)
+        }));
         
-        addGPSLog(`Distance to A: ${distToA.toFixed(1)}m, to B: ${distToB.toFixed(1)}m`);
+        // Find closest checkpoint
+        const closest = distances.reduce((min, curr) => 
+            curr.distance < min.distance ? curr : min
+        );
         
-        // Determine if we're at either checkpoint
-        const atA = distToA <= GPS_CONFIG.proximityThreshold;
-        const atB = distToB <= GPS_CONFIG.proximityThreshold;
+        addGPSLog(`Closest: ${closest.checkpoint.name} at ${closest.distance.toFixed(1)}m`);
         
-        // Calculate which checkpoint is closer
-        const closerToA = distToA < distToB;
+        // Check if at any checkpoint
+        const atCheckpoint = distances.find(d => d.distance <= GPS_CONFIG.proximityThreshold);
         
-        // Determine position relative to checkpoints
-        let status = '';
-        
-        if (atA && atB) {
-            // At both (unlikely unless they're very close)
-            status = 'At both checkpoints';
-            STATE.checkpointA.visited = true;
-            STATE.checkpointA.active = true;
-            STATE.checkpointB.visited = true;
-            STATE.checkpointB.active = true;
-            addGPSLog('✓ At both checkpoints!', 'checkpoint');
-        } else if (atA) {
-            // At checkpoint A
-            status = 'At Checkpoint A';
-            STATE.checkpointA.visited = true;
-            STATE.checkpointA.active = true;
-            STATE.checkpointB.active = false;
-            addGPSLog('✓ At Checkpoint A', 'checkpoint');
-        } else if (atB) {
-            // At checkpoint B
-            status = 'At Checkpoint B';
-            STATE.checkpointB.visited = true;
-            STATE.checkpointB.active = true;
+        if (atCheckpoint) {
+            // At a checkpoint
+            const idx = atCheckpoint.index;
+            checkpointStates[idx].visited = true;
+            checkpointStates[idx].active = true;
             
-            // If we're at B, we must have passed A
-            if (!STATE.checkpointA.visited) {
-                STATE.checkpointA.visited = true;
-                addGPSLog('✓ Checkpoint A marked as passed', 'checkpoint');
+            // Mark all previous checkpoints as visited
+            for (let i = 0; i < idx; i++) {
+                if (!checkpointStates[i].visited) {
+                    checkpointStates[i].visited = true;
+                    addGPSLog(`✓ ${CHECKPOINTS[i].name} marked as passed`, 'checkpoint');
+                }
+                checkpointStates[i].active = false;
             }
-            STATE.checkpointA.active = false;
-            addGPSLog('✓ At Checkpoint B', 'checkpoint');
+            
+            // Mark all future checkpoints as not active
+            for (let i = idx + 1; i < CHECKPOINTS.length; i++) {
+                checkpointStates[i].active = false;
+            }
+            
+            addGPSLog(`✓ At ${atCheckpoint.checkpoint.name}`, 'checkpoint');
         } else {
-            // Not at either checkpoint - determine if between them
-            const totalDist = calculateDistance(CHECKPOINTS.A.lat, CHECKPOINTS.A.lng, CHECKPOINTS.B.lat, CHECKPOINTS.B.lng);
-            const sumDist = distToA + distToB;
-            const tolerance = totalDist * 0.3; // 30% tolerance
+            // Not at any checkpoint - determine position in sequence
+            const closestIdx = closest.index;
             
-            const isBetween = Math.abs(sumDist - totalDist) <= tolerance;
+            // If we're closer to a later checkpoint than the first unvisited one,
+            // mark earlier ones as visited
+            let firstUnvisited = checkpointStates.findIndex(s => !s.visited);
+            if (firstUnvisited === -1) firstUnvisited = CHECKPOINTS.length - 1;
             
-            if (isBetween) {
-                // Between checkpoints
-                status = 'Between A and B';
-                
-                if (closerToA) {
-                    // Approaching A
-                    STATE.checkpointA.active = true;
-                    STATE.checkpointA.visited = false;
-                    STATE.checkpointB.active = false;
-                    STATE.checkpointB.visited = false;
-                    addGPSLog('→ Between checkpoints (closer to A, A is active)');
-                } else {
-                    // Crossed A, approaching B
-                    STATE.checkpointA.visited = true;
-                    STATE.checkpointA.active = false;
-                    STATE.checkpointB.active = true;
-                    STATE.checkpointB.visited = false;
-                    addGPSLog('→ Between checkpoints (closer to B, A marked done, B is active)');
+            if (closestIdx > firstUnvisited) {
+                // We've passed some checkpoints
+                for (let i = 0; i < closestIdx; i++) {
+                    if (!checkpointStates[i].visited) {
+                        checkpointStates[i].visited = true;
+                        addGPSLog(`✓ ${CHECKPOINTS[i].name} marked as passed`, 'checkpoint');
+                    }
+                    checkpointStates[i].active = false;
                 }
+                checkpointStates[closestIdx].active = true;
+                checkpointStates[closestIdx].visited = false;
             } else {
-                // Away from both
-                if (closerToA) {
-                    status = 'Before Checkpoint A';
-                    STATE.checkpointA.active = false;
-                    STATE.checkpointB.active = false;
-                    addGPSLog('← Away from checkpoints (before A)');
-                } else {
-                    status = 'After Checkpoint B';
-                    STATE.checkpointA.visited = true;
-                    STATE.checkpointA.active = false;
-                    STATE.checkpointB.visited = true;
-                    STATE.checkpointB.active = false;
-                    addGPSLog('→ Away from checkpoints (after B)');
-                }
+                // Set the closest unvisited checkpoint as active
+                checkpointStates.forEach((state, idx) => {
+                    state.active = (idx === firstUnvisited);
+                });
             }
+            
+            addGPSLog(`→ Approaching ${CHECKPOINTS[firstUnvisited].name}`);
         }
         
         // Update UI
@@ -210,7 +220,7 @@
         // Update GPS status if element exists
         const gpsStatus = document.getElementById('gps-status');
         if (gpsStatus) {
-            gpsStatus.textContent = `GPS: ${status}`;
+            gpsStatus.textContent = `GPS: ${closest.distance.toFixed(0)}m to ${closest.checkpoint.name}`;
         }
     }
 
@@ -249,8 +259,9 @@
         updateCheckpointUI();
         
         addGPSLog('Starting GPS tracking...');
-        addGPSLog(`Checkpoint A: ${CHECKPOINTS.A.lat.toFixed(6)}, ${CHECKPOINTS.A.lng.toFixed(6)}`);
-        addGPSLog(`Checkpoint B: ${CHECKPOINTS.B.lat.toFixed(6)}, ${CHECKPOINTS.B.lng.toFixed(6)}`);
+        CHECKPOINTS.forEach((checkpoint, index) => {
+            addGPSLog(`Checkpoint ${index + 1} (${checkpoint.name}): ${checkpoint.lat.toFixed(6)}, ${checkpoint.lng.toFixed(6)}`);
+        });
         
         STATE.gpsWatchId = navigator.geolocation.watchPosition(
             (position) => {

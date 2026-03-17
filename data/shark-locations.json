@@ -4,7 +4,7 @@
   "sharks": [
     {
       "id": "shark-1",
-      "title": "Label A",
+      "title": "San Pedro Square",
       "description": "Checkpoint A",
       "latitude": 37.336861,
       "longitude": -121.894361,
@@ -18,7 +18,7 @@
     },
     {
       "id": "shark-2",
-      "title": "Label B",
+      "title": "Sharks Way",
       "description": "Checkpoint B",
       "latitude": 37.334222,
       "longitude": -121.900417,

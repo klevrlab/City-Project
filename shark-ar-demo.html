@@ -7,6 +7,11 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Sharks Way AR - Shark Painting Demo</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="./css/map-component.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="./JS/checkpoint-loader.js"></script>
+    <script src="./JS/shared-map-markers.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1"></script>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
@@ -177,43 +182,6 @@
             display: block;
             filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
             object-fit: contain;
-        }
-
-        /* Progress tracker (top-right) — from marker-demo */
-        #progress-tracker {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(0, 109, 117, 0.15);
-            backdrop-filter: blur(20px) saturate(180%);
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
-            padding: 16px 18px;
-            border-radius: 16px;
-            color: white;
-            font-size: 11px;
-            z-index: 100;
-            border: 1px solid rgba(0, 169, 224, 0.3);
-            box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
-            max-width: 140px;
-        }
-        #progress-tracker .stop-item {
-            margin: 6px 0;
-            opacity: 0.5;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        #progress-tracker .stop-item.visited {
-            opacity: 1;
-            color: #00A9E0;
-        }
-        #progress-tracker .stop-item .check-icon {
-            width: 14px;
-            height: 14px;
-            stroke: currentColor;
-            stroke-width: 2.5;
-            fill: none;
         }
 
         /* 3D Model overlay */
@@ -479,32 +447,9 @@
             0%, 100% { transform: translateX(-50%) scale(1); opacity: 1; }
             50% { transform: translateX(-50%) scale(1.05); opacity: 0.9; }
         }
-
         @media (max-width: 480px) {
-            #info-panel {
-                bottom: 10px;
-                right: 10px;
-                width: 120px;
-                padding: 14px 12px;
-            }
-            #info-panel h2 { font-size: 13px; }
-            #info-panel p { font-size: 11px; }
-            #event-info {
-                max-width: 90%;
-                padding: 14px 16px;
-            }
-            #event-info.visible { left: 10px; }
             #event-info h3 { font-size: 15px; }
             #event-info .event-details { font-size: 12px; }
-            #progress-tracker {
-                top: auto;
-                right: auto;
-                bottom: 10px;
-                left: 10px;
-                max-width: 120px;
-                padding: 12px 14px;
-                font-size: 10px;
-            }
             #model-overlay {
                 width: 340px;
                 height: 340px;
@@ -514,6 +459,7 @@
                 font-size: 13px;
             }
         }
+
     </style>
 </head>
 <body>
@@ -574,7 +520,14 @@
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                 <circle cx="12" cy="13" r="4"/>
             </svg>
-            Selfie AR
+            Selfie with Sammy
+        </a>
+        <a href="./selfie-ar.html?character=sharkey" class="nav-link">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+            </svg>
+            Selfie with Sharkey
         </a>
     </div>
 
@@ -596,9 +549,9 @@
             </select>
         </div>
         <div style="display:flex;gap:6px;">
-            <button id="dev-trigger-shark" style="flex:1;background:#003333;color:#0ff;border:1px solid #0ff;border-radius:6px;padding:5px 8px;font-family:monospace;font-size:11px;cursor:pointer;">🦈 Mock Found</button>
-            <button id="dev-dismiss-shark" style="flex:1;background:#330000;color:#f55;border:1px solid #f55;border-radius:6px;padding:5px 8px;font-family:monospace;font-size:11px;cursor:pointer;">✕ Dismiss</button>
-            <button id="dev-eoe-map" style="flex:1;background:#002233;color:#0af;border:1px solid #0af;border-radius:6px;padding:5px 8px;font-family:monospace;font-size:11px;cursor:pointer;">🗺 EOE Map</button>
+            <button id="dev-trigger-shark" style="flex:1;background:#003333;color:#0ff;border:1px solid #0ff;border-radius:6px;padding:5px 8px;font-family:monospace;font-size:11px;cursor:pointer;">Mock Found</button>
+            <button id="dev-dismiss-shark" style="flex:1;background:#330000;color:#f55;border:1px solid #f55;border-radius:6px;padding:5px 8px;font-family:monospace;font-size:11px;cursor:pointer;">Dismiss</button>
+            <button id="dev-eoe-map" style="flex:1;background:#002233;color:#0af;border:1px solid #0af;border-radius:6px;padding:5px 8px;font-family:monospace;font-size:11px;cursor:pointer;">EOE Map</button>
         </div>
     </div> -->
     <script>
@@ -638,14 +591,14 @@
     <div id="eoe-map-overlay" style="display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,10,20,0.92);backdrop-filter:blur(12px);flex-direction:column;align-items:center;justify-content:center;padding:24px;">
         <div style="width:100%;max-width:420px;background:rgba(0,30,40,0.95);border:1px solid rgba(0,169,224,0.4);border-radius:20px;padding:24px;color:white;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-                <h2 style="color:#00A9E0;font-size:20px;margin:0;">🦈 Sharks Way Tour</h2>
-                <button id="eoe-close" style="background:none;border:none;color:#aaa;font-size:22px;cursor:pointer;line-height:1;">✕</button>
+                <h2 style="color:#00A9E0;font-size:20px;margin:0;">Sharks Way Tour</h2>
+                <button id="eoe-close" style="background:none;border:none;color:#aaa;font-size:22px;cursor:pointer;line-height:1;">&times;</button>
             </div>
             <p style="color:rgba(255,255,255,0.6);font-size:13px;margin-bottom:20px;">End of Experience — Tour Summary</p>
             <div style="position:relative;background:rgba(0,109,117,0.15);border-radius:14px;padding:16px;margin-bottom:20px;border:1px solid rgba(0,169,224,0.2);">
                 <div style="display:flex;flex-direction:column;gap:14px;">
                     <div class="eoe-stop" data-stop="0" style="display:flex;align-items:center;gap:14px;">
-                        <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,169,224,0.2);border:2px solid #00A9E0;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🏟</div>
+                        <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,169,224,0.2);border:2px solid #00A9E0;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;font-weight:700;">1</div>
                         <div style="flex:1;">
                             <div style="font-weight:600;font-size:14px;">SAP Center</div>
                             <div style="font-size:12px;color:rgba(255,255,255,0.5);">The Big Game · Feb 9, 2026</div>
@@ -654,7 +607,7 @@
                     </div>
                     <div style="height:1px;background:rgba(0,169,224,0.1);"></div>
                     <div class="eoe-stop" data-stop="1" style="display:flex;align-items:center;gap:14px;">
-                        <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,169,224,0.2);border:2px solid #00A9E0;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🏙</div>
+                        <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,169,224,0.2);border:2px solid #00A9E0;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;font-weight:700;">2</div>
                         <div style="flex:1;">
                             <div style="font-weight:600;font-size:14px;">Downtown San Jose</div>
                             <div style="font-size:12px;color:rgba(255,255,255,0.5);">March Madness · Mar 15–Apr 6</div>
@@ -663,7 +616,7 @@
                     </div>
                     <div style="height:1px;background:rgba(0,169,224,0.1);"></div>
                     <div class="eoe-stop" data-stop="2" style="display:flex;align-items:center;gap:14px;">
-                        <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,169,224,0.2);border:2px solid #00A9E0;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🌮</div>
+                        <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,169,224,0.2);border:2px solid #00A9E0;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;font-weight:700;">3</div>
                         <div style="flex:1;">
                             <div style="font-weight:600;font-size:14px;">San Pedro Square</div>
                             <div style="font-size:12px;color:rgba(255,255,255,0.5);">World Cup Viewing · Jun–Jul 2026</div>
@@ -681,7 +634,7 @@
                     <div id="eoe-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#006D75,#00A9E0);border-radius:3px;transition:width 0.5s ease;"></div>
                 </div>
             </div>
-            <button id="eoe-share" style="width:100%;padding:13px;background:linear-gradient(135deg,#006D75,#00A9E0);color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;">Share My Tour 🦈</button>
+            <button id="eoe-share" style="width:100%;padding:13px;background:linear-gradient(135deg,#006D75,#00A9E0);color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;">Share My Tour</button>
         </div>
     </div>
 
@@ -717,7 +670,7 @@
     <!-- Progress tracker -->
     <div id="progress-tracker">
         <div style="font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none;"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
             Tour Progress
         </div>
         <div class="stop-item" data-stop="0">
@@ -732,6 +685,12 @@
             <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>
             San Pedro Sq
         </div>
+    </div>
+
+    <!-- Map Component -->
+    <div id="map-container">
+        <button id="toggle-map">+</button>
+        <div id="mini-map"></div>
     </div>
 
     <script>
@@ -878,7 +837,7 @@
                 const badge = el.querySelector('.eoe-badge');
                 if (STATE.visitedStops.has(stop)) {
                     el.style.opacity = '1';
-                    if (badge) { badge.textContent = '✓ Visited'; badge.style.background = 'rgba(0,200,100,0.2)'; badge.style.color = '#0f9'; badge.style.borderColor = 'rgba(0,200,100,0.4)'; }
+                    if (badge) { badge.textContent = 'Visited'; badge.style.background = 'rgba(0,200,100,0.2)'; badge.style.color = '#0f9'; badge.style.borderColor = 'rgba(0,200,100,0.4)'; }
                 } else {
                     el.style.opacity = '0.45';
                 }
@@ -891,7 +850,7 @@
         document.getElementById('eoe-close').addEventListener('click', closeEoeMap);
         document.getElementById('eoe-share').addEventListener('click', () => {
             const visited = STATE.visitedStops.size;
-            const msg = `I visited ${visited}/3 stops on the Sharks Way AR Tour! 🦈 #SharksWayAR #Immersion2026`;
+            const msg = `I visited ${visited}/3 stops on the Sharks Way AR Tour! #SharksWayAR #Immersion2026`;
             if (navigator.share) {
                 navigator.share({ title: 'Sharks Way AR Tour', text: msg });
             } else {
@@ -1203,6 +1162,77 @@
                 closeMenu();
             }
         });
+
+        // Map functionality
+        var map = null;
+        var userMarker = null;
+        var userLat = null;
+        var userLng = null;
+
+        function initializeMap() {
+            if (map) return;
+            
+            var mapContainer = document.getElementById('mini-map');
+            map = L.map(mapContainer, {
+                zoomControl: false,
+                attributionControl: true
+            }).setView([37.3352, -121.8811], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19
+            }).addTo(map);
+        }
+
+        function updateMap() {
+            if (!map || !userLat || !userLng) return;
+
+            map.setView([userLat, userLng], 16);
+
+            // Use shared marker system
+            var mapContainer = document.getElementById('map-container');
+            var isExpanded = mapContainer.classList.contains('expanded');
+            userMarker = updateMapMarkers(map, userLat, userLng, userMarker, isExpanded);
+        }
+
+        document.getElementById('toggle-map').addEventListener('click', function() {
+            var mapContainer = document.getElementById('map-container');
+            var isExpanded = mapContainer.classList.toggle('expanded');
+            this.textContent = isExpanded ? '−' : '+';
+            
+            setTimeout(function() {
+                if (map) {
+                    map.invalidateSize();
+                    updateMap();
+                }
+            }, 400);
+        });
+
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(
+                function(position) {
+                    userLat = position.coords.latitude;
+                    userLng = position.coords.longitude;
+                    
+                    if (!map) {
+                        initializeMap();
+                    }
+                    updateMap();
+                },
+                function(error) {
+                    console.error('Geolocation error:', error);
+                },
+                { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+            );
+        }
+
+        setTimeout(function() {
+            if (!map) {
+                initializeMap();
+            }
+        }, 1000);
     </script>
+
+    <!-- GPS Tracking for Checkpoints -->
+    <script src="./JS/shared-gps-tracking.js"></script>
 </body>
 </html>
