@@ -7,6 +7,12 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Sharks Way AR - Marker Demo</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="./css/map-component.css" />
+    <link rel="stylesheet" href="./css/progress-tracker.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="./JS/checkpoint-loader.js"></script>
+    <script src="./JS/shared-map-markers.js"></script>
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -152,6 +158,54 @@
             opacity: 1;
             pointer-events: auto;
         }
+        #header {
+            position: fixed;
+            top: 60px;
+            left: 20px;
+            background: rgba(0, 109, 117, 0.15);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            color: white;
+            padding: 18px 16px;
+            border-radius: 20px;
+            z-index: 1000;
+            width: 200px;
+            border: 1px solid rgba(0, 169, 224, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+        #header h2 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            font-weight: 700;
+            color: #FFFFFF;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+        }
+        #header p {
+            margin: 0;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.4;
+        }
+        #header #gps-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        #header #gps-status .icon {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+        }
+        #event-icon-header {
+            width: 32px;
+            height: 32px;
+            margin-bottom: 8px;
+            display: block;
+        }
         #info-panel {
             position: fixed;
             bottom: 20px;
@@ -257,56 +311,6 @@
         #tap-hint.visible {
             display: block;
         }
-        #progress-tracker {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(0, 109, 117, 0.15);
-            backdrop-filter: blur(20px) saturate(180%);
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
-            padding: 16px 18px;
-            border-radius: 16px;
-            color: white;
-            font-size: 11px;
-            z-index: 100;
-            border: 1px solid rgba(0, 169, 224, 0.3);
-            box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
-            max-width: 160px;
-        }
-        #progress-tracker .stop-item {
-            margin: 6px 0;
-            opacity: 0.5;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.3s ease;
-        }
-        #progress-tracker .stop-item.visited {
-            opacity: 1;
-            color: #00A9E0;
-        }
-        #progress-tracker .stop-item.visited .check-icon circle {
-            fill: #00A9E0;
-            stroke: #00A9E0;
-        }
-        #progress-tracker .stop-item.visited .check-icon path {
-            stroke: white;
-            fill: none;
-            stroke-width: 2;
-        }
-        #progress-tracker .stop-item.active {
-            opacity: 1;
-            color: #00A9E0;
-            font-weight: bold;
-        }
-        #progress-tracker .stop-item .check-icon {
-            width: 14px;
-            height: 14px;
-            stroke: currentColor;
-            stroke-width: 2.5;
-            fill: none;
-        }
         @keyframes pulse {
             0%, 100% { transform: translateX(-50%) scale(1); opacity: 1; }
             50% { transform: translateX(-50%) scale(1.05); opacity: 0.9; }
@@ -350,9 +354,22 @@
             fill: none;
         }
         @media (max-width: 480px) {
+            #header {
+                top: 50px;
+                left: 10px;
+                width: 160px;
+                padding: 14px 12px;
+            }
+            #header h2 {
+                font-size: 13px;
+            }
+            #header p {
+                font-size: 10px;
+            }
             #info-panel {
-                bottom: 10px;
-                right: 10px;
+                top: 60px;
+                height: 110px;
+                left: 10px;
                 width: 120px;
                 padding: 14px 12px;
             }
@@ -375,13 +392,6 @@
             #event-info .event-details {
                 font-size: 12px;
             }
-            #progress-tracker {
-                bottom: 10px;
-                left: 10px;
-                max-width: 140px;
-                padding: 12px 14px;
-                font-size: 10px;
-            }
             #tap-hint {
                 bottom: 20px;
                 font-size: 12px;
@@ -392,6 +402,7 @@
                 font-size: 13px;
             }
         }
+
     </style>
 </head>
 <body>
@@ -440,7 +451,14 @@
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                 <circle cx="12" cy="13" r="4"/>
             </svg>
-            Selfie AR
+            Selfie with Sammy
+        </a>
+        <a href="./selfie-ar.html?character=sharkey" class="nav-link">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+            </svg>
+            Selfie with Sharkey
         </a>
     </div>
 
@@ -451,6 +469,12 @@
         <!-- <p class="marker-hint">Get marker: bit.ly/hiro-marker</p> -->
     </div>
 
+    <!-- Map Component -->
+    <div id="map-container">
+        <button id="toggle-map">+</button>
+        <div id="mini-map"></div>
+    </div>
+
     <!-- <div id="tap-hint">
         <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 5v14m7-7H5"/></svg>
         Tap marker to learn more
@@ -458,16 +482,14 @@
 
     <div id="progress-tracker">
         <div style="font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none;"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
             Tour Progress
         </div>
         <div class="stop-item" data-checkpoint="A" id="checkpoint-a">
             <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
-            Label A
         </div>
         <div class="stop-item" data-checkpoint="B" id="checkpoint-b">
             <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
-            Label B
         </div>
     </div>
 
@@ -804,6 +826,74 @@
             console.log('Print Hiro marker from: https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png');
             console.log('Looking for: ./assets/3D-models/plushie_shark.glb');
         });
+
+        // Map functionality
+        var map = null;
+        var userMarker = null;
+        var userLat = null;
+        var userLng = null;
+
+        function initializeMap() {
+            if (map) return;
+            
+            var mapContainer = document.getElementById('mini-map');
+            map = L.map(mapContainer, {
+                zoomControl: false,
+                attributionControl: true
+            }).setView([37.3352, -121.8811], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19
+            }).addTo(map);
+        }
+
+        function updateMap() {
+            if (!map || !userLat || !userLng) return;
+
+            map.setView([userLat, userLng], 16);
+
+            // Use shared marker system
+            var mapContainer = document.getElementById('map-container');
+            var isExpanded = mapContainer.classList.contains('expanded');
+            userMarker = updateMapMarkers(map, userLat, userLng, userMarker, isExpanded);
+        }
+
+        document.getElementById('toggle-map').addEventListener('click', function() {
+            var mapContainer = document.getElementById('map-container');
+            var isExpanded = mapContainer.classList.toggle('expanded');
+            this.textContent = isExpanded ? '−' : '+';
+            
+            setTimeout(function() {
+                if (map) {
+                    map.invalidateSize();
+                    updateMap();
+                }
+            }, 400);
+        });
+
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(
+                function(position) {
+                    userLat = position.coords.latitude;
+                    userLng = position.coords.longitude;
+                    
+                    if (!map) {
+                        initializeMap();
+                    }
+                    updateMap();
+                },
+                function(error) {
+                    console.error('Geolocation error:', error);
+                },
+                { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+            );
+        }
+
+        setTimeout(function() {
+            if (!map) {
+                initializeMap();
+            }
+        }, 1000);
     </script>
 </body>
 </html>

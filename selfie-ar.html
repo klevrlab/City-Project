@@ -6,6 +6,12 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Sharks Way - Selfie AR</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="./css/map-component.css?v=2" />
+    <link rel="stylesheet" href="./css/progress-tracker.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="./JS/checkpoint-loader.js"></script>
+    <script src="./JS/shared-map-markers.js"></script>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
@@ -31,7 +37,12 @@
         #shark-overlay {
             position: fixed; z-index: 10;
             pointer-events: none;
-            display: none;
+            opacity: 0;
+            visibility: hidden;
+        }
+        #shark-overlay.visible {
+            opacity: 1;
+            visibility: visible;
         }
         #shark-viewer {
             background: transparent;
@@ -267,67 +278,6 @@
             transition: opacity 0.5s ease;
         }
 
-        /* Progress tracker (checkpoint tracker) */
-        #progress-tracker {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(0, 109, 117, 0.15);
-            backdrop-filter: blur(20px) saturate(180%);
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
-            padding: 16px 18px;
-            border-radius: 16px;
-            color: white;
-            font-size: 11px;
-            z-index: 100;
-            border: 1px solid rgba(0, 169, 224, 0.3);
-            box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
-            max-width: 160px;
-        }
-        #progress-tracker .stop-item {
-            margin: 6px 0;
-            opacity: 0.5;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.3s ease;
-        }
-        #progress-tracker .stop-item.visited {
-            opacity: 1;
-            color: #00A9E0;
-        }
-        #progress-tracker .stop-item.visited .check-icon circle {
-            fill: #00A9E0;
-            stroke: #00A9E0;
-        }
-        #progress-tracker .stop-item.visited .check-icon path {
-            stroke: white;
-            fill: none;
-            stroke-width: 2;
-        }
-        #progress-tracker .stop-item.active {
-            opacity: 1;
-            color: #00A9E0;
-            font-weight: bold;
-        }
-        #progress-tracker .stop-item .check-icon {
-            width: 14px;
-            height: 14px;
-            stroke: currentColor;
-            stroke-width: 2.5;
-            fill: none;
-        }
-        @media (max-width: 480px) {
-            #progress-tracker {
-                bottom: 10px;
-                left: 10px;
-                max-width: 140px;
-                padding: 12px 14px;
-                font-size: 10px;
-            }
-        }
-
         /* Flash */
         #selfie-flash {
             position: fixed;
@@ -443,28 +393,28 @@
     <!-- Shark overlay positioned at shoulder by JS -->
     <div id="shark-overlay">
         <model-viewer id="shark-viewer"
-            src="./assets/3D-models/Pose_sharky_02.glb"
+            src="./sammy_final_pose.glb"
             camera-orbit="0deg 75deg 150%"
             field-of-view="60deg"
             min-field-of-view="40deg"
             max-field-of-view="90deg"
             disable-zoom interaction-prompt="none"
             environment-image="neutral" shadow-intensity="0"
-            style="width:300px;height:300px;background:transparent;--poster-color:transparent;">
+            style="width:250px;height:250px;background:transparent;--poster-color:transparent;">
         </model-viewer>
     </div>
 
     <!-- Loading -->
     <div id="selfie-loading">
         <div class="spinner"></div>
-        <h2>🦈 Selfie AR</h2>
-        <p id="loading-msg">Starting body tracking...</p>
+        <h2>Selfie AR</h2>
+        <p id="loading-msg">Loading...</p>
     </div>
 
     <!-- Top bar -->
     <div id="topbar">
         <a href="./index.html">&larr;</a>
-        <h1>Selfie AR</h1>
+        <h1>Selfie with Sammy</h1>
         <button id="hamburger-btn">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                 <line x1="3" y1="6" x2="21" y2="6"/>
@@ -506,7 +456,14 @@
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                 <circle cx="12" cy="13" r="4"/>
             </svg>
-            Selfie AR
+            Selfie with Sammy
+        </a>
+        <a href="./selfie-ar.html?character=sharkey" class="nav-link">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+            </svg>
+            Selfie with Sharkey
         </a>
     </div>
 
@@ -518,11 +475,9 @@
         </div>
         <div class="stop-item" data-checkpoint="A" id="checkpoint-a">
             <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
-            Label A
         </div>
         <div class="stop-item" data-checkpoint="B" id="checkpoint-b">
             <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
-            Label B
         </div>
     </div>
 
@@ -539,7 +494,8 @@
             <option value="./assets/3D-models/mock_up_eoe_map.glb">mock_up_eoe_map</option>
             <option value="./assets/3D-models/Pose_sharky_01.glb">Pose_sharky_01</option>
             <option value="./assets/3D-models/Pose_sharky_01._no_glass.glb">Pose_sharky_01_no_glass</option>
-            <option value="./assets/3D-models/Pose_sharky_02.glb" selected>Pose_sharky_02</option>
+            <option value="./assets/3D-models/Pose_sharky_02.glb">Pose_sharky_02</option>
+            <option value="./sammy_final_pose.glb" selected>sammy_final_pose</option>
         </select>
         <div id="pose-status">No pose detected</div>
         <label>Anchor:</label>
@@ -548,13 +504,21 @@
             <option value="right">Right shoulder</option>
             <option value="mid" selected>Between shoulders</option>
         </select>
-        <label>Size: <span id="size-val">300</span>px</label>
-        <input type="range" id="size-slider" min="80" max="700" step="10" value="300">
-        <label>Y nudge: <span id="y-nudge-val">0</span>px</label>
-        <input type="range" id="y-nudge" min="-300" max="300" step="5" value="0">
+        <label>Size: <span id="size-val">250</span>px</label>
+        <input type="range" id="size-slider" min="80" max="700" step="10" value="250">
+        <label>Y nudge: <span id="y-nudge-val">-110</span>px</label>
+        <input type="range" id="y-nudge" min="-300" max="300" step="5" value="-110">
+        <label>X nudge: <span id="x-nudge-val">0</span>px</label>
+        <input type="range" id="x-nudge" min="-200" max="200" step="5" value="0">
     </div>
 
-    <div id="selfie-hint">🦈 Step back so your shoulders are visible</div>
+    <div id="selfie-hint">Step back so your shoulders are visible</div>
+
+    <!-- Map Component -->
+    <div id="map-container">
+        <button id="toggle-map">+</button>
+        <div id="mini-map"></div>
+    </div>
 
     <div id="selfie-controls">
         <button id="selfie-snap"></button>
@@ -563,7 +527,7 @@
     <div id="selfie-flash"></div>
 
     <div id="selfie-preview">
-        <div id="selfie-preview-label">Your Sharks Way Selfie 🦈</div>
+        <div id="selfie-preview-label">Your Sharks Way Selfie</div>
         <img id="selfie-preview-img" src="" alt="Selfie">
         <div id="selfie-preview-actions">
             <button id="btn-retake">
@@ -597,12 +561,25 @@
     </div>
 
     <script>
+        var urlParams = new URLSearchParams(window.location.search);
+        var character = urlParams.get('character') || 'sammy';
+        
         var video = document.getElementById('video');
         var overlay = document.getElementById('shark-overlay');
         var viewer = document.getElementById('shark-viewer');
         var poseStatus = document.getElementById('pose-status');
-        var DEV = { anchor: 'right', size: 210, yNudge: -70 };
+        var DEV = { anchor: 'left', size: 250, yNudge: -110, xNudge: 70 };
         var lastPos = null;
+        
+        if (character === 'sharkey') {
+            viewer.setAttribute('src', './assets/3D-models/sharkie_final_pose.glb');
+            document.title = 'Sharks Way - Selfie with Sharkey';
+            document.querySelector('#topbar h1').textContent = 'Selfie with Sharkey';
+        } else {
+            viewer.setAttribute('src', './sammy_final_pose.glb');
+            document.title = 'Sharks Way - Selfie with Sammy';
+            document.querySelector('#topbar h1').textContent = 'Selfie with Sammy';
+        }
 
         // ─── CAMERA ───
         navigator.mediaDevices.getUserMedia({
@@ -611,7 +588,9 @@
         }).then(function(stream) {
             video.srcObject = stream;
             video.play();
-            initPose();
+            setTimeout(function() {
+                initPose();
+            }, 2000);
         }).catch(function(e) {
             document.getElementById('loading-msg').textContent = 'Camera error: ' + e.message;
         });
@@ -654,7 +633,7 @@
             if (!results.poseLandmarks) {
                 poseStatus.textContent = 'No pose detected';
                 poseStatus.classList.remove('detected');
-                overlay.style.display = 'none';
+                overlay.classList.remove('visible');
                 return;
             }
             var lm = results.poseLandmarks;
@@ -678,21 +657,19 @@
             else if (DEV.anchor === 'right') { px = rx + 90; py = ry; }
             else                             { px = (lx + rx) / 2; py = (ly + ry) / 2; }
 
+            px += DEV.xNudge;
             py += DEV.yNudge;
 
-            // Clamp so the full shark always stays within viewport
-            var clampedX = Math.min(Math.max(px - half, 0), W - DEV.size);
-            var clampedY = Math.min(Math.max(py - half, 0), H - DEV.size);
-
-            overlay.style.left    = clampedX + 'px';
-            overlay.style.top     = clampedY + 'px';
-            overlay.style.display = 'block';
+            // Allow model to move freely, no clamping
+            overlay.style.left    = (px - half) + 'px';
+            overlay.style.top     = (py - half) + 'px';
+            overlay.classList.add('visible');
             viewer.style.width    = DEV.size + 'px';
             viewer.style.height   = DEV.size + 'px';
 
-            poseStatus.textContent = '✓ Shoulders detected';
+            poseStatus.textContent = 'Shoulders detected';
             poseStatus.classList.add('detected');
-            lastPos = { px: clampedX + half, py: clampedY + half };
+            lastPos = { px: px, py: py };
         }
 
         // ─── DEV CONTROLS ───
@@ -711,6 +688,10 @@
         document.getElementById('y-nudge').addEventListener('input', function() {
             DEV.yNudge = parseInt(this.value);
             document.getElementById('y-nudge-val').textContent = DEV.yNudge;
+        });
+        document.getElementById('x-nudge').addEventListener('input', function() {
+            DEV.xNudge = parseInt(this.value);
+            document.getElementById('x-nudge-val').textContent = DEV.xNudge;
         });
 
         // ─── SNAP ───
@@ -783,7 +764,7 @@
                     navigator.share({ files: [new File([blob], 'sharks-way-selfie.png', { type: 'image/png' })] });
                 });
             } else {
-                navigator.clipboard.writeText('Check out my Sharks Way selfie! 🦈')
+                navigator.clipboard.writeText('Check out my Sharks Way selfie!')
                     .then(function() { alert('Caption copied!'); });
             }
         });
@@ -827,6 +808,74 @@
                 closeMenu();
             }
         });
+
+        // Map functionality
+        var map = null;
+        var userMarker = null;
+        var userLat = null;
+        var userLng = null;
+
+        function initializeMap() {
+            if (map) return;
+            
+            var mapContainer = document.getElementById('mini-map');
+            map = L.map(mapContainer, {
+                zoomControl: false,
+                attributionControl: true
+            }).setView([37.3352, -121.8811], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19
+            }).addTo(map);
+        }
+
+        function updateMap() {
+            if (!map || !userLat || !userLng) return;
+
+            map.setView([userLat, userLng], 16);
+
+            // Use shared marker system
+            var mapContainer = document.getElementById('map-container');
+            var isExpanded = mapContainer.classList.contains('expanded');
+            userMarker = updateMapMarkers(map, userLat, userLng, userMarker, isExpanded);
+        }
+
+        document.getElementById('toggle-map').addEventListener('click', function() {
+            var mapContainer = document.getElementById('map-container');
+            var isExpanded = mapContainer.classList.toggle('expanded');
+            this.textContent = isExpanded ? '−' : '+';
+            
+            setTimeout(function() {
+                if (map) {
+                    map.invalidateSize();
+                    updateMap();
+                }
+            }, 400);
+        });
+
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(
+                function(position) {
+                    userLat = position.coords.latitude;
+                    userLng = position.coords.longitude;
+                    
+                    if (!map) {
+                        initializeMap();
+                    }
+                    updateMap();
+                },
+                function(error) {
+                    console.error('Geolocation error:', error);
+                },
+                { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+            );
+        }
+
+        setTimeout(function() {
+            if (!map) {
+                initializeMap();
+            }
+        }, 1000);
     </script>
 
     <!-- GPS Tracking for Checkpoints -->
