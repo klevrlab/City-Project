@@ -648,9 +648,11 @@
         </div>
         <div class="stop-item" data-checkpoint="A" id="checkpoint-a">
             <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+            Loading...
         </div>
         <div class="stop-item" data-checkpoint="B" id="checkpoint-b">
             <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+            Loading...
         </div>
         <!-- <div class="gps-status" id="gps-status">GPS: Waiting...</div> -->
     </div>
@@ -1921,9 +1923,18 @@
         var userLng = null;
 
         function initializeMap() {
-            if (map) return;
+            if (map) {
+                console.log('[MAP] Map already initialized');
+                return;
+            }
             
+            console.log('[MAP] Initializing map...');
             var mapContainer = document.getElementById('mini-map');
+            if (!mapContainer) {
+                console.error('[MAP] Map container not found!');
+                return;
+            }
+            
             map = L.map(mapContainer, {
                 zoomControl: false,
                 attributionControl: true
@@ -1932,17 +1943,28 @@
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19
             }).addTo(map);
+            
+            console.log('[MAP] Map initialized successfully');
         }
 
         function updateMap() {
-            if (!map || !userLat || !userLng) return;
+            if (!map) {
+                console.log('[MAP] Map not initialized, cannot update');
+                return;
+            }
+            if (!userLat || !userLng) {
+                console.log('[MAP] No GPS position yet');
+                return;
+            }
 
+            console.log('[MAP] Updating map with position:', userLat, userLng);
             map.setView([userLat, userLng], 16);
 
             // Use shared marker system
             var mapContainer = document.getElementById('map-container');
             var isExpanded = mapContainer.classList.contains('expanded');
             userMarker = updateMapMarkers(map, userLat, userLng, userMarker, isExpanded);
+            console.log('[MAP] Map updated with markers');
         }
 
         document.getElementById('toggle-map').addEventListener('click', function() {
@@ -1959,21 +1981,26 @@
         });
 
         if (navigator.geolocation) {
+            console.log('[GPS] Starting geolocation watch...');
             navigator.geolocation.watchPosition(
                 function(position) {
                     userLat = position.coords.latitude;
                     userLng = position.coords.longitude;
+                    console.log('[GPS] Position updated:', userLat, userLng, 'accuracy:', position.coords.accuracy + 'm');
                     
                     if (!map) {
+                        console.log('[GPS] Map not initialized, initializing now...');
                         initializeMap();
                     }
                     updateMap();
                 },
                 function(error) {
-                    console.error('Geolocation error:', error);
+                    console.error('[GPS] Geolocation error:', error.code, error.message);
                 },
                 { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
             );
+        } else {
+            console.error('[GPS] Geolocation not supported by this browser');
         }
 
         setTimeout(function() {
