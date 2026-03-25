@@ -86,20 +86,11 @@
         window.addEventListener('beforeunload', stopGPSTracking);
     }
 
-    // Haversine formula to calculate distance between two coordinates
+    // Calculate distance based solely on longitude difference
     function calculateDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371e3; // Earth's radius in meters
-        const φ1 = lat1 * Math.PI / 180;
-        const φ2 = lat2 * Math.PI / 180;
-        const Δφ = (lat2 - lat1) * Math.PI / 180;
-        const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                  Math.cos(φ1) * Math.cos(φ2) *
-                  Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-        return R * c; // Distance in meters
+        // Simplified to use only longitude difference for consistency
+        // At San Jose latitude (~37.33°N), 1 degree of longitude is approx 88,000 meters.
+        return Math.abs(lon2 - lon1) * 88000;
     }
 
     // GPS logging
@@ -140,79 +131,36 @@
         console.log('[GPS] UI updated for', CHECKPOINTS.length, 'checkpoints');
     }
 
-    // Evaluate checkpoint status based on GPS position
+    // Evaluate checkpoint status based on simple longitude check
+    // "left of both check both, left of one check one, left of none check none"
     function evaluateCheckpoints(position) {
         const { latitude, longitude, accuracy } = position.coords;
         
         addGPSLog(`Position: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (±${accuracy.toFixed(1)}m)`);
         
-        // Calculate distances to all checkpoints
-        const distances = CHECKPOINTS.map((checkpoint, index) => ({
-            index,
-            checkpoint,
-            distance: calculateDistance(latitude, longitude, checkpoint.lat, checkpoint.lng)
-        }));
+        let checkedCount = 0;
         
-        // Find closest checkpoint
-        const closest = distances.reduce((min, curr) => 
-            curr.distance < min.distance ? curr : min
-        );
-        
-        addGPSLog(`Closest: ${closest.checkpoint.name} at ${closest.distance.toFixed(1)}m`);
-        
-        // Check if at any checkpoint
-        const atCheckpoint = distances.find(d => d.distance <= GPS_CONFIG.proximityThreshold);
-        
-        if (atCheckpoint) {
-            // At a checkpoint
-            const idx = atCheckpoint.index;
-            checkpointStates[idx].visited = true;
-            checkpointStates[idx].active = true;
-            
-            // Mark all previous checkpoints as visited
-            for (let i = 0; i < idx; i++) {
-                if (!checkpointStates[i].visited) {
-                    checkpointStates[i].visited = true;
-                    addGPSLog(`✓ ${CHECKPOINTS[i].name} marked as passed`, 'checkpoint');
+        // Check if user's longitude is "left of" (less than or equal to) the checkpoint's longitude
+        CHECKPOINTS.forEach((checkpoint, index) => {
+            if (longitude <= checkpoint.lng) {
+                if (!checkpointStates[index].visited) {
+                    addGPSLog(`✓ Passed ${checkpoint.name}`, 'checkpoint');
                 }
-                checkpointStates[i].active = false;
-            }
-            
-            // Mark all future checkpoints as not active
-            for (let i = idx + 1; i < CHECKPOINTS.length; i++) {
-                checkpointStates[i].active = false;
-            }
-            
-            addGPSLog(`✓ At ${atCheckpoint.checkpoint.name}`, 'checkpoint');
-        } else {
-            // Not at any checkpoint - determine position in sequence
-            const closestIdx = closest.index;
-            
-            // If we're closer to a later checkpoint than the first unvisited one,
-            // mark earlier ones as visited
-            let firstUnvisited = checkpointStates.findIndex(s => !s.visited);
-            if (firstUnvisited === -1) firstUnvisited = CHECKPOINTS.length - 1;
-            
-            if (closestIdx > firstUnvisited) {
-                // We've passed some checkpoints
-                for (let i = 0; i < closestIdx; i++) {
-                    if (!checkpointStates[i].visited) {
-                        checkpointStates[i].visited = true;
-                        addGPSLog(`✓ ${CHECKPOINTS[i].name} marked as passed`, 'checkpoint');
-                    }
-                    checkpointStates[i].active = false;
-                }
-                checkpointStates[closestIdx].active = true;
-                checkpointStates[closestIdx].visited = false;
+                checkpointStates[index].visited = true;
+                checkedCount++;
             } else {
-                // Set the closest unvisited checkpoint as active
-                checkpointStates.forEach((state, idx) => {
-                    state.active = (idx === firstUnvisited);
-                });
+                checkpointStates[index].visited = false;
             }
-            
-            addGPSLog(`→ Approaching ${CHECKPOINTS[firstUnvisited].name}`);
-        }
+        });
+        
+        // Set active state for UI (next target is active, or last target if all visited)
+        checkpointStates.forEach((state, index) => {
+            if (state.visited) {
+                state.active = (index === CHECKPOINTS.length - 1 || !checkpointStates[index + 1].visited);
+            } else {
+                state.active = (index === 0 || checkpointStates[index - 1].visited);
+            }
+        });
         
         // Update UI
         updateCheckpointUI();
@@ -220,7 +168,7 @@
         // Update GPS status if element exists
         const gpsStatus = document.getElementById('gps-status');
         if (gpsStatus) {
-            gpsStatus.textContent = `GPS: ${closest.distance.toFixed(0)}m to ${closest.checkpoint.name}`;
+            gpsStatus.textContent = `GPS: Longitude ${longitude.toFixed(5)} (${checkedCount}/${CHECKPOINTS.length} checked)`;
         }
     }
 

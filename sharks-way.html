@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -20,7 +21,12 @@
     <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
     <script src="https://unpkg.com/three@0.126.0/examples/js/loaders/GLTFLoader.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #000;
@@ -43,7 +49,10 @@
             object-fit: cover;
             z-index: 0;
         }
-        #debug-canvas { display: none; }
+
+        #debug-canvas {
+            display: none;
+        }
 
         /* Loading overlay */
         #loading {
@@ -57,19 +66,46 @@
             z-index: 200;
             transition: opacity 0.5s ease;
         }
-        #loading.hidden { opacity: 0; pointer-events: none; }
+
+        #loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
         .spinner {
-            width: 40px; height: 40px;
+            width: 40px;
+            height: 40px;
             border: 3px solid rgba(0, 169, 224, 0.2);
             border-top-color: #00A9E0;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
             margin-bottom: 16px;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        #loading h2 { font-size: 18px; margin-bottom: 8px; }
-        #loading p { font-size: 13px; color: rgba(255,255,255,0.7); text-align: center; max-width: 280px; line-height: 1.5; }
-        #loading-status { margin-top: 12px; font-size: 12px; color: #00A9E0; }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #loading h2 {
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+
+        #loading p {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+            text-align: center;
+            max-width: 280px;
+            line-height: 1.5;
+        }
+
+        #loading-status {
+            margin-top: 12px;
+            font-size: 12px;
+            color: #00A9E0;
+        }
 
         /* Info panel (bottom-right) — from marker-demo */
         #info-panel {
@@ -87,8 +123,9 @@
             height: auto;
             border: 1px solid rgba(0, 169, 224, 0.3);
             box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
+
         #info-panel h2 {
             margin: 0 0 8px 0;
             font-size: 14px;
@@ -97,12 +134,14 @@
             letter-spacing: 0.3px;
             line-height: 1.3;
         }
+
         #info-panel p {
             margin: 6px 0;
             font-size: 12px;
             line-height: 1.4;
             color: rgba(255, 255, 255, 0.85);
         }
+
         #info-panel .status-text {
             font-size: 10px;
             opacity: 0.7;
@@ -128,28 +167,33 @@
             max-width: 280px;
             border: 1px solid rgba(0, 169, 224, 0.3);
             box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
             transition: left 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
+
         #event-info.visible {
             left: 20px;
         }
+
         #event-info h3 {
             margin: 0 0 10px 0;
             font-size: 16px;
             font-weight: 700;
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
+
         #event-info .event-details {
             font-size: 13px;
             line-height: 1.6;
         }
+
         #event-info .event-details p {
             margin: 6px 0;
             display: flex;
             align-items: center;
             gap: 6px;
         }
+
         .icon {
             width: 16px;
             height: 16px;
@@ -159,6 +203,7 @@
             stroke-width: 2;
             fill: none;
         }
+
         .cta-button {
             background: rgba(0, 169, 224, 0.3);
             backdrop-filter: blur(10px);
@@ -172,14 +217,16 @@
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 4px 12px rgba(0, 169, 224, 0.3),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
             display: block;
             width: 100%;
         }
+
         .cta-button:active {
             transform: scale(0.95);
             background: rgba(0, 169, 224, 0.5);
         }
+
         #event-icon {
             width: 45px;
             height: 45px;
@@ -211,11 +258,13 @@
             opacity: 0;
             pointer-events: none;
         }
+
         #model-overlay.visible {
             transform: translateX(-50%) scale(1);
             opacity: 1;
             pointer-events: auto;
         }
+
         model-viewer {
             width: 100%;
             height: 100%;
@@ -232,9 +281,19 @@
             animation: glowPulse 3s ease-in-out infinite;
             z-index: -1;
         }
+
         @keyframes glowPulse {
-            0%, 100% { transform: scale(1); opacity: 0.6; }
-            50% { transform: scale(1.1); opacity: 1; }
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 0.6;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 1;
+            }
         }
 
         /* Shark name label under model */
@@ -257,17 +316,27 @@
             text-align: center;
             box-shadow: 0 8px 32px rgba(0, 169, 224, 0.2);
         }
+
         #shark-label.visible {
             opacity: 1;
             transform: translateX(-50%) translateY(0);
         }
-        #shark-label .label-name { color: #00A9E0; }
-        #shark-label .label-score { font-size: 11px; color: rgba(255,255,255,0.6); margin-left: 8px; }
+
+        #shark-label .label-name {
+            color: #00A9E0;
+        }
+
+        #shark-label .label-score {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-left: 8px;
+        }
 
         /* Scanning animation */
         #scan-line {
             position: fixed;
-            left: 10%; right: 10%;
+            left: 10%;
+            right: 10%;
             height: 2px;
             background: linear-gradient(90deg, transparent, #00A9E0, transparent);
             box-shadow: 0 0 12px #00A9E0;
@@ -275,45 +344,95 @@
             z-index: 5;
             animation: scanMove 2.5s ease-in-out infinite;
         }
-        #scan-line.active { opacity: 0.6; }
+
+        #scan-line.active {
+            opacity: 0.6;
+        }
+
         @keyframes scanMove {
-            0% { top: 15%; }
-            50% { top: 85%; }
-            100% { top: 15%; }
+            0% {
+                top: 15%;
+            }
+
+            50% {
+                top: 85%;
+            }
+
+            100% {
+                top: 15%;
+            }
         }
 
         /* Corner brackets */
         .corner {
             position: fixed;
-            width: 30px; height: 30px;
+            width: 30px;
+            height: 30px;
             border-color: rgba(0, 169, 224, 0.5);
             border-style: solid;
             border-width: 0;
             z-index: 5;
         }
-        .corner.tl { top: 12%; left: 10%; border-top-width: 2px; border-left-width: 2px; border-radius: 4px 0 0 0; }
-        .corner.tr { top: 12%; right: 10%; border-top-width: 2px; border-right-width: 2px; border-radius: 0 4px 0 0; }
-        .corner.bl { bottom: 12%; left: 10%; border-bottom-width: 2px; border-left-width: 2px; border-radius: 0 0 0 4px; }
-        .corner.br { bottom: 12%; right: 10%; border-bottom-width: 2px; border-right-width: 2px; border-radius: 0 0 4px 0; }
+
+        .corner.tl {
+            top: 12%;
+            left: 10%;
+            border-top-width: 2px;
+            border-left-width: 2px;
+            border-radius: 4px 0 0 0;
+        }
+
+        .corner.tr {
+            top: 12%;
+            right: 10%;
+            border-top-width: 2px;
+            border-right-width: 2px;
+            border-radius: 0 4px 0 0;
+        }
+
+        .corner.bl {
+            bottom: 12%;
+            left: 10%;
+            border-bottom-width: 2px;
+            border-left-width: 2px;
+            border-radius: 0 0 0 4px;
+        }
+
+        .corner.br {
+            bottom: 12%;
+            right: 10%;
+            border-bottom-width: 2px;
+            border-right-width: 2px;
+            border-radius: 0 0 4px 0;
+        }
 
         /* Top bar */
         #topbar {
             position: fixed;
-            top: 0; left: 0; right: 0;
+            top: 0;
+            left: 0;
+            right: 0;
             padding: 12px 14px;
-            background: linear-gradient(to bottom, rgba(0,22,26,0.7) 0%, transparent 100%);
+            background: linear-gradient(to bottom, rgba(0, 22, 26, 0.7) 0%, transparent 100%);
             display: flex;
             align-items: center;
             gap: 10px;
             z-index: 100;
         }
-        #topbar h1 { font-size: 14px; font-weight: 700; flex: 1; }
+
+        #topbar h1 {
+            font-size: 14px;
+            font-weight: 700;
+            flex: 1;
+        }
+
         #topbar .back {
             color: #00A9E0;
             text-decoration: none;
             font-size: 13px;
             font-weight: 600;
         }
+
         #hamburger-btn {
             background: rgba(0, 169, 224, 0.25);
             border: 1px solid rgba(0, 169, 224, 0.4);
@@ -332,10 +451,12 @@
             z-index: 101;
             -webkit-tap-highlight-color: transparent;
         }
+
         #hamburger-btn:active {
             transform: scale(0.95);
             background: rgba(0, 169, 224, 0.4);
         }
+
         #hamburger-btn svg {
             width: 20px;
             height: 20px;
@@ -343,6 +464,7 @@
             stroke-width: 2;
             fill: none;
         }
+
         #topbar .top-btn {
             background: rgba(0, 169, 224, 0.25);
             border: 1px solid rgba(0, 169, 224, 0.4);
@@ -353,14 +475,17 @@
             font-weight: 600;
             cursor: pointer;
         }
+
         #topbar .top-btn:disabled {
             opacity: 0.45;
             cursor: default;
         }
+
         #topbar .top-btn.top-btn--warn {
             border-color: rgba(255, 177, 0, 0.6);
             background: rgba(255, 177, 0, 0.18);
         }
+
         #trained-badge {
             margin-left: auto;
             background: rgba(0, 169, 224, 0.25);
@@ -372,8 +497,17 @@
         }
 
         @keyframes pulse {
-            0%, 100% { transform: translateX(-50%) scale(1); opacity: 1; }
-            50% { transform: translateX(-50%) scale(1.05); opacity: 0.9; }
+
+            0%,
+            100% {
+                transform: translateX(-50%) scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: translateX(-50%) scale(1.05);
+                opacity: 0.9;
+            }
         }
 
         /* Navigation Menu */
@@ -392,9 +526,11 @@
             padding: 60px 20px 20px;
             overflow-y: auto;
         }
+
         #nav-menu.open {
             right: 0;
         }
+
         #nav-menu .close-btn {
             position: absolute;
             top: 12px;
@@ -414,12 +550,14 @@
             -webkit-tap-highlight-color: transparent;
             padding: 0;
         }
+
         #nav-menu h2 {
             color: #00A9E0;
             font-size: 18px;
             margin-bottom: 20px;
             font-weight: 700;
         }
+
         #nav-menu .nav-link {
             display: flex;
             align-items: center;
@@ -435,12 +573,14 @@
             font-weight: 600;
             transition: all 0.3s ease;
         }
+
         #nav-menu .nav-link:hover,
         #nav-menu .nav-link:active {
             background: rgba(0, 169, 224, 0.25);
             border-color: rgba(0, 169, 224, 0.4);
             transform: translateX(-4px);
         }
+
         #nav-menu .nav-link svg {
             width: 20px;
             height: 20px;
@@ -448,6 +588,7 @@
             stroke-width: 2;
             fill: none;
         }
+
         #nav-overlay {
             position: fixed;
             inset: 0;
@@ -457,6 +598,7 @@
             pointer-events: none;
             transition: opacity 0.3s ease;
         }
+
         #nav-overlay.visible {
             opacity: 1;
             pointer-events: auto;
@@ -470,27 +612,47 @@
                 height: auto;
                 padding: 14px 12px;
             }
-            #info-panel h2 { font-size: 13px; }
-            #info-panel p { font-size: 11px; }
+
+            #info-panel h2 {
+                font-size: 13px;
+            }
+
+            #info-panel p {
+                font-size: 11px;
+            }
+
             #event-info {
                 max-width: 90%;
                 padding: 14px 16px;
             }
-            #event-info.visible { left: 10px; }
-            #event-info h3 { font-size: 15px; }
-            #event-info .event-details { font-size: 12px; }
+
+            #event-info.visible {
+                left: 10px;
+            }
+
+            #event-info h3 {
+                font-size: 15px;
+            }
+
+            #event-info .event-details {
+                font-size: 12px;
+            }
+
             #model-overlay {
                 width: 340px;
                 height: 340px;
             }
+
             .cta-button {
                 padding: 10px 16px;
                 font-size: 13px;
             }
+
             #topbar .top-btn {
                 padding: 5px 8px;
                 font-size: 10px;
             }
+
             #nav-menu {
                 width: 85%;
                 max-width: 320px;
@@ -506,24 +668,36 @@
             pointer-events: none;
             transition: opacity 0.4s ease;
         }
+
         #shark-plane-overlay.visible {
             opacity: 1;
             pointer-events: auto;
         }
+
         #shark-plane-overlay a-scene {
             position: absolute;
             width: 100%;
             height: 100%;
         }
+
         #shark-plane-overlay canvas {
             background: transparent !important;
         }
-/* 
+
+        /* 
         /* ── Sharks Way: map FAB icon (page-scoped) ── */
         @keyframes map-fab-pulse {
-            0%,100% { box-shadow: 0 4px 18px rgba(0,109,117,0.55), 0 0 0 0 rgba(0,169,224,0.4); }
-            60%      { box-shadow: 0 4px 18px rgba(0,109,117,0.55), 0 0 0 8px rgba(0,169,224,0); }
+
+            0%,
+            100% {
+                box-shadow: 0 4px 18px rgba(0, 109, 117, 0.55), 0 0 0 0 rgba(0, 169, 224, 0.4);
+            }
+
+            60% {
+                box-shadow: 0 4px 18px rgba(0, 109, 117, 0.55), 0 0 0 8px rgba(0, 169, 224, 0);
+            }
         }
+
         #map-container {
             width: 50px;
             height: 50px;
@@ -532,27 +706,29 @@
             backdrop-filter: blur(20px) saturate(200%);
             -webkit-backdrop-filter: blur(20px) saturate(200%);
             border: 1.5px solid rgba(0, 169, 224, 0.45);
-            box-shadow: 0 4px 18px rgba(0,109,117,0.55),
-                        0 0 0 0 rgba(0,169,224,0.4);
+            box-shadow: 0 4px 18px rgba(0, 109, 117, 0.55),
+                0 0 0 0 rgba(0, 169, 224, 0.4);
             overflow: visible;
             animation: map-fab-pulse 3s ease-in-out infinite;
-            transition: width  0.45s cubic-bezier(0.4,0,0.2,1),
-                        height 0.45s cubic-bezier(0.4,0,0.2,1),
-                        border-radius 0.45s cubic-bezier(0.4,0,0.2,1),
-                        box-shadow 0.3s ease,
-                        animation 0s;
+            transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                height 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                border-radius 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.3s ease,
+                animation 0s;
             right: 14px;
             bottom: 22px;
         }
+
         #map-container.expanded {
             width: min(300px, calc(100vw - 28px));
             height: min(300px, 45vh);
             border-radius: 16px;
             overflow: hidden;
             animation: none;
-            box-shadow: 0 8px 40px rgba(0,109,117,0.5),
-                        inset 0 1px 0 rgba(255,255,255,0.06);
+            box-shadow: 0 8px 40px rgba(0, 109, 117, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.06);
         }
+
         /* map tile */
         #mini-map {
             opacity: 0;
@@ -562,7 +738,12 @@
             inset: 0;
             border-radius: inherit;
         }
-        #map-container.expanded #mini-map { opacity:1; pointer-events:auto; }
+
+        #map-container.expanded #mini-map {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
         /* FAB button */
         #toggle-map {
             position: absolute;
@@ -581,9 +762,13 @@
             font-weight: unset;
             border-radius: 50%;
             -webkit-tap-highlight-color: transparent;
-            transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1);
+            transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        #toggle-map:active { transform: scale(0.85); }
+
+        #toggle-map:active {
+            transform: scale(0.85);
+        }
+
         /* map SVG icon */
         .map-fab-icon {
             width: 26px;
@@ -591,38 +776,71 @@
             display: block;
             flex-shrink: 0;
         }
+
         /* close icon */
         .map-icon-close {
             display: none;
             width: 15px;
             height: 15px;
-            color: rgba(255,255,255,0.9);
+            color: rgba(255, 255, 255, 0.9);
         }
-        .map-icon-close svg { width:15px; height:15px; }
-        #map-container.expanded .map-fab-icon  { display: none; }
-        #map-container.expanded .map-icon-close { display:flex; align-items:center; justify-content:center; }
+
+        .map-icon-close svg {
+            width: 15px;
+            height: 15px;
+        }
+
+        #map-container.expanded .map-fab-icon {
+            display: none;
+        }
+
+        #map-container.expanded .map-icon-close {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         #map-container.expanded #toggle-map {
             inset: auto;
-            top: 7px; right: 7px;
-            width: 27px; height: 27px;
-            background: rgba(0,18,24,0.78);
-            border: 1px solid rgba(0,169,224,0.35);
+            top: 7px;
+            right: 7px;
+            width: 27px;
+            height: 27px;
+            background: rgba(0, 18, 24, 0.78);
+            border: 1px solid rgba(0, 169, 224, 0.35);
             border-radius: 50%;
             backdrop-filter: blur(8px);
         }
+
         /* responsive */
         @media (max-width: 480px) {
-            #map-container { width: 46px; height: 46px; right: 10px; bottom: 16px; }
-            #toggle-map    { width: 46px; height: 46px; }
-            .map-fab-icon  { width: 24px; height: 24px; }
+            #map-container {
+                width: 46px;
+                height: 46px;
+                right: 10px;
+                bottom: 16px;
+            }
+
+            #toggle-map {
+                width: 46px;
+                height: 46px;
+            }
+
+            .map-fab-icon {
+                width: 24px;
+                height: 24px;
+            }
+
             #map-container.expanded {
                 width: min(260px, calc(100vw - 20px));
                 height: min(260px, 40vh);
             }
-        } */
+        }
 
+        */
     </style>
 </head>
+
 <body>
     <!-- Camera feed -->
     <video id="video" autoplay playsinline muted></video>
@@ -642,9 +860,9 @@
         <h1>Sharks Way</h1>
         <button id="hamburger-btn">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <line x1="3" y1="6" x2="21" y2="6"/>
-                <line x1="3" y1="12" x2="21" y2="12"/>
-                <line x1="3" y1="18" x2="21" y2="18"/>
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
         </button>
     </div>
@@ -656,37 +874,37 @@
         <h2>Navigation</h2>
         <a href="./sharks-way.html" class="nav-link">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                <circle cx="12" cy="10" r="3"/>
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
             </svg>
             Sharks Way
         </a>
         <a href="./location-tour.html" class="nav-link">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <circle cx="12" cy="10" r="3"/>
-                <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"/>
+                <circle cx="12" cy="10" r="3" />
+                <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z" />
             </svg>
             Location Tour
         </a>
         <a href="./marker-demo.html" class="nav-link">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                <line x1="8" y1="21" x2="16" y2="21"/>
-                <line x1="12" y1="17" x2="12" y2="21"/>
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
             </svg>
             Marker
         </a>
         <a href="./selfie-ar.html" class="nav-link">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                <circle cx="12" cy="13" r="4"/>
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
             </svg>
             Selfie with Sammy
         </a>
         <a href="./selfie-ar.html?character=sharkey" class="nav-link">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                <circle cx="12" cy="13" r="4"/>
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
             </svg>
             Selfie with Sharkie
         </a>
@@ -695,21 +913,10 @@
     <!-- 3D Plushie overlay -->
     <div id="model-overlay">
         <div id="model-glow"></div>
-        <model-viewer
-            id="shark-model-viewer"
-            src="./assets/shark.glb"
-            auto-rotate
-            rotation-per-second="30deg"
-            camera-orbit="0deg 75deg 4m"
-            field-of-view="30deg"
-            min-field-of-view="20deg"
-            max-field-of-view="45deg"
-            disable-zoom
-            interaction-prompt="none"
-            environment-image="neutral"
-            shadow-intensity="0.5"
-            style="background: transparent; overflow: visible;"
-        ></model-viewer>
+        <model-viewer id="shark-model-viewer" src="./assets/shark.glb" auto-rotate rotation-per-second="30deg"
+            camera-orbit="0deg 75deg 4m" field-of-view="30deg" min-field-of-view="20deg" max-field-of-view="45deg"
+            disable-zoom interaction-prompt="none" environment-image="neutral" shadow-intensity="0.5"
+            style="background: transparent; overflow: visible;"></model-viewer>
     </div>
 
     <!-- Shark label -->
@@ -731,12 +938,17 @@
             <p id="event-date"></p>
             <p id="event-location"></p>
         </div>
-        <div id="sharkey-message" style="font-size: 12px; margin-top: 8px; color: rgba(255,255,255,0.8); line-height: 1.5;"></div>
+        <div id="sharkey-message"
+            style="font-size: 12px; margin-top: 8px; color: rgba(255,255,255,0.8); line-height: 1.5;"></div>
         <button class="cta-button" id="learn-more">
-            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><path d="M17 2 12 7 7 2"/></svg>
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
+                <path d="M17 2 12 7 7 2" />
+            </svg>
             Learn More
         </button>
-        <button class="cta-button" id="dismiss-event" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); margin-top: 6px;">
+        <button class="cta-button" id="dismiss-event"
+            style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); margin-top: 6px;">
             Dismiss
         </button>
     </div>
@@ -744,15 +956,23 @@
     <!-- Progress tracker -->
     <div id="progress-tracker">
         <div style="font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none;"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
-            Checkpoints
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none;">
+                <!-- <circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> -->
+                Checkpoints
         </div>
         <div class="stop-item" data-checkpoint="A" id="checkpoint-a">
-            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="m9 12 2 2 4-4"></path>
+            </svg>
             Loading...
         </div>
         <div class="stop-item" data-checkpoint="B" id="checkpoint-b">
-            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="m9 12 2 2 4-4"></path>
+            </svg>
             Loading...
         </div>
         <!-- <div class="gps-status" id="gps-status">GPS: Waiting...</div> -->
@@ -767,23 +987,30 @@
             -->
             <svg class="map-fab-icon" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <!-- map sheet left fold -->
-                <polygon points="2,5 9,3 9,21 2,23" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)" stroke-width="1.2" stroke-linejoin="round"/>
+                <polygon points="2,5 9,3 9,21 2,23" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)"
+                    stroke-width="1.2" stroke-linejoin="round" />
                 <!-- map sheet middle -->
-                <polygon points="9,3 17,5 17,23 9,21" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.55)" stroke-width="1.2" stroke-linejoin="round"/>
+                <polygon points="9,3 17,5 17,23 9,21" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.55)"
+                    stroke-width="1.2" stroke-linejoin="round" />
                 <!-- map sheet right fold -->
-                <polygon points="17,5 24,3 24,21 17,23" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)" stroke-width="1.2" stroke-linejoin="round"/>
+                <polygon points="17,5 24,3 24,21 17,23" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)"
+                    stroke-width="1.2" stroke-linejoin="round" />
                 <!-- route line on map -->
-                <path d="M5 14 Q7 10 9 12 Q11 14 13 10" stroke="#00A9E0" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <path d="M5 14 Q7 10 9 12 Q11 14 13 10" stroke="#00A9E0" stroke-width="1.3" stroke-linecap="round"
+                    stroke-linejoin="round" fill="none" />
                 <!-- pin body -->
-                <path d="M19 4.5 C17.07 4.5 15.5 6.07 15.5 8 C15.5 10.5 19 14.5 19 14.5 C19 14.5 22.5 10.5 22.5 8 C22.5 6.07 20.93 4.5 19 4.5Z" fill="#00A9E0" stroke="rgba(0,18,24,0.4)" stroke-width="0.8"/>
+                <path
+                    d="M19 4.5 C17.07 4.5 15.5 6.07 15.5 8 C15.5 10.5 19 14.5 19 14.5 C19 14.5 22.5 10.5 22.5 8 C22.5 6.07 20.93 4.5 19 4.5Z"
+                    fill="#00A9E0" stroke="rgba(0,18,24,0.4)" stroke-width="0.8" />
                 <!-- pin inner dot -->
-                <circle cx="19" cy="8" r="1.6" fill="rgba(0,18,24,0.55)"/>
+                <circle cx="19" cy="8" r="1.6" fill="rgba(0,18,24,0.55)" />
             </svg>
             <!-- Close icon (shown when expanded) -->
             <span class="map-icon-close">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
             </span>
         </button>
@@ -793,18 +1020,22 @@
     <!-- Shark animation + video plane (fallback mode) -->
     <div id="shark-plane-overlay">
         <a-scene id="mural-shark-scene" embedded vr-mode-ui="enabled: false"
-            renderer="alpha: true; antialias: true; colorManagement: true;"
-            shadow="type: pcfsoft">
+            renderer="alpha: true; antialias: true; colorManagement: true;" shadow="type: pcfsoft">
             <a-assets>
-                <video id="videoTexture" src="./assets/video.mp4" autoplay loop muted playsinline crossorigin="anonymous" preload="auto"></video>
+                <video id="videoTexture" src="./assets/video.mp4" autoplay loop muted playsinline
+                    crossorigin="anonymous" preload="auto"></video>
                 <a-asset-item id="sharkModel1" src="./assets/3D-models/STELLA_CAI_SHARK_SJSU_TEST1.glb"></a-asset-item>
                 <a-asset-item id="sharkModel2" src="./assets/3D-models/SHAUN_SHARK_ANIMATED.glb"></a-asset-item>
             </a-assets>
             <a-entity id="mural-shark-root" mural-shark-content></a-entity>
             <a-entity camera="fov: 55; zoom: 1.0" position="0 1.35 3.1" look-controls="enabled: false"></a-entity>
             <a-entity light="type: ambient; intensity: 0.9; color: #ffffff"></a-entity>
-            <a-entity light="type: directional; intensity: 1.1; color: #ffffff; castShadow: true; shadowMapWidth: 1024; shadowMapHeight: 1024; shadowCameraLeft: -12; shadowCameraRight: 12; shadowCameraTop: 12; shadowCameraBottom: -12; shadowCameraNear: 0.5; shadowCameraFar: 30; shadowBias: -0.0001" position="2 4 2"></a-entity>
-            <a-plane id="shadow-ground" position="0 -2 0" rotation="-90 0 0" width="24" height="24" material="color: #1a1a1a; transparent: true; opacity: 0.5; depthWrite: false" shadow="cast: false; receive: true"></a-plane>
+            <a-entity
+                light="type: directional; intensity: 1.1; color: #ffffff; castShadow: true; shadowMapWidth: 1024; shadowMapHeight: 1024; shadowCameraLeft: -12; shadowCameraRight: 12; shadowCameraTop: 12; shadowCameraBottom: -12; shadowCameraNear: 0.5; shadowCameraFar: 30; shadowBias: -0.0001"
+                position="2 4 2"></a-entity>
+            <a-plane id="shadow-ground" position="0 -2 0" rotation="-90 0 0" width="24" height="24"
+                material="color: #1a1a1a; transparent: true; opacity: 0.5; depthWrite: false"
+                shadow="cast: false; receive: true"></a-plane>
         </a-scene>
     </div>
 
@@ -879,7 +1110,7 @@
                             const maxStart = Math.max(duration - 4, 0.1);
                             videoEl.currentTime = Math.random() * maxStart;
                         }
-                        videoEl.play().catch(function () {});
+                        videoEl.play().catch(function () { });
                     }
                     this.el.setAttribute('scale', '0.001 0.001 0.001');
                     this.el.setAttribute('animation__factIn', {
@@ -1419,28 +1650,19 @@
             return decimal;
         }
 
-        // Calculate distance between two coordinates (Haversine formula)
+        // Calculate distance based solely on longitude difference
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; // Earth radius in meters
-            const φ1 = lat1 * Math.PI / 180;
-            const φ2 = lat2 * Math.PI / 180;
-            const Δφ = (lat2 - lat1) * Math.PI / 180;
-            const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                    Math.cos(φ1) * Math.cos(φ2) *
-                    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-            return R * c; // Distance in meters
+            // Simplified to use only longitude difference for consistency
+            // At San Jose latitude (~37.33°N), 1 degree of longitude is approx 88,000 meters.
+            return Math.abs(lon2 - lon1) * 88000;
         }
 
         // Add log entry to console
         function addGPSLog(message, type = 'info') {
             const timestamp = new Date().toLocaleTimeString();
             const logMessage = `[GPS ${timestamp}] ${message}`;
-            
-            switch(type) {
+
+            switch (type) {
                 case 'checkpoint':
                     console.log('%c' + logMessage, 'color: #00FF88; font-weight: bold');
                     break;
@@ -1457,16 +1679,16 @@
         function updateCheckpointUI() {
             const checkpointAEl = document.getElementById('checkpoint-a');
             const checkpointBEl = document.getElementById('checkpoint-b');
-            
+
             console.log('[GPS] Updating UI - A visited:', STATE.checkpointA.visited, 'active:', STATE.checkpointA.active, '| B visited:', STATE.checkpointB.visited, 'active:', STATE.checkpointB.active);
-            
+
             // Update Checkpoint A
             checkpointAEl.classList.remove('visited', 'active');
             const svgA = checkpointAEl.querySelector('.check-icon');
             if (svgA) {
                 const circleA = svgA.querySelector('circle');
                 const pathA = svgA.querySelector('path');
-                
+
                 if (STATE.checkpointA.visited) {
                     checkpointAEl.classList.add('visited');
                     console.log('[GPS] Checkpoint A marked with checkmark');
@@ -1475,14 +1697,14 @@
             if (STATE.checkpointA.active) {
                 checkpointAEl.classList.add('active');
             }
-            
+
             // Update Checkpoint B
             checkpointBEl.classList.remove('visited', 'active');
             const svgB = checkpointBEl.querySelector('.check-icon');
             if (svgB) {
                 const circleB = svgB.querySelector('circle');
                 const pathB = svgB.querySelector('path');
-                
+
                 if (STATE.checkpointB.visited) {
                     checkpointBEl.classList.add('visited');
                     console.log('[GPS] Checkpoint B marked with checkmark');
@@ -1493,108 +1715,58 @@
             }
         }
 
-        // Determine checkpoint status based on position
+        // Determine checkpoint status based on simple longitude check
+        // "left of both check both, left of one check one, left of none check none"
         function evaluateCheckpoints(position) {
             const { latitude, longitude, accuracy } = position.coords;
-            
+
             addGPSLog(`Position: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (±${accuracy.toFixed(1)}m)`);
-            
-            // Calculate distances to both checkpoints
-            const distToA = calculateDistance(latitude, longitude, CHECKPOINTS.A.lat, CHECKPOINTS.A.lng);
-            const distToB = calculateDistance(latitude, longitude, CHECKPOINTS.B.lat, CHECKPOINTS.B.lng);
-            
-            addGPSLog(`Distance to A: ${distToA.toFixed(1)}m, to B: ${distToB.toFixed(1)}m`);
-            
-            // Determine if we're at either checkpoint
-            const atA = distToA <= GPS_CONFIG.proximityThreshold;
-            const atB = distToB <= GPS_CONFIG.proximityThreshold;
-            
-            // Calculate which checkpoint is closer to determine order
-            const closerToA = distToA < distToB;
-            
-            // Determine position relative to checkpoints
+
+            let checkedCount = 0;
             let status = '';
-            
-            if (atA && atB) {
-                // At both (unlikely unless they're very close)
-                status = 'At both checkpoints';
+
+            // Check if user's longitude is "left of" (less than or equal to) the checkpoint's longitude
+            if (longitude <= CHECKPOINTS.A.lng) {
+                if (!STATE.checkpointA.visited) {
+                    addGPSLog(`✓ Passed Checkpoint A`, 'checkpoint');
+                }
                 STATE.checkpointA.visited = true;
-                STATE.checkpointA.active = true;
+                checkedCount++;
+            } else {
+                STATE.checkpointA.visited = false;
+            }
+
+            if (longitude <= CHECKPOINTS.B.lng) {
+                if (!STATE.checkpointB.visited) {
+                    addGPSLog(`✓ Passed Checkpoint B`, 'checkpoint');
+                }
                 STATE.checkpointB.visited = true;
+                checkedCount++;
+            } else {
+                STATE.checkpointB.visited = false;
+            }
+
+            // Set active state for UI and descriptive status
+            if (STATE.checkpointA.visited && STATE.checkpointB.visited) {
+                STATE.checkpointA.active = false;
                 STATE.checkpointB.active = true;
-                addGPSLog('✓ At both checkpoints!', 'checkpoint');
-            } else if (atA) {
-                // At checkpoint A
-                status = 'At Checkpoint A';
-                STATE.checkpointA.visited = true;
+                status = 'Left of both (checked both)';
+            } else if (STATE.checkpointA.visited) {
+                STATE.checkpointA.active = false;
+                STATE.checkpointB.active = true;
+                status = 'Left of one (checked A)';
+            } else {
                 STATE.checkpointA.active = true;
                 STATE.checkpointB.active = false;
-                addGPSLog('✓ At Checkpoint A', 'checkpoint');
-            } else if (atB) {
-                // At checkpoint B
-                status = 'At Checkpoint B';
-                STATE.checkpointB.visited = true;
-                STATE.checkpointB.active = true;
-                
-                // If we're at B, we must have passed A (mark it visited)
-                if (!STATE.checkpointA.visited) {
-                    STATE.checkpointA.visited = true;
-                    addGPSLog('✓ Checkpoint A marked as passed', 'checkpoint');
-                }
-                STATE.checkpointA.active = false;
-                addGPSLog('✓ At Checkpoint B', 'checkpoint');
-            } else {
-                // Not at either checkpoint - determine if between them
-                const totalDist = calculateDistance(CHECKPOINTS.A.lat, CHECKPOINTS.A.lng, CHECKPOINTS.B.lat, CHECKPOINTS.B.lng);
-                const sumDist = distToA + distToB;
-                const tolerance = totalDist * 0.3; // 30% tolerance for "between"
-                
-                const isBetween = Math.abs(sumDist - totalDist) <= tolerance;
-                
-                if (isBetween) {
-                    // Between checkpoints
-                    status = 'Between A and B';
-                    
-                    // If between and closer to A, A is active (approaching A)
-                    // If between and closer to B, A is done and B is active (crossed A, approaching B)
-                    if (closerToA) {
-                        STATE.checkpointA.active = true;
-                        STATE.checkpointA.visited = false; // Haven't crossed it yet
-                        STATE.checkpointB.active = false;
-                        STATE.checkpointB.visited = false;
-                        addGPSLog('→ Between checkpoints (closer to A, A is active)');
-                    } else {
-                        // Closer to B means we've crossed A
-                        STATE.checkpointA.visited = true; // Mark A as done
-                        STATE.checkpointA.active = false;
-                        STATE.checkpointB.active = true;
-                        STATE.checkpointB.visited = false; // Not yet at B
-                        addGPSLog('→ Between checkpoints (closer to B, A marked done, B is active)');
-                    }
-                } else {
-                    // Away from both
-                    if (closerToA) {
-                        status = 'Before Checkpoint A';
-                        STATE.checkpointA.active = false;
-                        STATE.checkpointB.active = false;
-                        addGPSLog('← Away from checkpoints (before A)');
-                    } else {
-                        status = 'After Checkpoint B';
-                        STATE.checkpointA.visited = true;
-                        STATE.checkpointB.visited = true;
-                        STATE.checkpointA.active = false;
-                        STATE.checkpointB.active = false;
-                        addGPSLog('→ Away from checkpoints (after B, both marked visited)', 'checkpoint');
-                    }
-                }
+                status = 'Right of both (none checked)';
             }
-            
+
             // Update GPS status display
             const gpsStatus = document.getElementById('gps-status');
             if (gpsStatus) {
-                gpsStatus.textContent = `GPS: ${status}`;
+                gpsStatus.textContent = `GPS: Longitude ${longitude.toFixed(5)} - ${status}`;
             }
-            
+
             // Update UI
             updateCheckpointUI();
         }
@@ -1602,7 +1774,7 @@
         // Handle GPS errors
         function handleGPSError(error) {
             let errorMsg = '';
-            switch(error.code) {
+            switch (error.code) {
                 case error.PERMISSION_DENIED:
                     errorMsg = 'GPS permission denied';
                     break;
@@ -1616,9 +1788,9 @@
                     errorMsg = 'GPS unknown error';
                     break;
             }
-            
+
             addGPSLog(errorMsg, 'error');
-            
+
             const gpsStatus = document.getElementById('gps-status');
             if (gpsStatus) {
                 gpsStatus.textContent = `GPS: ${errorMsg}`;
@@ -1631,14 +1803,14 @@
                 addGPSLog('Geolocation not supported', 'error');
                 return;
             }
-            
+
             // Initialize UI with empty circles
             updateCheckpointUI();
-            
+
             addGPSLog('Starting GPS tracking...');
             addGPSLog(`Checkpoint A: ${CHECKPOINTS.A.lat.toFixed(6)}, ${CHECKPOINTS.A.lng.toFixed(6)}`);
             addGPSLog(`Checkpoint B: ${CHECKPOINTS.B.lat.toFixed(6)}, ${CHECKPOINTS.B.lng.toFixed(6)}`);
-            
+
             STATE.gpsWatchId = navigator.geolocation.watchPosition(
                 (position) => {
                     STATE.currentPosition = position;
@@ -1767,13 +1939,13 @@
             e.preventDefault();
             openMenu();
         });
-        
+
         closeMenuBtn.addEventListener('click', closeMenu);
         closeMenuBtn.addEventListener('touchend', (e) => {
             e.preventDefault();
             closeMenu();
         });
-        
+
         navOverlay.addEventListener('click', closeMenu);
         navOverlay.addEventListener('touchend', (e) => {
             e.preventDefault();
@@ -1908,7 +2080,7 @@
                     const data = await resp.json();
                     if (data && data.length > 0) { applyEmbeddings(data); return; }
                 }
-            } catch (e) {}
+            } catch (e) { }
 
             // 2. Try localStorage cache
             try {
@@ -1917,7 +2089,7 @@
                     const data = JSON.parse(cached);
                     if (data && data.length > 0) { applyEmbeddings(data); return; }
                 }
-            } catch (e) {}
+            } catch (e) { }
 
             throw new Error('Unable to load shark data');
         }
@@ -2029,7 +2201,7 @@
 
                 STATE.running = true;
                 loop();
-                
+
                 // Start GPS tracking
                 startGPSTracking();
             } catch (e) {
@@ -2054,14 +2226,14 @@
                 console.log('[MAP] Map already initialized');
                 return;
             }
-            
+
             console.log('[MAP] Initializing map...');
             var mapContainer = document.getElementById('mini-map');
             if (!mapContainer) {
                 console.error('[MAP] Map container not found!');
                 return;
             }
-            
+
             map = L.map(mapContainer, {
                 zoomControl: false,
                 attributionControl: true
@@ -2070,7 +2242,7 @@
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19
             }).addTo(map);
-            
+
             console.log('[MAP] Map initialized successfully');
         }
 
@@ -2094,12 +2266,12 @@
             console.log('[MAP] Map updated with markers');
         }
 
-        document.getElementById('toggle-map').addEventListener('click', function() {
+        document.getElementById('toggle-map').addEventListener('click', function () {
             var mapContainer = document.getElementById('map-container');
             var isExpanded = mapContainer.classList.toggle('expanded');
 
-            
-            setTimeout(function() {
+
+            setTimeout(function () {
                 if (map) {
                     map.invalidateSize();
                     updateMap();
@@ -2110,18 +2282,18 @@
         if (navigator.geolocation) {
             console.log('[GPS] Starting geolocation watch...');
             navigator.geolocation.watchPosition(
-                function(position) {
+                function (position) {
                     userLat = position.coords.latitude;
                     userLng = position.coords.longitude;
                     console.log('[GPS] Position updated:', userLat, userLng, 'accuracy:', position.coords.accuracy + 'm');
-                    
+
                     if (!map) {
                         console.log('[GPS] Map not initialized, initializing now...');
                         initializeMap();
                     }
                     updateMap();
                 },
-                function(error) {
+                function (error) {
                     console.error('[GPS] Geolocation error:', error.code, error.message);
                 },
                 { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
@@ -2130,7 +2302,7 @@
             console.error('[GPS] Geolocation not supported by this browser');
         }
 
-        setTimeout(function() {
+        setTimeout(function () {
             if (!map) {
                 initializeMap();
             }
@@ -2142,4 +2314,5 @@
     <!-- GPS Tracking for Checkpoints -->
     <script src="./JS/shared-gps-tracking.js"></script>
 </body>
+
 </html>

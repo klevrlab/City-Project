@@ -21,20 +21,11 @@
         }
     }
 
-    // Calculate distance between two coordinates (Haversine formula)
+    // Calculate distance based solely on longitude difference
     function calculateDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371e3; // Earth's radius in meters
-        const φ1 = lat1 * Math.PI / 180;
-        const φ2 = lat2 * Math.PI / 180;
-        const Δφ = (lat2 - lat1) * Math.PI / 180;
-        const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                  Math.cos(φ1) * Math.cos(φ2) *
-                  Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-        return R * c; // Distance in meters
+        // Simplified to use only longitude difference for consistency
+        // At San Jose latitude (~37.33°N), 1 degree of longitude is approx 88,000 meters.
+        return Math.abs(lon2 - lon1) * 88000;
     }
 
     // Update map with user position and checkpoint markers
