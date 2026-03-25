@@ -518,7 +518,108 @@
         #shark-plane-overlay canvas {
             background: transparent !important;
         }
-
+/* 
+        /* ── Sharks Way: map FAB icon (page-scoped) ── */
+        @keyframes map-fab-pulse {
+            0%,100% { box-shadow: 0 4px 18px rgba(0,109,117,0.55), 0 0 0 0 rgba(0,169,224,0.4); }
+            60%      { box-shadow: 0 4px 18px rgba(0,109,117,0.55), 0 0 0 8px rgba(0,169,224,0); }
+        }
+        #map-container {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(0, 18, 24, 0.82);
+            backdrop-filter: blur(20px) saturate(200%);
+            -webkit-backdrop-filter: blur(20px) saturate(200%);
+            border: 1.5px solid rgba(0, 169, 224, 0.45);
+            box-shadow: 0 4px 18px rgba(0,109,117,0.55),
+                        0 0 0 0 rgba(0,169,224,0.4);
+            overflow: visible;
+            animation: map-fab-pulse 3s ease-in-out infinite;
+            transition: width  0.45s cubic-bezier(0.4,0,0.2,1),
+                        height 0.45s cubic-bezier(0.4,0,0.2,1),
+                        border-radius 0.45s cubic-bezier(0.4,0,0.2,1),
+                        box-shadow 0.3s ease,
+                        animation 0s;
+            right: 14px;
+            bottom: 22px;
+        }
+        #map-container.expanded {
+            width: min(300px, calc(100vw - 28px));
+            height: min(300px, 45vh);
+            border-radius: 16px;
+            overflow: hidden;
+            animation: none;
+            box-shadow: 0 8px 40px rgba(0,109,117,0.5),
+                        inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+        /* map tile */
+        #mini-map {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease 0.15s;
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+        }
+        #map-container.expanded #mini-map { opacity:1; pointer-events:auto; }
+        /* FAB button */
+        #toggle-map {
+            position: absolute;
+            inset: 0;
+            width: 50px;
+            height: 50px;
+            background: transparent;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 1001;
+            padding: 0;
+            font-size: unset;
+            font-weight: unset;
+            border-radius: 50%;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        #toggle-map:active { transform: scale(0.85); }
+        /* map SVG icon */
+        .map-fab-icon {
+            width: 26px;
+            height: 26px;
+            display: block;
+            flex-shrink: 0;
+        }
+        /* close icon */
+        .map-icon-close {
+            display: none;
+            width: 15px;
+            height: 15px;
+            color: rgba(255,255,255,0.9);
+        }
+        .map-icon-close svg { width:15px; height:15px; }
+        #map-container.expanded .map-fab-icon  { display: none; }
+        #map-container.expanded .map-icon-close { display:flex; align-items:center; justify-content:center; }
+        #map-container.expanded #toggle-map {
+            inset: auto;
+            top: 7px; right: 7px;
+            width: 27px; height: 27px;
+            background: rgba(0,18,24,0.78);
+            border: 1px solid rgba(0,169,224,0.35);
+            border-radius: 50%;
+            backdrop-filter: blur(8px);
+        }
+        /* responsive */
+        @media (max-width: 480px) {
+            #map-container { width: 46px; height: 46px; right: 10px; bottom: 16px; }
+            #toggle-map    { width: 46px; height: 46px; }
+            .map-fab-icon  { width: 24px; height: 24px; }
+            #map-container.expanded {
+                width: min(260px, calc(100vw - 20px));
+                height: min(260px, 40vh);
+            }
+        } */
 
     </style>
 </head>
@@ -659,7 +760,33 @@
 
     <!-- Map Component -->
     <div id="map-container">
-        <button id="toggle-map">+</button>
+        <button id="toggle-map" aria-label="Open map">
+            <!--
+                Map FAB icon: a clean folded-map + location pin drawn in white/teal
+                Visible at 26×26px, crisp on dark backgrounds
+            -->
+            <svg class="map-fab-icon" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- map sheet left fold -->
+                <polygon points="2,5 9,3 9,21 2,23" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)" stroke-width="1.2" stroke-linejoin="round"/>
+                <!-- map sheet middle -->
+                <polygon points="9,3 17,5 17,23 9,21" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.55)" stroke-width="1.2" stroke-linejoin="round"/>
+                <!-- map sheet right fold -->
+                <polygon points="17,5 24,3 24,21 17,23" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)" stroke-width="1.2" stroke-linejoin="round"/>
+                <!-- route line on map -->
+                <path d="M5 14 Q7 10 9 12 Q11 14 13 10" stroke="#00A9E0" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <!-- pin body -->
+                <path d="M19 4.5 C17.07 4.5 15.5 6.07 15.5 8 C15.5 10.5 19 14.5 19 14.5 C19 14.5 22.5 10.5 22.5 8 C22.5 6.07 20.93 4.5 19 4.5Z" fill="#00A9E0" stroke="rgba(0,18,24,0.4)" stroke-width="0.8"/>
+                <!-- pin inner dot -->
+                <circle cx="19" cy="8" r="1.6" fill="rgba(0,18,24,0.55)"/>
+            </svg>
+            <!-- Close icon (shown when expanded) -->
+            <span class="map-icon-close">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </span>
+        </button>
         <div id="mini-map"></div>
     </div>
 
@@ -1970,7 +2097,7 @@
         document.getElementById('toggle-map').addEventListener('click', function() {
             var mapContainer = document.getElementById('map-container');
             var isExpanded = mapContainer.classList.toggle('expanded');
-            this.textContent = isExpanded ? '−' : '+';
+
             
             setTimeout(function() {
                 if (map) {

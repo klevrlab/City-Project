@@ -1,60 +1,126 @@
-/* Map Component Styles - Reusable across all pages */
+/* Map Component Styles - Global FAB icon, reusable across all pages */
+
+@keyframes map-fab-pulse {
+    0%,100% { box-shadow: 0 4px 18px rgba(0,109,117,0.55), 0 0 0 0 rgba(0,169,224,0.4); }
+    60%      { box-shadow: 0 4px 18px rgba(0,109,117,0.55), 0 0 0 8px rgba(0,169,224,0); }
+}
 
 #map-container {
-    width: 140px;
-    height: 100px;
-    background: rgba(0, 109, 117, 0.15);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border-radius: 16px;
-    border: 1px solid rgba(0, 169, 224, 0.3);
-    pointer-events: auto;
-    overflow: hidden;
-    box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(0, 18, 24, 0.82);
+    backdrop-filter: blur(20px) saturate(200%);
+    -webkit-backdrop-filter: blur(20px) saturate(200%);
+    border: 1.5px solid rgba(0, 169, 224, 0.45);
+    box-shadow: 0 4px 18px rgba(0,109,117,0.55), 0 0 0 0 rgba(0,169,224,0.4);
+    overflow: visible;
+    animation: map-fab-pulse 3s ease-in-out infinite;
     position: fixed;
-    right: 10px;
-    bottom: 20px;
-    transition: all 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
+    right: 14px;
+    bottom: 22px;
+    transition: width  0.45s cubic-bezier(0.4,0,0.2,1),
+                height 0.45s cubic-bezier(0.4,0,0.2,1),
+                border-radius 0.45s cubic-bezier(0.4,0,0.2,1),
+                box-shadow 0.3s ease;
     z-index: 100;
+    pointer-events: auto;
 }
 
 #map-container.expanded {
-    width: 300px;
-    height: 300px;
-    z-index: 2000;
+    width: min(300px, calc(100vw - 28px));
+    height: min(300px, 45vh);
+    border-radius: 16px;
+    overflow: hidden;
+    animation: none;
+    box-shadow: 0 8px 40px rgba(0,109,117,0.5),
+                inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
 #mini-map {
-    width: 100%;
-    height: 100%;
-    position: relative;
-    border: none;
-    border-radius: 16px;
-    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease 0.15s;
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+}
+
+#map-container.expanded #mini-map {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .leaflet-container {
     width: 100%;
     height: 100%;
-    border-radius: 16px;
+    border-radius: inherit;
 }
 
+/* FAB toggle button */
 #toggle-map {
     position: absolute;
-    top: 4px;
-    right: 4px;
-    background: rgba(0, 169, 224, 0.9);
+    inset: 0;
+    width: 50px;
+    height: 50px;
+    background: transparent;
     border: none;
-    color: white;
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    z-index: 1000;
-    font-size: 16px;
-    font-weight: bold;
+    z-index: 1001;
+    padding: 0;
+    font-size: unset;
+    font-weight: unset;
+    border-radius: 50%;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+#toggle-map:active { transform: scale(0.85); }
+
+/* Map SVG icon (collapsed state) */
+.map-fab-icon {
+    width: 26px;
+    height: 26px;
+    display: block;
+    flex-shrink: 0;
+}
+
+/* Close icon (expanded state) */
+.map-icon-close {
+    display: none;
+    width: 15px;
+    height: 15px;
+    color: rgba(255,255,255,0.9);
+}
+
+.map-icon-close svg { width: 15px; height: 15px; }
+
+/* State switching */
+#map-container.expanded .map-fab-icon  { display: none; }
+#map-container.expanded .map-icon-close { display: flex; align-items: center; justify-content: center; }
+
+/* Close badge repositioned inside expanded map */
+#map-container.expanded #toggle-map {
+    inset: auto;
+    top: 7px;
+    right: 7px;
+    width: 27px;
+    height: 27px;
+    background: rgba(0,18,24,0.78);
+    border: 1px solid rgba(0,169,224,0.35);
+    border-radius: 50%;
+    backdrop-filter: blur(8px);
+}
+
+@media (max-width: 480px) {
+    #map-container { width: 46px; height: 46px; right: 10px; bottom: 16px; }
+    #toggle-map    { width: 46px; height: 46px; }
+    .map-fab-icon  { width: 24px; height: 24px; }
+    #map-container.expanded {
+        width: min(260px, calc(100vw - 20px));
+        height: min(260px, 40vh);
+    }
 }
