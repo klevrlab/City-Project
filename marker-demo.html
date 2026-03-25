@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -26,24 +27,35 @@
             user-select: none;
             touch-action: none;
         }
+
         /* Top bar */
         #topbar {
             position: fixed;
-            top: 0; left: 0; right: 0;
+            top: 0;
+            left: 0;
+            right: 0;
             padding: 12px 14px;
-            background: linear-gradient(to bottom, rgba(0,22,26,0.7) 0%, transparent 100%);
+            background: linear-gradient(to bottom, rgba(0, 22, 26, 0.7) 0%, transparent 100%);
             display: flex;
             align-items: center;
             gap: 10px;
             z-index: 1001;
         }
-        #topbar h1 { font-size: 14px; font-weight: 700; flex: 1; color: white; }
+
+        #topbar h1 {
+            font-size: 14px;
+            font-weight: 700;
+            flex: 1;
+            color: white;
+        }
+
         #topbar .back {
             color: #00A9E0;
             text-decoration: none;
             font-size: 13px;
             font-weight: 600;
         }
+
         #hamburger-btn {
             background: rgba(0, 169, 224, 0.25);
             border: 1px solid rgba(0, 169, 224, 0.4);
@@ -62,10 +74,12 @@
             z-index: 1002;
             -webkit-tap-highlight-color: transparent;
         }
+
         #hamburger-btn:active {
             transform: scale(0.95);
             background: rgba(0, 169, 224, 0.4);
         }
+
         #hamburger-btn svg {
             width: 20px;
             height: 20px;
@@ -73,6 +87,7 @@
             stroke-width: 2;
             fill: none;
         }
+
         /* Navigation Menu */
         #nav-menu {
             position: fixed;
@@ -89,9 +104,11 @@
             padding: 60px 20px 20px;
             overflow-y: auto;
         }
+
         #nav-menu.open {
             right: 0;
         }
+
         #nav-menu .close-btn {
             position: absolute;
             top: 12px;
@@ -111,12 +128,14 @@
             -webkit-tap-highlight-color: transparent;
             padding: 0;
         }
+
         #nav-menu h2 {
             color: #00A9E0;
             font-size: 18px;
             margin-bottom: 20px;
             font-weight: 700;
         }
+
         #nav-menu .nav-link {
             display: flex;
             align-items: center;
@@ -132,12 +151,14 @@
             font-weight: 600;
             transition: all 0.3s ease;
         }
+
         #nav-menu .nav-link:hover,
         #nav-menu .nav-link:active {
             background: rgba(0, 169, 224, 0.25);
             border-color: rgba(0, 169, 224, 0.4);
             transform: translateX(-4px);
         }
+
         #nav-menu .nav-link svg {
             width: 20px;
             height: 20px;
@@ -145,6 +166,7 @@
             stroke-width: 2;
             fill: none;
         }
+
         #nav-overlay {
             position: fixed;
             inset: 0;
@@ -154,10 +176,12 @@
             pointer-events: none;
             transition: opacity 0.3s ease;
         }
+
         #nav-overlay.visible {
             opacity: 1;
             pointer-events: auto;
         }
+
         #header {
             position: fixed;
             top: 60px;
@@ -172,8 +196,9 @@
             width: 200px;
             border: 1px solid rgba(0, 169, 224, 0.3);
             box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
+
         #header h2 {
             margin: 0 0 8px 0;
             font-size: 14px;
@@ -181,18 +206,21 @@
             color: #FFFFFF;
             text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
         }
+
         #header p {
             margin: 0;
             font-size: 11px;
             color: rgba(255, 255, 255, 0.8);
             line-height: 1.4;
         }
+
         #header #gps-status {
             display: flex;
             align-items: center;
             gap: 6px;
             margin-top: 8px;
         }
+
         #header #gps-status .icon {
             width: 14px;
             height: 14px;
@@ -200,12 +228,14 @@
             stroke-width: 2;
             fill: none;
         }
+
         #event-icon-header {
             width: 32px;
             height: 32px;
             margin-bottom: 8px;
             display: block;
         }
+
         #info-panel {
             position: fixed;
             bottom: 20px;
@@ -220,8 +250,9 @@
             width: 140px;
             border: 1px solid rgba(0, 169, 224, 0.3);
             box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
+
         #info-panel h2 {
             margin: 0 0 8px 0;
             font-size: 14px;
@@ -232,12 +263,14 @@
             line-height: 1.3;
             word-wrap: break-word;
         }
+
         #info-panel p {
             margin: 6px 0;
             font-size: 12px;
             line-height: 1.4;
             color: rgba(255, 255, 255, 0.85);
         }
+
         #info-panel .marker-hint {
             font-size: 10px;
             opacity: 0.7;
@@ -246,6 +279,7 @@
             border-top: 1px solid rgba(0, 169, 224, 0.2);
             line-height: 1.3;
         }
+
         #event-info {
             position: fixed;
             top: 120px;
@@ -261,34 +295,41 @@
             max-width: 280px;
             border: 1px solid rgba(0, 169, 224, 0.3);
             box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
             transition: left 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
+
         #event-info.visible {
             left: 20px;
         }
+
         #event-info h3 {
             margin: 0 0 10px 0;
             font-size: 16px;
             font-weight: 700;
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
+
         #event-info .event-details {
             font-size: 13px;
             line-height: 1.6;
         }
+
         #event-info .event-details p {
             margin: 6px 0;
             display: flex;
             align-items: center;
             gap: 6px;
         }
+
         #event-info .event-description {
             display: none;
         }
+
         #sharkey-message {
             display: none;
         }
+
         #tap-hint {
             position: fixed;
             bottom: 30px;
@@ -308,13 +349,25 @@
             box-shadow: 0 4px 16px rgba(0, 109, 117, 0.3);
             animation: pulse 2s ease-in-out infinite;
         }
+
         #tap-hint.visible {
             display: block;
         }
+
         @keyframes pulse {
-            0%, 100% { transform: translateX(-50%) scale(1); opacity: 1; }
-            50% { transform: translateX(-50%) scale(1.05); opacity: 0.9; }
+
+            0%,
+            100% {
+                transform: translateX(-50%) scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: translateX(-50%) scale(1.05);
+                opacity: 0.9;
+            }
         }
+
         .cta-button {
             background: rgba(0, 169, 224, 0.3);
             backdrop-filter: blur(10px);
@@ -328,14 +381,16 @@
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 4px 12px rgba(0, 169, 224, 0.3),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
             display: block;
             width: 100%;
         }
+
         .cta-button:active {
             transform: scale(0.95);
             background: rgba(0, 169, 224, 0.5);
         }
+
         #event-icon {
             width: 45px;
             height: 45px;
@@ -344,6 +399,7 @@
             filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
             object-fit: contain;
         }
+
         .icon {
             width: 16px;
             height: 16px;
@@ -353,6 +409,7 @@
             stroke-width: 2;
             fill: none;
         }
+
         @media (max-width: 480px) {
             #header {
                 top: 50px;
@@ -360,12 +417,15 @@
                 width: 160px;
                 padding: 14px 12px;
             }
+
             #header h2 {
                 font-size: 13px;
             }
+
             #header p {
                 font-size: 10px;
             }
+
             #info-panel {
                 top: 60px;
                 height: 110px;
@@ -373,38 +433,46 @@
                 width: 120px;
                 padding: 14px 12px;
             }
+
             #info-panel h2 {
                 font-size: 13px;
             }
+
             #info-panel p {
                 font-size: 11px;
             }
+
             #event-info {
                 max-width: 90%;
                 padding: 14px 16px;
             }
+
             #event-info.visible {
                 left: 10px;
             }
+
             #event-info h3 {
                 font-size: 15px;
             }
+
             #event-info .event-details {
                 font-size: 12px;
             }
+
             #tap-hint {
                 bottom: 20px;
                 font-size: 12px;
                 padding: 10px 20px;
             }
+
             .cta-button {
                 padding: 10px 16px;
                 font-size: 13px;
             }
         }
-
     </style>
 </head>
+
 <body>
     <!-- Top bar -->
     <div id="topbar">
@@ -412,9 +480,9 @@
         <h1>Marker Demo</h1>
         <button id="hamburger-btn">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <line x1="3" y1="6" x2="21" y2="6"/>
-                <line x1="3" y1="12" x2="21" y2="12"/>
-                <line x1="3" y1="18" x2="21" y2="18"/>
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
         </button>
     </div>
@@ -426,37 +494,37 @@
         <h2>Navigation</h2>
         <a href="./sharks-way.html" class="nav-link">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                <circle cx="12" cy="10" r="3"/>
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
             </svg>
             Sharks Way
         </a>
         <a href="./location-tour.html" class="nav-link">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <circle cx="12" cy="10" r="3"/>
-                <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"/>
+                <circle cx="12" cy="10" r="3" />
+                <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z" />
             </svg>
             Location Tour
         </a>
         <a href="./marker-demo.html" class="nav-link">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                <line x1="8" y1="21" x2="16" y2="21"/>
-                <line x1="12" y1="17" x2="12" y2="21"/>
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
             </svg>
             Marker
         </a>
         <a href="./selfie-ar.html" class="nav-link">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                <circle cx="12" cy="13" r="4"/>
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
             </svg>
             Selfie with Sammy
         </a>
         <a href="./selfie-ar.html?character=sharkey" class="nav-link">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                <circle cx="12" cy="13" r="4"/>
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
             </svg>
             Selfie with Sharkie
         </a>
@@ -471,7 +539,22 @@
 
     <!-- Map Component -->
     <div id="map-container">
-        <button id="toggle-map">+</button>
+        <button id="toggle-map" aria-label="Open map">
+            <svg class="map-fab-icon" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="2,5 9,3 9,21 2,23" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)" stroke-width="1.2" stroke-linejoin="round"/>
+                <polygon points="9,3 17,5 17,23 9,21" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.55)" stroke-width="1.2" stroke-linejoin="round"/>
+                <polygon points="17,5 24,3 24,21 17,23" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)" stroke-width="1.2" stroke-linejoin="round"/>
+                <path d="M5 14 Q7 10 9 12 Q11 14 13 10" stroke="#00A9E0" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <path d="M19 4.5 C17.07 4.5 15.5 6.07 15.5 8 C15.5 10.5 19 14.5 19 14.5 C19 14.5 22.5 10.5 22.5 8 C22.5 6.07 20.93 4.5 19 4.5Z" fill="#00A9E0" stroke="rgba(0,18,24,0.4)" stroke-width="0.8"/>
+                <circle cx="19" cy="8" r="1.6" fill="rgba(0,18,24,0.55)"/>
+            </svg>
+            <span class="map-icon-close">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </span>
+        </button>
         <div id="mini-map"></div>
     </div>
 
@@ -482,16 +565,24 @@
 
     <div id="progress-tracker">
         <div style="font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none;"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none;">
+                <circle cx="12" cy="12" r="10" />
+                <path d="m9 12 2 2 4-4" />
+            </svg>
             Tour Progress
         </div>
         <div class="stop-item" data-checkpoint="A" id="checkpoint-a">
-            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
-            Loading...
+            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="m9 12 2 2 4-4"></path>
+            </svg>
         </div>
         <div class="stop-item" data-checkpoint="B" id="checkpoint-b">
-            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
-            Loading...
+            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="m9 12 2 2 4-4"></path>
+            </svg>
         </div>
     </div>
 
@@ -504,7 +595,10 @@
         </div>
         <div id="sharkey-message"></div>
         <button class="cta-button" id="learn-more">
-            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><path d="M17 2 12 7 7 2"/></svg>
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
+                <path d="M17 2 12 7 7 2" />
+            </svg>
             Learn More
         </button>
     </div>
@@ -522,7 +616,7 @@
         </select>
     </div> -->
     <script>
-        document.getElementById('glb-select').addEventListener('change', function() {
+        document.getElementById('glb-select').addEventListener('change', function () {
             var asset = document.getElementById('shark-model');
             if (asset) {
                 asset.setAttribute('src', this.value);
@@ -534,11 +628,9 @@
         });
     </script>
 
-    <a-scene
-        embedded
+    <a-scene embedded
         arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
-        vr-mode-ui="enabled: false"
-        renderer="logarithmicDepthBuffer: true; precision: medium;">
+        vr-mode-ui="enabled: false" renderer="logarithmicDepthBuffer: true; precision: medium;">
 
         <a-assets>
             <a-asset-item id="shark-model" src="./assets/3D-models/plushie_shark.glb"></a-asset-item>
@@ -546,77 +638,47 @@
 
         <a-marker type="pattern" url="./pattern-shark.patt" id="hiro-marker" class="clickable">
             <!-- Sharkie 3D Model -->
-            <a-entity 
-                id="sharkey"
-                gltf-model="#shark-model"
-                position="0 0.5 0"
-                rotation="0 180 0"
-                scale="0.5 0.5 0.5"
+            <a-entity id="sharkey" gltf-model="#shark-model" position="0 0.5 0" rotation="0 180 0" scale="0.5 0.5 0.5"
                 animation="property: rotation; to: 0 190 0; dir: alternate; loop: true; dur: 3000; easing: easeInOutSine"
                 animation__float="property: position; to: 0 0.6 0; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine">
             </a-entity>
-            
+
             <!-- Fallback box (visible if model doesn't load) -->
-            <a-box 
-                id="fallback-shark"
-                position="0 0.5 0" 
-                width="0.3" 
-                height="0.2" 
-                depth="0.6" 
-                color="#006D75"
+            <a-box id="fallback-shark" position="0 0.5 0" width="0.3" height="0.2" depth="0.6" color="#006D75"
                 animation="property: rotation; to: 0 360 0; loop: true; dur: 3000">
             </a-box>
-            
+
             <!-- Tour stop platform -->
-            <a-cylinder 
-                position="0 0 0" 
-                radius="0.6" 
-                height="0.1" 
-                color="#F4901E"
+            <a-cylinder position="0 0 0" radius="0.6" height="0.1" color="#F4901E"
                 animation="property: rotation; to: 0 360 0; loop: true; dur: 20000; easing: linear">
             </a-cylinder>
-            
+
             <!-- Floating text with background -->
-            <a-plane 
-                position="0 1.2 0" 
-                width="1.2" 
-                height="0.3" 
-                color="#006D75" 
-                opacity="0.7"
+            <a-plane position="0 1.2 0" width="1.2" height="0.3" color="#006D75" opacity="0.7"
                 animation="property: position; to: 0 1.35 0; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine">
             </a-plane>
-            <a-text 
-                value="Sharkie's\nTour Stop" 
-                align="center" 
-                color="#FFFFFF" 
-                position="0 1.21 0.01"
+            <a-text value="Sharkie's\nTour Stop" align="center" color="#FFFFFF" position="0 1.21 0.01"
                 scale="0.4 0.4 0.4"
                 animation="property: position; to: 0 1.36 0.01; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine">
             </a-text>
-            
+
             <!-- Orbiting rings -->
-            <a-torus 
-                position="0 0.5 0" 
-                radius="0.5" 
-                radius-tubular="0.03" 
-                color="#00A9E0"
+            <a-torus position="0 0.5 0" radius="0.5" radius-tubular="0.03" color="#00A9E0"
                 animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear">
             </a-torus>
-            
-            <a-torus 
-                position="0 0.5 0" 
-                radius="0.7" 
-                radius-tubular="0.02" 
-                color="#F4901E"
-                rotation="90 0 0"
+
+            <a-torus position="0 0.5 0" radius="0.7" radius-tubular="0.02" color="#F4901E" rotation="90 0 0"
                 animation="property: rotation; to: 90 360 0; loop: true; dur: 6000; easing: linear">
             </a-torus>
-            
+
             <!-- Particle effects (stars) -->
             <a-entity id="particles">
-                <a-sphere position="0.5 1.2 0.3" radius="0.03" color="#FFD700" animation="property: position; to: 0.5 1.5 0.3; dir: alternate; loop: true; dur: 1500"></a-sphere>
-                <a-sphere position="-0.4 1.0 -0.2" radius="0.03" color="#FFD700" animation="property: position; to: -0.4 1.3 -0.2; dir: alternate; loop: true; dur: 1800"></a-sphere>
-                <a-sphere position="0.3 1.4 -0.4" radius="0.03" color="#FFD700" animation="property: position; to: 0.3 1.7 -0.4; dir: alternate; loop: true; dur: 2000"></a-sphere>
+                <a-sphere position="0.5 1.2 0.3" radius="0.03" color="#FFD700"
+                    animation="property: position; to: 0.5 1.5 0.3; dir: alternate; loop: true; dur: 1500"></a-sphere>
+                <a-sphere position="-0.4 1.0 -0.2" radius="0.03" color="#FFD700"
+                    animation="property: position; to: -0.4 1.3 -0.2; dir: alternate; loop: true; dur: 1800"></a-sphere>
+                <a-sphere position="0.3 1.4 -0.4" radius="0.03" color="#FFD700"
+                    animation="property: position; to: 0.3 1.7 -0.4; dir: alternate; loop: true; dur: 2000"></a-sphere>
             </a-entity>
         </a-marker>
 
@@ -667,10 +729,10 @@
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
-            
+
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
-            
+
             if (type === 'found') {
                 oscillator.frequency.value = 800;
                 gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
@@ -694,7 +756,7 @@
             document.getElementById('sharkey-message').textContent = event.sharkeyMessage;
             document.getElementById('event-icon').src = event.icon;
             if (eventInfo) eventInfo.classList.add('visible');
-            
+
             visitedStops.add(currentEventIndex);
             updateProgress();
         }
@@ -718,7 +780,7 @@
             const event = dummyEvents[currentEventIndex];
             showEvent(event);
             playSound('found');
-            
+
             setTimeout(() => {
                 if (markerVisible && tapHint) {
                     tapHint.classList.add('visible');
@@ -736,7 +798,7 @@
         document.getElementById('learn-more').addEventListener('click', () => {
             playSound('tap');
             alert(`Ready to attend ${dummyEvents[currentEventIndex].title}?\n\nIn the full version, this would:\n- Show ticket options\n- Add to calendar\n- Share with friends\n- Get directions`);
-            
+
             currentEventIndex = (currentEventIndex + 1) % dummyEvents.length;
             const event = dummyEvents[currentEventIndex];
             showEvent(event);
@@ -765,20 +827,20 @@
             e.preventDefault();
             openMenu();
         });
-        
+
         closeMenuBtn.addEventListener('click', closeMenu);
         closeMenuBtn.addEventListener('touchend', (e) => {
             e.preventDefault();
             closeMenu();
         });
-        
+
         navOverlay.addEventListener('click', closeMenu);
         navOverlay.addEventListener('touchend', (e) => {
             e.preventDefault();
             closeMenu();
         });
 
-        document.addEventListener('keydown', function(e) {
+        document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape' && navMenu.classList.contains('open')) {
                 closeMenu();
             }
@@ -837,7 +899,7 @@
 
         function initializeMap() {
             if (map) return;
-            
+
             var mapContainer = document.getElementById('mini-map');
             map = L.map(mapContainer, {
                 zoomControl: false,
@@ -860,12 +922,12 @@
             userMarker = updateMapMarkers(map, userLat, userLng, userMarker, isExpanded);
         }
 
-        document.getElementById('toggle-map').addEventListener('click', function() {
+        document.getElementById('toggle-map').addEventListener('click', function () {
             var mapContainer = document.getElementById('map-container');
             var isExpanded = mapContainer.classList.toggle('expanded');
-            this.textContent = isExpanded ? '−' : '+';
-            
-            setTimeout(function() {
+
+
+            setTimeout(function () {
                 if (map) {
                     map.invalidateSize();
                     updateMap();
@@ -875,27 +937,28 @@
 
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(
-                function(position) {
+                function (position) {
                     userLat = position.coords.latitude;
                     userLng = position.coords.longitude;
-                    
+
                     if (!map) {
                         initializeMap();
                     }
                     updateMap();
                 },
-                function(error) {
+                function (error) {
                     console.error('Geolocation error:', error);
                 },
                 { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
             );
         }
 
-        setTimeout(function() {
+        setTimeout(function () {
             if (!map) {
                 initializeMap();
             }
         }, 1000);
     </script>
 </body>
+
 </html>

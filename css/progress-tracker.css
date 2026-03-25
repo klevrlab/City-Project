@@ -2,8 +2,10 @@
 
 #progress-tracker {
     position: fixed;
-    bottom: 20px;
-    left: 0px;
+    top: 50px;
+    /* same height as info-panel */
+    right: 10px;
+    /* right of info-panel (20px left + 140px width + 10px gap) */
     background: rgba(0, 109, 117, 0.15);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -14,9 +16,9 @@
     z-index: 100;
     border: 1px solid rgba(0, 169, 224, 0.3);
     box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
-                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
     max-width: 160px;
-    width: 140px;
+    width: 150px;
     max-height: 200px;
     overflow-y: auto;
     overflow-x: hidden;
@@ -83,11 +85,21 @@
     fill: none;
 }
 
+#progress-tracker .gps-status {
+    font-size: 9px;
+    opacity: 0.6;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 169, 224, 0.2);
+}
+
 @media (max-width: 480px) {
     #progress-tracker {
-        bottom: 10px;
-        left: 10px;
-        max-width: 140px;
+        top: 60px;
+        right: 10px;
+        /* stays right of info-panel on mobile too */
+        max-width: 160px;
+        width: 150px;
         padding: 12px 14px;
         font-size: 10px;
     }
