@@ -996,6 +996,7 @@
         <img id="event-icon" src="./assets/the-big-game.svg" alt="Event" onerror="this.style.display='none'">
         <h2>Sharks Way Tour</h2>
         <p>Point camera at a shark painting</p>
+        <p class="status-text" id="gps-status">GPS: waiting…</p>
     </div>
 
     <!-- Event info slide-in -->
@@ -1631,6 +1632,11 @@
         const CACHE_KEY = 'shark-embeddings-v5';
         const MARCH_MADNESS_PROMO_END_UTC = '2026-04-07T00:00:00Z';
 
+        // GPS fallback: keep shark "active" near Sharks Way (San Jose)
+        // NOTE: Update these coordinates if you have a more precise spot.
+        const GPS_TARGET = { lat: 37.33564048861824, lng: -121.8978303846544 }; // Sharks Way (exact)
+        const GPS_RADIUS_M = 250; // "remotely close" radius
+
         // ─── UI REFS ───
         const ui = {
             video: document.getElementById('video'),
@@ -1643,7 +1649,8 @@
             sharkLabel: document.getElementById('shark-label'),
             labelName: document.getElementById('labelName'),
             eventInfo: document.getElementById('event-info'),
-            infoPanel: document.getElementById('info-panel')
+            infoPanel: document.getElementById('info-panel'),
+            gpsStatus: document.getElementById('gps-status')
         };
 
         const muralSceneEl = document.getElementById('mural-shark-scene');
@@ -1684,6 +1691,8 @@
             currentEventIndex: 0,
             visitedStops: new Set(),
             gpsWatchId: null,
+            gpsActive: false,
+            gpsDistanceM: null,
             currentPosition: null,
             basketballPromoTimer: null,
             checkpointA: { visited: false, active: false },
@@ -2260,6 +2269,68 @@
             hideEvent();
         }
 
+        // ─── GPS FALLBACK ───
+        function haversineMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        function updateGpsStatusText() {
+            if (!ui.gpsStatus) return;
+            if (STATE.gpsDistanceM == null) {
+                ui.gpsStatus.textContent = 'GPS: waiting…';
+                return;
+            }
+            const d = STATE.gpsDistanceM;
+            const distText = d >= 1000 ? `${(d / 1000).toFixed(2)}km` : `${Math.round(d)}m`;
+            ui.gpsStatus.textContent = `GPS: ${distText} from Sharks Way`;
+        }
+
+        function startGpsWatch() {
+            if (!('geolocation' in navigator)) {
+                if (ui.gpsStatus) ui.gpsStatus.textContent = 'GPS: unavailable';
+                return;
+            }
+
+            try {
+                if (STATE.gpsWatchId != null) navigator.geolocation.clearWatch(STATE.gpsWatchId);
+            } catch (e) { /* ignore */ }
+
+            STATE.gpsWatchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    const d = haversineMeters(lat, lng, GPS_TARGET.lat, GPS_TARGET.lng);
+                    STATE.gpsDistanceM = d;
+                    const inRange = d <= GPS_RADIUS_M;
+
+                    // If user is close, force the "found" state even if ML can't see the mural (night/low light).
+                    STATE.gpsActive = inRange;
+                    updateGpsStatusText();
+
+                    const cooldownOver = performance.now() - STATE.dismissedAt > 3000;
+                    if (inRange && cooldownOver && !STATE.sharkVisible) {
+                        onSharkFound('gps', 1.0);
+                    }
+                },
+                (err) => {
+                    console.warn('GPS error:', err);
+                    STATE.gpsDistanceM = null;
+                    STATE.gpsActive = false;
+                    if (ui.gpsStatus) ui.gpsStatus.textContent = 'GPS: blocked';
+                },
+                { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
+            );
+        }
+
         // ─── MAIN LOOP ───
         async function loop() {
             if (!STATE.running) return;
@@ -2275,7 +2346,10 @@
                 const smoothed = rollingScore(rawMatch);
 
                 const cooldownOver = performance.now() - STATE.dismissedAt > 3000;
-                if (cooldownOver && smoothed.name && smoothed.score >= THRESHOLD && smoothed.confidence >= 0.4) {
+                const mlMatch = cooldownOver && smoothed.name && smoothed.score >= THRESHOLD && smoothed.confidence >= 0.4;
+                const gpsMatch = cooldownOver && STATE.gpsActive;
+
+                if (mlMatch || gpsMatch) {
                     STATE.lastMatchTime = performance.now();
                     onSharkFound(smoothed.name, smoothed.score);
                 } else {
@@ -2294,6 +2368,7 @@
                 await loadModel();
                 await loadEmbeddings();
                 await startCamera();
+                startGpsWatch();
 
                 ui.loading.classList.add('hidden');
 
