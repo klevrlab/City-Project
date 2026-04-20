@@ -163,7 +163,7 @@
             color: white;
             padding: 16px 20px;
             border-radius: 16px;
-            z-index: 100;
+            z-index: 1000;
             max-width: 280px;
             border: 1px solid rgba(0, 169, 224, 0.3);
             box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
@@ -1695,6 +1695,7 @@
             gpsDistanceM: null,
             currentPosition: null,
             basketballPromoTimer: null,
+            bannerDismissTimer: null,
             checkpointA: { visited: false, active: false },
             checkpointB: { visited: false, active: false }
         };
@@ -1975,6 +1976,12 @@
             ui.eventInfo.classList.add('visible');
 
             STATE.visitedStops.add(STATE.currentEventIndex);
+
+            if (STATE.bannerDismissTimer) clearTimeout(STATE.bannerDismissTimer);
+            STATE.bannerDismissTimer = setTimeout(() => {
+                STATE.bannerDismissTimer = null;
+                hideEvent();
+            }, 5000);
         }
 
         function hideEvent() {
@@ -2263,6 +2270,10 @@
             STATE.sharkVisible = false;
             STATE.dismissedAt = performance.now();
             STATE.recentScores = [];
+            if (STATE.bannerDismissTimer) {
+                clearTimeout(STATE.bannerDismissTimer);
+                STATE.bannerDismissTimer = null;
+            }
             ui.sharkLabel.classList.remove('visible');
             hideFallbackSharks();
             hideBasketballPromo();
