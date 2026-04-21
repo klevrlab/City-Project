@@ -7,7 +7,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>Sharks Way AR - Marker Demo (8th Wall)</title>
+    <title>Sharks Way - Shark AR (8th Wall)</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="./css/map-component.css" />
@@ -15,6 +15,11 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="./JS/checkpoint-loader.js"></script>
     <script src="./JS/shared-map-markers.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1"></script>
+    <script src="./JS/shark-embedding-detector.js"></script>
+    <script src="./JS/xr8-shark-video-bridge.js"></script>
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
 
@@ -284,14 +289,6 @@
             gap: 6px;
         }
 
-        #event-info .event-description {
-            display: none;
-        }
-
-        #sharkey-message {
-            display: none;
-        }
-
         .cta-button {
             background: rgba(0, 169, 224, 0.3);
             backdrop-filter: blur(10px);
@@ -352,14 +349,142 @@
             text-decoration: none;
             font-weight: 600;
         }
+
+        #loading {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 22, 26, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            transition: opacity 0.5s ease;
+        }
+
+        #loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #loading .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(0, 169, 224, 0.2);
+            border-top-color: #00A9E0;
+            border-radius: 50%;
+            animation: spin8w 0.8s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin8w {
+            to { transform: rotate(360deg); }
+        }
+
+        #loading h2 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+
+        #loading p {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+            text-align: center;
+            max-width: 280px;
+        }
+
+        #loading-status {
+            margin-top: 12px;
+            font-size: 12px;
+            color: #00A9E0;
+        }
+
+        #debug-canvas {
+            display: none;
+        }
+
+        #model-overlay {
+            position: fixed;
+            bottom: 10%;
+            left: 50%;
+            transform: translateX(-50%) scale(0);
+            width: min(92vw, 420px);
+            height: min(92vw, 420px);
+            z-index: 2500;
+            transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55), opacity 0.3s ease;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #model-overlay.visible {
+            transform: translateX(-50%) scale(1);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #model-overlay model-viewer {
+            width: 100%;
+            height: 100%;
+            --poster-color: transparent;
+            background: transparent;
+        }
+
+        #model-glow {
+            position: absolute;
+            inset: -20px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0, 169, 224, 0.15) 0%, transparent 70%);
+            z-index: -1;
+        }
+
+        #shark-label-8w {
+            position: fixed;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(0, 109, 117, 0.25);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(0, 169, 224, 0.4);
+            border-radius: 30px;
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 700;
+            z-index: 2600;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        #shark-label-8w.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        #event-info .event-description { display: none; }
+
+        #sharkey-message {
+            display: block;
+            font-size: 12px;
+            margin-top: 8px;
+            line-height: 1.5;
+        }
     </style>
 </head>
 
 <body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <h2>Loading Shark AI</h2>
+        <p>World tracking and painting detection. Point at a sidewalk shark when the camera is live.</p>
+        <p id="loading-status">Preparing model…</p>
+    </div>
+    <canvas id="debug-canvas" width="224" height="224" aria-hidden="true"></canvas>
+
     <!-- Top bar -->
     <div id="topbar">
         <a href="./index.html" class="back">&larr;</a>
-        <h1>Marker Demo (8th Wall)</h1>
+        <h1>Shark AR (8th Wall)</h1>
         <button id="hamburger-btn">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                 <line x1="3" y1="6" x2="21" y2="6" />
@@ -404,20 +529,6 @@
             </svg>
             Marker (8th Wall)
         </a>
-        <a href="./sharks-way-8thwall.html" class="nav-link">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                <path d="M2 17l10 5 10-5" />
-            </svg>
-            Shark Detection (8W)
-        </a>
-        <a href="./shark-ar-8thwall.html" class="nav-link">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                <path d="M2 17l10 5 10-5" />
-            </svg>
-            Shark AR (8W)
-        </a>
         <a href="./selfie-ar.html" class="nav-link">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
@@ -432,13 +543,27 @@
             </svg>
             Selfie with Sharkie
         </a>
+        <a href="./sharks-way-8thwall.html" class="nav-link">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+            </svg>
+            Detection (8W)
+        </a>
+        <a href="./shark-ar-8thwall.html" class="nav-link">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+            </svg>
+            Shark AR (8W)
+        </a>
     </div>
 
     <div id="info-panel">
         <img id="event-icon" src="./assets/the-big-game.svg" alt="Event" onerror="this.style.display='none'">
         <h2>Sharks Way Tour</h2>
-        <p>Tap to recenter</p>
-        <p class="marker-hint">8th Wall world-tracking demo</p>
+        <p>8th Wall + model viewer + painting detection</p>
+        <p class="marker-hint">TensorFlow.js MobileNet</p>
     </div>
 
     <div id="event-info">
@@ -456,7 +581,23 @@
             </svg>
             Learn More
         </button>
+        <button class="cta-button" id="dismiss-event" type="button"
+            style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); margin-top: 6px;">
+            Dismiss
+        </button>
     </div>
+
+    <div id="model-overlay" aria-hidden="true">
+        <div id="model-glow"></div>
+        <model-viewer id="shark-model-viewer-8w"
+            src="./assets/3D-models/STELLA_CAI_SHARK_SJSU_TEST1.glb"
+            auto-rotate rotation-per-second="30deg" camera-orbit="0deg 75deg auto"
+            field-of-view="45deg" min-field-of-view="30deg" max-field-of-view="60deg" disable-zoom
+            interaction-prompt="none" environment-image="neutral" shadow-intensity="0.5"
+            style="background: transparent; overflow: visible;">
+        </model-viewer>
+    </div>
+    <div id="shark-label-8w"><span id="labelName-8w">Sharkie</span></div>
 
     <!-- Map Component -->
     <div id="map-container">
@@ -520,7 +661,7 @@
         </a-assets>
 
         <!-- Content: placed in front of the camera by default (world-tracking) -->
-        <a-entity id="shark-root" position="0 0 -2">
+        <a-entity id="shark-root" position="0 0 -2" visible="false">
             <a-entity id="sharkey" gltf-model="#shark-model" position="0 0.35 0" rotation="0 180 0"
                 scale="0.5 0.5 0.5"
                 animation="property: rotation; to: 0 190 0; dir: alternate; loop: true; dur: 3000; easing: easeInOutSine"
@@ -631,42 +772,140 @@
             if (eventInfo) eventInfo.classList.add('visible');
         }
 
+        const modelOverlayEl = document.getElementById('model-overlay');
+        const labelName8w = document.getElementById('labelName-8w');
+        const sharkLabel8w = document.getElementById('shark-label-8w');
+
         document.getElementById('learn-more').addEventListener('click', () => {
             playSound('tap');
             alert(`Ready to attend ${dummyEvents[currentEventIndex].title}?\n\nIn the full version, this would:\n- Show ticket options\n- Add to calendar\n- Share with friends\n- Get directions`);
-
+            dismissSharkUi();
             currentEventIndex = (currentEventIndex + 1) % dummyEvents.length;
-            showEvent(dummyEvents[currentEventIndex]);
         });
+        const dismissBtn = document.getElementById('dismiss-event');
+        if (dismissBtn) {
+            dismissBtn.addEventListener('click', () => { playSound('tap'); dismissSharkUi(); });
+        }
 
-        // Show the event panel once XR is running (or immediately as fallback).
-        function onExperienceReady() {
+        const THRESHOLD = 0.55;
+        const EMBEDDINGS_URL = './data/shark-embeddings-browser.json';
+        const IMAGE_LIST_URL = './shark-image-list.json';
+        const CACHE_KEY = 'shark-embeddings-v5';
+        const SED = window.SharkEmbeddingDetector;
+        const loadingEl = document.getElementById('loading');
+        const loadingStatus = document.getElementById('loading-status');
+        const debugCanvas = document.getElementById('debug-canvas');
+
+        const mlState = {
+            model: null,
+            running: false,
+            frameSkip: 0,
+            sharkVisible: false,
+            dismissedAt: 0,
+            emb: SED.createEmbeddingState(),
+            feedVideo: null
+        };
+
+        function setSharkSceneVisible(yes) {
+            const root = document.getElementById('shark-root');
+            if (root) root.setAttribute('visible', yes);
+        }
+
+        function onSharkFoundMl() {
+            if (mlState.sharkVisible) return;
+            mlState.sharkVisible = true;
+            setSharkSceneVisible(true);
+            if (modelOverlayEl) modelOverlayEl.classList.add('visible');
+            if (sharkLabel8w) {
+                if (labelName8w) labelName8w.textContent = 'Sharkie';
+                sharkLabel8w.classList.add('visible');
+            }
             showEvent(dummyEvents[currentEventIndex]);
             playSound('found');
         }
 
+        function dismissSharkUi() {
+            mlState.sharkVisible = false;
+            mlState.dismissedAt = performance.now();
+            mlState.emb.recentScores = [];
+            setSharkSceneVisible(false);
+            if (modelOverlayEl) modelOverlayEl.classList.remove('visible');
+            if (sharkLabel8w) sharkLabel8w.classList.remove('visible');
+            if (eventInfo) eventInfo.classList.remove('visible');
+        }
+
+        function mlLoop() {
+            if (!mlState.running) return;
+            (async function () {
+                try {
+                    if (mlState.model && mlState.feedVideo && mlState.emb.enrolled.length) {
+                        mlState.frameSkip += 1;
+                        if (mlState.frameSkip % 2 === 0) {
+                            const embedding = await SED.getFrameEmbedding(mlState.model, mlState.feedVideo, debugCanvas);
+                            if (embedding) {
+                                const rawMatch = SED.bestMatch(mlState.emb, embedding);
+                                const smoothed = SED.rollingScore(mlState.emb, rawMatch);
+                                const cooldownOver = performance.now() - mlState.dismissedAt > 3000;
+                                if (cooldownOver && smoothed.name && smoothed.score >= THRESHOLD && smoothed.confidence >= 0.4) {
+                                    onSharkFoundMl();
+                                }
+                            }
+                        }
+                    }
+                } catch (e) { console.error(e); }
+            })();
+            requestAnimationFrame(mlLoop);
+        }
+
+        async function startSharkMl() {
+            const status = (t) => { if (loadingStatus) loadingStatus.textContent = t; };
+            try {
+                status('Loading AI model…');
+                mlState.model = await SED.loadModel(status);
+                status('Loading embeddings…');
+                await SED.loadEmbeddings(mlState.emb, mlState.model, {
+                    embeddingsUrl: EMBEDDINGS_URL,
+                    cacheKey: CACHE_KEY,
+                    imageListUrl: IMAGE_LIST_URL,
+                    onStatus: status
+                });
+                window.SharkXR8VideoBridge.whenVideoReady({
+                    onVideo: (v) => {
+                        mlState.feedVideo = v;
+                        if (loadingEl) loadingEl.classList.add('hidden');
+                        mlState.running = true;
+                        mlLoop();
+                    },
+                    delayMs: 400
+                });
+            } catch (e) {
+                console.error(e);
+                status('Could not start detection. See console or refresh.');
+            }
+        }
+
+        function onSceneReadyForMl() {
+            setSharkSceneVisible(false);
+            startSharkMl();
+        }
+
         // If the engine isn't available, show a setup banner so the page doesn't look "broken".
-        // `xr.js` is loaded async, so wait for `xrloaded` before assuming it's missing.
         function ensureXr8PresentOrExplain() {
             const banner = document.getElementById('setup-banner');
-
             const startExperience = () => {
                 if (banner) banner.style.display = 'none';
                 const scene = document.querySelector('a-scene');
-                if (!scene) { onExperienceReady(); return; }
-                scene.addEventListener('loaded', onExperienceReady, { once: true });
+                if (!scene) { onSceneReadyForMl(); return; }
+                scene.addEventListener('loaded', onSceneReadyForMl, { once: true });
             };
-
             if (window.XR8) {
                 startExperience();
                 return;
             }
-
             const timeoutId = setTimeout(() => {
                 if (!window.XR8 && banner) banner.style.display = 'block';
-                onExperienceReady();
+                onSceneReadyForMl();
             }, 1500);
-
             window.addEventListener('xrloaded', () => {
                 clearTimeout(timeoutId);
                 startExperience();

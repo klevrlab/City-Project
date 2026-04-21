@@ -9,11 +9,15 @@ This repo is a static site (GitHub Pages compatible). To run 8th Wall Engine in 
    - `external/xr/xr.js`
    - the associated `.wasm` / worker / chunk assets that `xr.js` expects
 
-### Why is this not committed?
+### Optional: separate “engine” repository
 
-The engine binary is distributed under a **binary-only license** and is large. This repo keeps it out of git so:
+The template at [`8w-distributed-engine/README.md`](../../8w-distributed-engine/README.md) describes a **sibling** GitHub repository that holds only unzipped engine files, tagged for reproducible rollouts. This app repo can keep a minimal or empty `external/xr` in git and populate it in CI; see [`.github/workflows/deploy-pages.yml`](../../.github/workflows/deploy-pages.yml) (variables `EIGHTH_WALL_ENGINE_*`).
+
+### Why is the full engine not always committed?
+
+The engine binary is distributed under a **binary-only license** and is large. Some teams keep it out of the main app history so:
 - clones stay small
-- you can swap engine versions locally
+- you can swap engine versions via the companion repo or a local unzip
 
 ### Related docs
 

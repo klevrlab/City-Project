@@ -25,7 +25,26 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
+      # Optional: copy the self-hosted 8th Wall engine from a separate repository (version-pinned
+      # xr-standalone contents). Set repository Variables: EIGHTH_WALL_ENGINE_REPO, EIGHTH_WALL_ENGINE_REF.
+      # For a private engine repo, add a fine-scoped PAT in Secrets: EIGHTH_WALL_ENGINE_TOKEN.
+      - name: Checkout 8th Wall engine (optional)
+        if: ${{ vars.EIGHTH_WALL_ENGINE_REPO != '' }}
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.EIGHTH_WALL_ENGINE_REPO }}
+          ref: ${{ vars.EIGHTH_WALL_ENGINE_REF || 'main' }}
+          path: _engine-8w
+          token: ${{ secrets.EIGHTH_WALL_ENGINE_TOKEN || github.token }}
+
+      - name: Install 8th Wall engine into external/xr
+        if: ${{ vars.EIGHTH_WALL_ENGINE_REPO != '' }}
+        run: |
+          rm -rf external/xr
+          mkdir -p external/xr
+          cp -a _engine-8w/. "external/xr/"
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
       

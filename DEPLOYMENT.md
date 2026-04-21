@@ -80,6 +80,17 @@ git push -u origin main
 https://username.github.io/repo/
 ```
 
+### 8th Wall engine via companion repository (optional)
+
+The GitHub Actions workflow can replace `external/xr` with a checkout of another repository (for example a private copy of the unzipped `xr-standalone` tree). In the GitHub **repository Variables** (Settings → Secrets and variables → Actions → Variables) set:
+
+- `EIGHTH_WALL_ENGINE_REPO` — e.g. `my-org/my-8w-engine`
+- `EIGHTH_WALL_ENGINE_REF` — branch or tag (optional; defaults to `main` in the workflow if unset)
+
+For a **private** engine repository, add a **Personal Access Token** (or a GitHub App installation token) in **Secrets** as `EIGHTH_WALL_ENGINE_TOKEN` with `contents:read` on that repo.
+
+If these variables are not set, the deploy uses whatever `external/xr` is already in this repository.
+
 ### Netlify
 
 1. **Deploy via CLI**
