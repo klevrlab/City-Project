@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>8th Wall Debug (Desktop Safe)</title>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: radial-gradient(1200px 800px at 20% 10%, rgba(0, 169, 224, 0.18), transparent 60%),
+        radial-gradient(900px 600px at 80% 0%, rgba(0, 109, 117, 0.25), transparent 55%),
+        #050a0d;
+      color: rgba(255, 255, 255, 0.92);
+      padding: 18px;
+    }
+
+    .top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .top a {
+      color: #00A9E0;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      max-width: 980px;
+    }
+
+    @media (min-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .card {
+      background: rgba(0, 22, 26, 0.7);
+      border: 1px solid rgba(0, 169, 224, 0.22);
+      border-radius: 16px;
+      padding: 14px 14px;
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(14px) saturate(170%);
+      -webkit-backdrop-filter: blur(14px) saturate(170%);
+    }
+
+    .card h2 {
+      margin: 0 0 10px 0;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.9);
+      letter-spacing: 0.2px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0;
+      border-top: 1px solid rgba(0, 169, 224, 0.12);
+      font-size: 12px;
+    }
+
+    .row:first-of-type {
+      border-top: none;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      color: rgba(0, 169, 224, 1);
+    }
+
+    .pill {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.85);
+      white-space: nowrap;
+    }
+
+    .ok {
+      border-color: rgba(40, 200, 120, 0.45);
+      background: rgba(40, 200, 120, 0.12);
+      color: rgba(170, 255, 210, 0.95);
+    }
+
+    .bad {
+      border-color: rgba(255, 90, 90, 0.45);
+      background: rgba(255, 90, 90, 0.12);
+      color: rgba(255, 210, 210, 0.95);
+    }
+
+    .warn {
+      border-color: rgba(255, 190, 80, 0.5);
+      background: rgba(255, 190, 80, 0.12);
+      color: rgba(255, 235, 200, 0.95);
+    }
+
+    .hint {
+      margin-top: 10px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: rgba(255, 255, 255, 0.75);
+    }
+
+    .hint a {
+      color: #00A9E0;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(0, 169, 224, 0.3);
+      background: rgba(0, 169, 224, 0.12);
+      color: rgba(255, 255, 255, 0.92);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    button:active {
+      transform: scale(0.99);
+    }
+
+    .log {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 169, 224, 0.16);
+      background: rgba(0, 0, 0, 0.25);
+      max-height: 240px;
+      overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      color: rgba(255, 255, 255, 0.82);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="top">
+    <a href="./index.html">&larr; Home</a>
+    <h1>8th Wall Debug (Desktop Safe)</h1>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Environment</h2>
+      <div class="row">
+        <div>Origin</div>
+        <div><code id="origin"></code></div>
+      </div>
+      <div class="row">
+        <div>Secure context (HTTPS)</div>
+        <div class="pill" id="secure"></div>
+      </div>
+      <div class="row">
+        <div>User agent</div>
+        <div class="pill" id="uaPill"></div>
+      </div>
+      <div class="row">
+        <div>Mobile</div>
+        <div class="pill" id="mobile"></div>
+      </div>
+      <div class="row">
+        <div>Camera API</div>
+        <div class="pill" id="cameraApi"></div>
+      </div>
+      <div class="hint">
+        Desktop can validate files + wiring, but <strong>SLAM/world tracking runs on mobile only</strong>.
+        Use Android + <code>chrome://inspect</code> for remote debugging from Windows.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Engine files (served by your host)</h2>
+      <div class="row">
+        <div><code>external/xr/xr.js</code></div>
+        <div class="pill" id="xrjs"></div>
+      </div>
+      <div class="row">
+        <div><code>external/xr/xr-slam.js</code></div>
+        <div class="pill" id="xrs"></div>
+      </div>
+      <div class="row">
+        <div><code>external/xr/xr-face.js</code></div>
+        <div class="pill" id="xrf"></div>
+      </div>
+      <div class="row">
+        <div><code>external/xr/resources/</code></div>
+        <div class="pill" id="resources"></div>
+      </div>
+      <button id="runChecks">Run checks</button>
+      <div class="log" id="log"></div>
+      <div class="hint">
+        If any of these show <span class="pill bad">404</span> on GitHub Pages, the engine won’t load.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const logEl = document.getElementById('log');
+    const log = (msg) => { logEl.textContent += msg + '\n'; };
+    const setPill = (id, state, label) => {
+      const el = document.getElementById(id);
+      el.classList.remove('ok', 'bad', 'warn');
+      el.classList.add(state);
+      el.textContent = label;
+    };
+
+    const isMobile = () => {
+      const ua = navigator.userAgent || '';
+      return /Android|iPhone|iPad|iPod/i.test(ua);
+    };
+
+    document.getElementById('origin').textContent = window.location.origin;
+    setPill('secure', window.isSecureContext ? 'ok' : 'bad', window.isSecureContext ? 'YES' : 'NO');
+    setPill('uaPill', 'warn', (navigator.userAgent || '').slice(0, 28) + '…');
+    setPill('mobile', isMobile() ? 'ok' : 'warn', isMobile() ? 'YES' : 'NO (desktop)');
+    setPill('cameraApi', (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) ? 'ok' : 'bad',
+      (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) ? 'AVAILABLE' : 'MISSING');
+
+    async function check(url, pillId, label) {
+      try {
+        const r = await fetch(url, { method: 'GET', cache: 'no-store' });
+        if (r.ok) {
+          setPill(pillId, 'ok', `${label} OK`);
+          log(`OK  ${r.status}  ${url}`);
+          return true;
+        }
+        setPill(pillId, 'bad', `${label} ${r.status}`);
+        log(`BAD ${r.status}  ${url}`);
+        return false;
+      } catch (e) {
+        setPill(pillId, 'bad', `${label} ERR`);
+        log(`ERR      ${url}\n  ${String(e)}`);
+        return false;
+      }
+    }
+
+    async function run() {
+      logEl.textContent = '';
+      log('Checking engine assets…');
+      await check('./external/xr/xr.js', 'xrjs', 'xr.js');
+      await check('./external/xr/xr-slam.js', 'xrs', 'slam');
+      await check('./external/xr/xr-face.js', 'xrf', 'face');
+
+      // resources folder can't be fetched directly; check a known file if present.
+      // We probe the directory itself; GitHub Pages may return 403/404 depending on settings.
+      await check('./external/xr/resources/', 'resources', 'resources/');
+
+      log('\nNext: open `marker-demo-8thwall.html` on a phone for actual tracking.');
+    }
+
+    document.getElementById('runChecks').addEventListener('click', run);
+    // Auto-run once
+    run();
+  </script>
+</body>
+
+</html>
+
