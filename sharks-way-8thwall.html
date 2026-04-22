@@ -22,14 +22,18 @@
 
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
 
-    <!-- XR Extras (loading UX + common components) -->
+    <!-- XR Extras (loading UX + common components). Must load BEFORE xr.js so xrextras
+         can register its A-Frame components in time for the scene to pick them up. -->
     <script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js" crossorigin="anonymous"></script>
 
-    <!-- 8th Wall Engine (self-hosted). See `external/xr/README.md` for setup. -->
-    <!-- Loaded synchronously so `window.XR8` exists before A-Frame inits the `xrweb` component
-         on the static `<a-scene>`. With `async`, a-scene's xrweb.init() can race xr.js and throw
-         "ReferenceError: XR8 is not defined" (observed on iOS Safari). -->
+    <!-- 8th Wall Engine (self-hosted). See `external/xr/README.md` for setup.
+         Loaded synchronously so `window.XR8` exists before A-Frame inits the `xrweb`
+         component. `data-preload-chunks="slam"` ensures world-tracking is ready
+         before `xrloaded` fires. -->
     <script src="./external/xr/xr.js" data-preload-chunks="slam"></script>
+
+    <!-- Shared scene bootstrap: correct attach order + diagnostics for iOS Safari. -->
+    <script src="./JS/xr8-scene-bootstrap.js"></script>
 
     <style>
         body {
@@ -835,62 +839,13 @@
             startSharkMl();
         }
 
-        // If the engine isn't available, show a setup banner so the page doesn't look "broken".
-        function ensureXr8PresentOrExplain() {
-            const banner = document.getElementById('setup-banner');
-            const showXrError = (err) => {
-                console.error(err);
-                if (banner) {
-                    banner.style.display = 'block';
-                    banner.innerHTML = `
-                      <div><strong>XR initialization failed.</strong></div>
-                      <div style="margin-top:6px;opacity:0.9;">
-                        ${err && err.message ? String(err.message) : 'The engine could not start a session.'}
-                      </div>
-                      <div style="margin-top:6px;opacity:0.8;">
-                        Check <code>/debug-8thwall.html</code> and refresh.
-                      </div>
-                    `;
-                }
-                onSceneReadyForMl();
-            };
-            const startExperience = async () => {
-                if (banner) banner.style.display = 'none';
-                const scene = document.getElementById('xrscene') || document.querySelector('a-scene');
-                if (!scene) { onSceneReadyForMl(); return; }
-                try {
-                    // Ensure the world-tracking (SLAM) chunk is loaded before attaching `xrweb`,
-                    // otherwise XR8 throws "No valid session manager to handle this session".
-                    if (window.XR8 && typeof window.XR8.loadChunk === 'function') {
-                        await window.XR8.loadChunk('slam');
-                    }
-                    // Attach XR8 / XR Extras components only after XR8 + slam chunk are ready.
-                    // XR8.AFrame requires an <a-camera> element to be present in the scene.
-                    scene.setAttribute('xrconfig', '');
-                    scene.setAttribute('xrweb', '');
-                    scene.setAttribute('xrextras-loading', '');
-                    scene.setAttribute('xrextras-runtime-error', '');
-                    scene.setAttribute('xrextras-tap-recenter', '');
-                } catch (e) {
-                    showXrError(e);
-                    return;
-                }
-                scene.addEventListener('loaded', onSceneReadyForMl, { once: true });
-            };
-            if (window.XR8) {
-                startExperience();
-                return;
-            }
-            const timeoutId = setTimeout(() => {
-                if (!window.XR8 && banner) banner.style.display = 'block';
-            }, 5000);
-            window.addEventListener('xrloaded', () => {
-                clearTimeout(timeoutId);
-                startExperience();
-            }, { once: true });
-        }
-
-        window.addEventListener('load', ensureXr8PresentOrExplain);
+        window.addEventListener('load', function () {
+            window.XR8SceneBootstrap.start({
+                scene: document.getElementById('xrscene') || document.querySelector('a-scene'),
+                banner: document.getElementById('setup-banner'),
+                onReady: onSceneReadyForMl
+            });
+        });
 
         // Navigation Menu
         const navMenu = document.getElementById('nav-menu');
