@@ -23,6 +23,9 @@
 
   function startPolling(onVideo) {
     if (pollTimer) return;
+    // Reset between polling sessions so repeated calls to `whenVideoReady()` don't
+    // inherit the previous attempt count and immediately hit MAX_TRIES.
+    tryCount = 0;
     pollTimer = setInterval(function () {
       var v = findVideoInDocument();
       if (v) {
@@ -85,6 +88,8 @@
     }
 
     function run() {
+      // Reset attempt counter for each invocation.
+      tryCount = 0;
       if (tryOnce()) return;
       installCameraPipelineModule(onVideo);
       if (tryOnce()) return;

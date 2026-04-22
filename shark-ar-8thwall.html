@@ -688,7 +688,7 @@
             </a-torus>
         </a-entity>
 
-        <a-entity camera></a-entity>
+        <a-camera></a-camera>
         <a-light type="ambient" intensity="0.9"></a-light>
         <a-entity light="type: directional; intensity: 0.9; color: #ffffff" position="1 2 1"></a-entity>
     </a-scene>
@@ -896,12 +896,32 @@
                 if (banner) banner.style.display = 'none';
                 const scene = document.getElementById('xrscene') || document.querySelector('a-scene');
                 if (!scene) { onSceneReadyForMl(); return; }
-                // Attach XR8 / XR Extras components only after XR8 exists.
-                scene.setAttribute('xrconfig', '');
-                scene.setAttribute('xrweb', '');
-                scene.setAttribute('xrextras-loading', '');
-                scene.setAttribute('xrextras-runtime-error', '');
-                scene.setAttribute('xrextras-tap-recenter', '');
+                try {
+                    // Attach XR8 / XR Extras components only after XR8 exists.
+                    // XR8.AFrame requires an <a-camera> element to be present in the scene.
+                    scene.setAttribute('xrconfig', '');
+                    scene.setAttribute('xrweb', '');
+                    scene.setAttribute('xrextras-loading', '');
+                    scene.setAttribute('xrextras-runtime-error', '');
+                    scene.setAttribute('xrextras-tap-recenter', '');
+                } catch (e) {
+                    console.error(e);
+                    if (banner) {
+                        banner.style.display = 'block';
+                        banner.innerHTML = `
+                          <div><strong>XR initialization failed.</strong></div>
+                          <div style="margin-top:6px;opacity:0.9;">
+                            This usually happens when the scene is missing an <code>&lt;a-camera&gt;</code> or the engine files didn't load correctly.
+                          </div>
+                          <div style="margin-top:6px;opacity:0.8;">
+                            Check <code>/debug-8thwall.html</code> and refresh.
+                          </div>
+                        `;
+                    }
+                    // Still allow ML to run (non-AR) so the page isn't dead.
+                    onSceneReadyForMl();
+                    return;
+                }
                 scene.addEventListener('loaded', onSceneReadyForMl, { once: true });
             };
             if (window.XR8) {
