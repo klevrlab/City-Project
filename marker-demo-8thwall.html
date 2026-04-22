@@ -510,12 +510,9 @@
     </div>
 
     <!-- 8th Wall A-Frame scene -->
-    <a-scene embedded vr-mode-ui="enabled: false"
-        xrconfig
-        xrweb
-        xrextras-loading
-        xrextras-runtime-error
-        xrextras-tap-recenter
+    <!-- NOTE: iOS can race A-Frame component init vs XR8 global creation.
+         We attach `xrconfig/xrweb` only after the `xrloaded` event fires. -->
+    <a-scene id="xrscene" embedded vr-mode-ui="enabled: false"
         renderer="logarithmicDepthBuffer: true; precision: medium;">
 
         <a-assets>
@@ -656,8 +653,14 @@
 
             const startExperience = () => {
                 if (banner) banner.style.display = 'none';
-                const scene = document.querySelector('a-scene');
+                const scene = document.getElementById('xrscene') || document.querySelector('a-scene');
                 if (!scene) { onExperienceReady(); return; }
+                // Attach XR8 / XR Extras components only after XR8 exists.
+                scene.setAttribute('xrconfig', '');
+                scene.setAttribute('xrweb', '');
+                scene.setAttribute('xrextras-loading', '');
+                scene.setAttribute('xrextras-runtime-error', '');
+                scene.setAttribute('xrextras-tap-recenter', '');
                 scene.addEventListener('loaded', onExperienceReady, { once: true });
             };
 
