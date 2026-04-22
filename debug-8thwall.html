@@ -131,6 +131,13 @@
       font-weight: 700;
     }
 
+    .res-probe {
+      display: block;
+      margin-top: 4px;
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
     button {
       appearance: none;
       border: 1px solid rgba(0, 169, 224, 0.3);
@@ -215,13 +222,17 @@
         <div class="pill" id="xrf"></div>
       </div>
       <div class="row">
-        <div><code>external/xr/resources/</code></div>
+        <div>
+          <code>external/xr/resources/</code>
+          <span class="res-probe" title="Probed file; static hosts have no directory listing">(probe: powered-by.svg)</span>
+        </div>
         <div class="pill" id="resources"></div>
       </div>
       <button id="runChecks">Run checks</button>
       <div class="log" id="log"></div>
       <div class="hint">
-        If any of these show <span class="pill bad">404</span> on GitHub Pages, the engine won’t load.
+        Core files (<code>xr.js</code>, chunk JS) should return HTTP 200. A bare <code>resources/</code> directory URL often
+        404s on static hosts (no directory index); the probe file confirms the <code>resources</code> tree is present.
       </div>
     </div>
   </div>
@@ -273,9 +284,9 @@
       await check('./external/xr/xr-slam.js', 'xrs', 'slam');
       await check('./external/xr/xr-face.js', 'xrf', 'face');
 
-      // resources folder can't be fetched directly; check a known file if present.
-      // We probe the directory itself; GitHub Pages may return 403/404 depending on settings.
-      await check('./external/xr/resources/', 'resources', 'resources/');
+      // GitHub Pages (and most static hosts) do not list directories: `resources/` returns 404.
+      // The engine loads files by path; verify a small known asset from xr-standalone instead.
+      await check('./external/xr/resources/powered-by.svg', 'resources', 'resources');
 
       log('\nNext: open `marker-demo-8thwall.html` on a phone for actual tracking.');
     }
