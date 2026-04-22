@@ -22,7 +22,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js" crossorigin="anonymous"></script>
 
     <!-- 8th Wall Engine (self-hosted). See `external/xr/README.md` for setup. -->
-    <script async src="./external/xr/xr.js" data-preload-chunks="slam"></script>
+    <!-- Loaded synchronously so `window.XR8` exists before A-Frame inits the `xrweb` component
+         on the static `<a-scene>`. With `async`, a-scene's xrweb.init() can race xr.js and throw
+         "ReferenceError: XR8 is not defined" (observed on iOS Safari). -->
+    <script src="./external/xr/xr.js" data-preload-chunks="slam"></script>
 
     <style>
         body {
@@ -646,7 +649,8 @@
         }
 
         // If the engine isn't available, show a setup banner so the page doesn't look "broken".
-        // `xr.js` is loaded async, so wait for `xrloaded` before assuming it's missing.
+        // Wait for `xrloaded` before assuming it's missing. Timeout is generous to account for
+        // cellular iPhone loads where the 1MB xr.js can exceed 1.5s (false positive on mobile).
         function ensureXr8PresentOrExplain() {
             const banner = document.getElementById('setup-banner');
 
@@ -664,8 +668,7 @@
 
             const timeoutId = setTimeout(() => {
                 if (!window.XR8 && banner) banner.style.display = 'block';
-                onExperienceReady();
-            }, 1500);
+            }, 5000);
 
             window.addEventListener('xrloaded', () => {
                 clearTimeout(timeoutId);
