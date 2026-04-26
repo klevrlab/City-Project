@@ -1,0 +1,197 @@
+/**
+ * A-Frame component to manage the Tour UI (navigation, event info, map).
+ */
+AFRAME.registerComponent('tour-ui', {
+  schema: {
+    autoShow: { type: 'boolean', default: false }
+  },
+  init: function () {
+    this.navMenu = document.getElementById('nav-menu');
+    this.navOverlay = document.getElementById('nav-overlay');
+    this.hamburgerBtn = document.getElementById('hamburger-btn');
+    this.closeMenuBtn = document.getElementById('close-menu');
+    this.eventInfo = document.getElementById('event-info');
+    this.learnMoreBtn = document.getElementById('learn-more');
+    this.modelOverlay = document.getElementById('model-overlay');
+    this.sharkLabel = document.getElementById('shark-label-8w');
+
+    // Bind event handlers
+    this.onSharkFound = this.onSharkFound.bind(this);
+    this.openMenu = this.openMenu.bind(this);
+    this.closeMenu = this.closeMenu.bind(this);
+    this.onLearnMore = this.onLearnMore.bind(this);
+    this.onDismiss = this.onDismiss.bind(this);
+
+    // Setup listeners
+    this.el.sceneEl.addEventListener('sharkFound', this.onSharkFound);
+    
+    if (this.hamburgerBtn) {
+      this.hamburgerBtn.addEventListener('click', this.openMenu);
+      this.hamburgerBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        this.openMenu();
+      });
+    }
+
+    if (this.closeMenuBtn) {
+      this.closeMenuBtn.addEventListener('click', this.closeMenu);
+      this.closeMenuBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        this.closeMenu();
+      });
+    }
+
+    if (this.navOverlay) {
+      this.navOverlay.addEventListener('click', this.closeMenu);
+    }
+
+    if (this.learnMoreBtn) {
+      this.learnMoreBtn.addEventListener('click', this.onLearnMore);
+    }
+
+    const dismissBtn = document.getElementById('dismiss-event');
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', this.onDismiss);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.navMenu && this.navMenu.classList.contains('open')) {
+        this.closeMenu();
+      }
+    });
+
+    // Map initialization logic can also be here or in a separate component
+    this.initMap();
+
+    if (this.data.autoShow) {
+      this.el.sceneEl.addEventListener('loaded', () => {
+        const eventSystem = this.el.sceneEl.systems['event-system'];
+        if (eventSystem) {
+          this.showEvent(eventSystem.getCurrentEvent());
+        }
+      });
+    }
+  },
+
+  onSharkFound: function () {
+    const eventSystem = this.el.sceneEl.systems['event-system'];
+    if (eventSystem) {
+      this.showEvent(eventSystem.getCurrentEvent());
+    }
+    
+    if (this.modelOverlay) this.modelOverlay.classList.add('visible');
+    if (this.sharkLabel) this.sharkLabel.classList.add('visible');
+  },
+
+  showEvent: function (event) {
+    document.getElementById('event-title').textContent = event.title;
+    document.getElementById('event-date').innerHTML = `<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>${event.date} &bull; ${event.time}`;
+    document.getElementById('event-location').innerHTML = `<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${event.location}`;
+    document.getElementById('event-description').textContent = event.description;
+    document.getElementById('sharkey-message').textContent = event.sharkeyMessage;
+    document.getElementById('event-icon').src = event.icon;
+    
+    if (this.eventInfo) this.eventInfo.classList.add('visible');
+  },
+
+  onLearnMore: function () {
+    if (window.AudioUtils) window.AudioUtils.playSound('tap');
+    
+    const eventSystem = this.el.sceneEl.systems['event-system'];
+    const currentEvent = eventSystem.getCurrentEvent();
+    
+    alert(`Ready to attend ${currentEvent.title}?\n\nIn the full version, this would:\n- Show ticket options\n- Add to calendar\n- Share with friends\n- Get directions`);
+    
+    this.dismissUi();
+    eventSystem.getNextEvent();
+  },
+
+  onDismiss: function () {
+    if (window.AudioUtils) window.AudioUtils.playSound('tap');
+    this.dismissUi();
+  },
+
+  dismissUi: function () {
+    if (this.eventInfo) this.eventInfo.classList.remove('visible');
+    if (this.modelOverlay) this.modelOverlay.classList.remove('visible');
+    if (this.sharkLabel) this.sharkLabel.classList.remove('visible');
+    this.el.sceneEl.emit('dismissSharkUi');
+  },
+
+  openMenu: function () {
+    if (this.navMenu) this.navMenu.classList.add('open');
+    if (this.navOverlay) this.navOverlay.classList.add('visible');
+    if (window.AudioUtils) window.AudioUtils.playSound('tap');
+  },
+
+  closeMenu: function () {
+    if (this.navMenu) this.navMenu.classList.remove('open');
+    if (this.navOverlay) this.navOverlay.classList.remove('visible');
+    if (window.AudioUtils) window.AudioUtils.playSound('tap');
+  },
+
+  initMap: function () {
+    // Simplified map integration for the component
+    // In a real refactor, this might be its own 'tour-map' component
+    if (typeof L === 'undefined') return;
+    
+    this.map = null;
+    this.userMarker = null;
+    this.userLat = null;
+    this.userLng = null;
+
+    const initialize = () => {
+      if (this.map) return;
+      const mapContainer = document.getElementById('mini-map');
+      if (!mapContainer) return;
+
+      this.map = L.map(mapContainer, {
+        zoomControl: false,
+        attributionControl: true
+      }).setView([37.3352, -121.8811], 13);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19
+      }).addTo(this.map);
+    };
+
+    const update = () => {
+      if (!this.map || !this.userLat || !this.userLng) return;
+      this.map.setView([this.userLat, this.userLng], 16);
+      const mapWrapper = document.getElementById('map-container');
+      const isExpanded = mapWrapper.classList.contains('expanded');
+      if (window.updateMapMarkers) {
+        this.userMarker = window.updateMapMarkers(this.map, this.userLat, this.userLng, this.userMarker, isExpanded);
+      }
+    };
+
+    const toggleBtn = document.getElementById('toggle-map');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        const mapWrapper = document.getElementById('map-container');
+        mapWrapper.classList.toggle('expanded');
+        setTimeout(() => {
+          if (this.map) {
+            this.map.invalidateSize();
+            update();
+          }
+        }, 400);
+      });
+    }
+
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(
+        (position) => {
+          this.userLat = position.coords.latitude;
+          this.userLng = position.coords.longitude;
+          initialize();
+          update();
+        },
+        (error) => { console.error('Geolocation error:', error); },
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+      );
+    }
+
+    setTimeout(initialize, 1000);
+  }
+});
