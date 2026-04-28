@@ -717,8 +717,15 @@
     </div>
 
     <script>
-        // Inline logic has been moved to src/components and src/systems
-        // following 8th Wall best practices for local development.
+        // Initialize 8th Wall scene bootstrap
+        XR8SceneBootstrap.start({
+            scene: document.getElementById('xrscene')
+        });
+
+        // Initialize App logic
+        if (window.App && typeof window.App.init === 'function') {
+            window.App.init();
+        }
     </script>
 
     <!-- GPS Tracking for Checkpoints -->

@@ -7,14 +7,29 @@
 
   var pollTimer = null;
   var tryCount = 0;
-  var MAX_TRIES = 60;
+  var MAX_TRIES = 80; // Increased patience for slower devices
 
   function isUsableVideo(el) {
-    return el && el.tagName === 'VIDEO' && el.videoWidth > 0 && el.videoHeight > 0;
+    // A usable video must have dimensions and be actively receiving a stream
+    return el && 
+           el.tagName === 'VIDEO' && 
+           el.videoWidth > 0 && 
+           el.videoHeight > 0 && 
+           (el.srcObject || el.src);
   }
 
   function findVideoInDocument() {
+    // 1. Prefer the standard 8th Wall video ID
+    var xrVideo = document.getElementById('xr-video');
+    if (isUsableVideo(xrVideo)) return xrVideo;
+
+    // 2. Look for any video with a srcObject (likely a camera stream)
     var list = document.querySelectorAll('video');
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].srcObject && isUsableVideo(list[i])) return list[i];
+    }
+
+    // 3. Fallback to any usable video
     for (var i = 0; i < list.length; i++) {
       if (isUsableVideo(list[i])) return list[i];
     }
@@ -23,8 +38,6 @@
 
   function startPolling(onVideo) {
     if (pollTimer) return;
-    // Reset between polling sessions so repeated calls to `whenVideoReady()` don't
-    // inherit the previous attempt count and immediately hit MAX_TRIES.
     tryCount = 0;
     pollTimer = setInterval(function () {
       var v = findVideoInDocument();
@@ -38,7 +51,10 @@
       if (tryCount >= MAX_TRIES) {
         clearInterval(pollTimer);
         pollTimer = null;
-        if (global.console) console.warn('xr8-shark-video-bridge: no video after polling');
+        if (global.console) {
+          console.warn('xr8-shark-video-bridge: no video after polling (' + MAX_TRIES + ' tries)');
+          console.info('Check if 8th Wall session started and camera permissions were granted.');
+        }
       }
     }, 250);
   }
@@ -75,8 +91,20 @@
    * @param {{ onVideo: function(HTMLVideoElement): void, delayMs?: number }} opts
    */
   function whenVideoReady(opts) {
-    var onVideo = opts.onVideo;
+    var originalOnVideo = opts.onVideo;
     var delay = opts.delayMs != null ? opts.delayMs : 0;
+    var called = false;
+
+    // Ensure we only call the callback once, even if multiple detection methods succeed
+    function onVideo(v) {
+      if (called) return;
+      called = true;
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+      originalOnVideo(v);
+    }
 
     function tryOnce() {
       var v = findVideoInDocument();
@@ -88,12 +116,11 @@
     }
 
     function run() {
-      // Reset attempt counter for each invocation.
       tryCount = 0;
       if (tryOnce()) return;
       installCameraPipelineModule(onVideo);
       if (tryOnce()) return;
-      startPolling(function (v) { onVideo(v); });
+      startPolling(onVideo);
     }
 
     if (global.XR8) {
