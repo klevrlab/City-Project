@@ -9,14 +9,14 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Sharks Way - Shark Painting Demo</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="./css/map-component.css" />
-    <link rel="stylesheet" href="./css/progress-tracker.css" />
+    <link rel="stylesheet" href="./src/css/map-component.css" />
+    <link rel="stylesheet" href="./src/css/progress-tracker.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="./JS/checkpoint-loader.js"></script>
-    <script src="./JS/shared-map-markers.js"></script>
+    <script src="./src/utils/checkpoint-loader.js"></script>
+    <script src="./src/utils/shared-map-markers.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1"></script>
-    <script src="./JS/shark-embedding-detector.js"></script>
+    <script src="./src/utils/shark-embedding-detector.js"></script>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
@@ -2094,7 +2094,7 @@
 
         async function loadEmbeddings() {
             ui.loadingStatus.textContent = 'Almost ready...';
-            return SED.loadEmbeddings(STATE, STATE.model, {
+            return SharkEmbeddingDetector.loadEmbeddings(STATE, STATE.model, {
                 embeddingsUrl: EMBEDDINGS_URL,
                 cacheKey: CACHE_KEY
             });
@@ -2102,7 +2102,7 @@
 
         async function loadModel() {
             ui.loadingStatus.textContent = 'Preparing camera...';
-            STATE.model = await SED.loadModel((s) => { ui.loadingStatus.textContent = s; });
+            STATE.model = await SharkEmbeddingDetector.loadModel((s) => { ui.loadingStatus.textContent = s; });
         }
 
         async function startCamera() {
@@ -2120,7 +2120,7 @@
         }
 
         async function getFrameEmbedding() {
-            return SED.getFrameEmbedding(STATE.model, ui.video, ui.debugCanvas);
+            return SharkEmbeddingDetector.getFrameEmbedding(STATE.model, ui.video, ui.debugCanvas);
         }
 
         // ─── SHARK FOUND / LOST ───
@@ -2237,8 +2237,8 @@
                     requestAnimationFrame(loop);
                     return;
                 }
-                const rawMatch = SED.bestMatch(STATE, embedding);
-                const smoothed = SED.rollingScore(STATE, rawMatch);
+                const rawMatch = SharkEmbeddingDetector.bestMatch(STATE, embedding);
+                const smoothed = SharkEmbeddingDetector.rollingScore(STATE, rawMatch);
 
                 const cooldownOver = performance.now() - STATE.dismissedAt > 3000;
                 const mlMatch = cooldownOver && smoothed.name && smoothed.score >= THRESHOLD && smoothed.confidence >= 0.4;
@@ -2380,7 +2380,7 @@
     </script>
 
     <!-- GPS Tracking for Checkpoints -->
-    <script src="./JS/shared-gps-tracking.js"></script>
+    <script src="./src/utils/shared-gps-tracking.js"></script>
 </body>
 
 </html>
