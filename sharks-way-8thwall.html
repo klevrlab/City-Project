@@ -172,6 +172,9 @@
         <a href="./marker-demo.html" class="nav-link">Marker (AR.js)</a>
         <a href="./selfie-ar.html" class="nav-link">Selfie AR</a>
         <a href="./sharks-way-8thwall.html" class="nav-link">Detection (8th Wall)</a>
+        
+        <h2 style="color:#00A9E0; font-size:18px; margin-top:30px; margin-bottom:20px;">Settings</h2>
+        <button onclick="fixGyro()" class="nav-link" style="width:100%; text-align:left; border:none; cursor:pointer; font-family:inherit;">Fix Gyro (iOS)</button>
     </div>
 
     <!-- Progress tracker (checkpoint tracker) -->
@@ -263,6 +266,31 @@
         document.getElementById('toggle-map').addEventListener('click', () => {
             document.getElementById('map-container').classList.toggle('expanded');
         });
+
+        // iOS 13+ DeviceOrientation Permission
+        window.fixGyro = () => {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        console.log('Gyro permission state:', permissionState);
+                        if (permissionState === 'granted') {
+                            alert('Gyroscope permissions granted! AR tracking should be improved.');
+                        } else {
+                            alert('Gyroscope permissions denied. AR tracking may not work correctly.');
+                        }
+                    })
+                    .catch(e => {
+                        console.error('Gyro request failed:', e);
+                        alert('Could not request Gyroscope permissions.');
+                    });
+            } else {
+                console.log('Gyro permission not required on this device');
+                alert('Gyroscope permission is not required or not supported on this device.');
+            }
+            // Close menu after clicking
+            navMenu.style.right = '-100%';
+            navOverlay.classList.remove('visible');
+        };
     </script>
 
     <!-- GPS Tracking for Checkpoints -->
