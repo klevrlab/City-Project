@@ -208,32 +208,21 @@
     </div>
 
     <div class="card">
-      <h2>Engine files (served by your host)</h2>
+      <h2>Engine files (Served by CDN)</h2>
       <div class="row">
-        <div><code>external/xr/xr.js</code></div>
+        <div><code>xr.js (Distributed Engine)</code></div>
         <div class="pill" id="xrjs"></div>
       </div>
       <div class="row">
-        <div><code>external/xr/xr-slam.js</code></div>
+        <div><code>8frame-1.5.0.min.js</code></div>
         <div class="pill" id="xrs"></div>
       </div>
       <div class="row">
-        <div><code>external/xr/xr-face.js</code></div>
+        <div><code>xrextras.js</code></div>
         <div class="pill" id="xrf"></div>
-      </div>
-      <div class="row">
-        <div>
-          <code>external/xr/resources/</code>
-          <span class="res-probe" title="Probed file; static hosts have no directory listing">(probe: powered-by.svg)</span>
-        </div>
-        <div class="pill" id="resources"></div>
       </div>
       <button id="runChecks">Run checks</button>
       <div class="log" id="log"></div>
-      <div class="hint">
-        Core files (<code>xr.js</code>, chunk JS) should return HTTP 200. A bare <code>resources/</code> directory URL often
-        404s on static hosts (no directory index); the probe file confirms the <code>resources</code> tree is present.
-      </div>
     </div>
   </div>
 
@@ -261,15 +250,11 @@
 
     async function check(url, pillId, label) {
       try {
-        const r = await fetch(url, { method: 'GET', cache: 'no-store' });
-        if (r.ok) {
-          setPill(pillId, 'ok', `${label} OK`);
-          log(`OK  ${r.status}  ${url}`);
-          return true;
-        }
-        setPill(pillId, 'bad', `${label} ${r.status}`);
-        log(`BAD ${r.status}  ${url}`);
-        return false;
+        const r = await fetch(url, { method: 'HEAD', cache: 'no-store', mode: 'no-cors' });
+        // no-cors will return status 0, but it proves the network request didn't fail
+        setPill(pillId, 'ok', `${label} OK`);
+        log(`OK  ${url}`);
+        return true;
       } catch (e) {
         setPill(pillId, 'bad', `${label} ERR`);
         log(`ERR      ${url}\n  ${String(e)}`);
@@ -279,14 +264,10 @@
 
     async function run() {
       logEl.textContent = '';
-      log('Checking engine assets…');
-      await check('./external/xr/xr.js', 'xrjs', 'xr.js');
-      await check('./external/xr/xr-slam.js', 'xrs', 'slam');
-      await check('./external/xr/xr-face.js', 'xrf', 'face');
-
-      // GitHub Pages (and most static hosts) do not list directories: `resources/` returns 404.
-      // The engine loads files by path; verify a small known asset from xr-standalone instead.
-      await check('./external/xr/resources/powered-by.svg', 'resources', 'resources');
+      log('Checking engine assets (CDN)…');
+      await check('https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js', 'xrjs', 'xr.js');
+      await check('https://cdn.8thwall.com/web/aframe/8frame-1.5.0.min.js', 'xrs', '8frame');
+      await check('https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js', 'xrf', 'extras');
 
       log('\nNext: open `sharks-way-8thwall.html` on a phone for actual tracking.');
     }

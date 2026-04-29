@@ -24,17 +24,10 @@
     <script src="./src/utils/shark-embedding-detector.js"></script>
     <script src="./src/utils/xr8-shark-video-bridge.js"></script>
 
-    <!-- A-Frame -->
-    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-
-    <!-- 8th Wall Engine -->
-    <script src="./external/xr/xr.js"></script>
-
-    <!-- XR Extras -->
-    <script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js"></script>
-
-    <!-- Simplified bootstrap -->
-    <script src="./src/utils/xr8-scene-bootstrap.js"></script>
+    <!-- 1. 8th Wall Engine & Extras (2026 Distributed Engine) -->
+    <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" crossorigin="anonymous" data-preload-chunks="slam" async></script>
+    <script src="https://cdn.8thwall.com/web/aframe/8frame-1.5.0.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js" crossorigin="anonymous" async></script>
 
     <!-- Project Source -->
     <script src="./src/utils/audio-utils.js"></script>
@@ -83,15 +76,15 @@
 </head>
 
 <body>
-    <div id="loading">
-        <div class="spinner"></div>
-        <h2 style="color:white; margin-top:16px;">Loading Full AR</h2>
-        <p style="color:#aaa; font-size:13px;" id="loading-status">Initializing 8th Wall…</p>
-    </div>
-
+    <!-- XRExtras will provide its own loading screen if xrextras-loading is used -->
+    
     <!-- 8th Wall A-Frame scene -->
-    <a-scene id="xrscene" embedded vr-mode-ui="enabled: false"
-        renderer="logarithmicDepthBuffer: true;"
+    <a-scene id="xrscene" 
+        xrweb
+        xrextras-loading
+        xrextras-runtime-error
+        embedded vr-mode-ui="enabled: false"
+        renderer="logarithmicDepthBuffer: true; colorManagement: true;"
         tour-ui shark-detector="useGps: true">
 
         <a-assets>
@@ -110,21 +103,13 @@
             </a-plane>
         </a-entity>
 
-        <a-camera id="camera"></a-camera>
+        <a-camera id="camera" position="0 1.6 0"></a-camera>
     </a-scene>
 
     <script>
-        // Start 8th Wall
-        XR8SceneBootstrap.start({
-            scene: document.getElementById('xrscene')
-        });
-
-        // Hide loading once engine started
+        // Start logic - 8th Wall components on a-scene will handle run()
         window.addEventListener('xrloaded', () => {
-            document.getElementById('loading-status').textContent = 'Ready!';
-            setTimeout(() => {
-                document.getElementById('loading').classList.add('hidden');
-            }, 500);
+            console.log('8th Wall Engine Loaded');
         });
     </script>
 

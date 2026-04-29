@@ -32,16 +32,23 @@ AFRAME.registerComponent('shark-detector', {
     this.debugCanvas = document.getElementById('debug-canvas');
 
     // Wait for scene to be ready before starting ML
-    if (this.el.sceneEl.loaded) {
-      this.startDetection();
+    if (this.el.sceneEl.hasLoaded) {
+      this.waitForReality();
     } else {
-      this.el.sceneEl.addEventListener('loaded', this.startDetection.bind(this));
+      this.el.sceneEl.addEventListener('loaded', this.waitForReality.bind(this));
     }
 
     // Listen for UI dismissal to reset cooldown
     this.el.sceneEl.addEventListener('dismissSharkUi', () => {
       this.dismissShark();
     });
+  },
+
+  waitForReality: function() {
+      // With XRExtras, it's safer to wait for realityready to ensure the camera feed is active
+      window.addEventListener('realityready', () => {
+          this.startDetection();
+      }, {once: true});
   },
 
   startDetection: function () {
