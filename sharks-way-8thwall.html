@@ -27,12 +27,16 @@
     <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" crossorigin="anonymous" data-preload-chunks="slam" async></script>
     <script src="https://cdn.8thwall.com/web/aframe/8frame-1.5.0.min.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js" crossorigin="anonymous" async></script>
+    
+    <!-- A-Frame Extras for Animation Mixer -->
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
 
     <!-- Project Source -->
     <script src="./src/utils/audio-utils.js"></script>
     <script src="./src/utils/math-utils.js"></script>
     <script src="./src/systems/event-system.js"></script>
     <script src="./src/components/shark-detector.js"></script>
+    <script src="./src/components/shark-animator.js"></script>
     <script src="./src/components/tour-ui.js"></script>
     <script src="./src/app.js"></script>
 
@@ -175,7 +179,7 @@
         
         <h2 style="color:#00A9E0; font-size:18px; margin-top:30px; margin-bottom:20px;">Settings</h2>
         <button onclick="fixGyro()" class="nav-link" style="width:100%; text-align:left; border:none; cursor:pointer; font-family:inherit;">Fix Gyro (iOS)</button>
-        <button onclick="if(window.forceSpawnShark) window.forceSpawnShark()" class="nav-link" style="width:100%; text-align:left; border:none; cursor:pointer; font-family:inherit; margin-top: 10px;">Force Spawn Shark</button>
+        <button onclick="if(window.forceSpawnShark) window.forceSpawnShark(); if(window.forceNextSharkAnimation) window.forceNextSharkAnimation();" class="nav-link" style="width:100%; text-align:left; border:none; cursor:pointer; font-family:inherit; margin-top: 10px;">Force Spawn / Cycle</button>
     </div>
 
     <!-- Progress tracker (checkpoint tracker) -->
@@ -232,16 +236,13 @@
         tour-ui shark-detector="useGps: true">
 
         <a-assets>
-            <a-asset-item id="shark-model" src="./assets/3D-models/plushie_shark.glb"></a-asset-item>
+            <a-asset-item id="shaun-shark" src="./assets/3D-models/SHAUN_SHARK_ANIMATED.glb"></a-asset-item>
+            <a-asset-item id="stella-shark" src="./assets/3D-models/STELLA_CAI_SHARK_SJSU_TEST1.glb"></a-asset-item>
+            <a-asset-item id="maria-shark" src="./assets/3D-models/MARIA_SHARK_ANIMATED.glb"></a-asset-item>
         </a-assets>
 
         <!-- Shark Content -->
-        <a-entity id="shark-root" position="0 0 -2" visible="false">
-            <a-entity gltf-model="#shark-model" scale="0.5 0.5 0.5"
-                animation="property: position; to: 0 0.1 0; dir: alternate; loop: true; dur: 2000;">
-            </a-entity>
-            <a-cylinder position="0 -0.2 0" radius="0.6" height="0.1" color="#F4901E"></a-cylinder>
-            <a-text value="Shark Found!" align="center" position="0 1 0" scale="0.5 0.5 0.5"></a-text>
+        <a-entity id="shark-root" position="0 0 0" visible="false" shark-animator>
         </a-entity>
 
         <a-camera id="camera" position="0 1.6 0"></a-camera>
