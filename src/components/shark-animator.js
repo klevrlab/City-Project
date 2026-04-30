@@ -1,6 +1,6 @@
 /**
  * Cycles through animated shark models upon trigger,
- * making them swim in, pause, swim past, and fade out.
+ * making them swim from behind the camera towards a tapped marker.
  */
 AFRAME.registerComponent('shark-animator', {
   schema: {
@@ -8,9 +8,6 @@ AFRAME.registerComponent('shark-animator', {
     swimInDur: { type: 'number', default: 4000 },
     pauseDur: { type: 'number', default: 5000 },
     swimPastDur: { type: 'number', default: 4000 },
-    startPos: { type: 'vec3', default: {x: -8, y: 0.5, z: -12} }, // Starts far left and back
-    pausePos: { type: 'vec3', default: {x: 0, y: 0.5, z: -3} },    // Swims to center stage
-    endPos: { type: 'vec3', default: {x: 12, y: 0.5, z: 2} },      // Swims past to the right
     scale: { type: 'vec3', default: {x: 0.8, y: 0.8, z: 0.8} }
   },
 
@@ -18,27 +15,35 @@ AFRAME.registerComponent('shark-animator', {
     this.currentIndex = 0;
     this.isRunning = false;
     this.activeEntity = null;
+    this.targetMarker = null;
 
-    // Listen for the trigger from shark-detector
-    this.el.sceneEl.addEventListener('sharkFound', () => {
-      if (!this.isRunning) {
-        this.startSequence();
-      }
-    });
+    // Create a visual marker for the tap
+    this.createMarker();
+
+    // Listen for ground tap
+    const ground = document.getElementById('ground');
+    if (ground) {
+        ground.addEventListener('click', (e) => {
+            const pt = e.detail.intersection.point;
+            this.spawnAtTarget(pt);
+        });
+    }
 
     // Expose a clean manual cycle trigger that also handles UI cleanup
     window.manualSharkSpawn = () => {
        console.log("Manual shark spawn/cycle triggered");
        
-       // Ensure the root is visible
-       const root = document.getElementById('shark-root');
-       if (root) root.setAttribute('visible', 'true');
-
-       if (!this.isRunning) {
-           this.startSequence();
-       } else {
-           this.cycleNext(); // Skip to next immediately
-       }
+       const cam = document.getElementById('camera');
+       const camPos = cam.object3D.position;
+       const camDir = new THREE.Vector3();
+       cam.object3D.getWorldDirection(camDir); // Points backward relative to camera local
+       camDir.multiplyScalar(-1); // Fix to forward vector
+       
+       // Target point is 4 meters directly in front of the camera
+       const pt = new THREE.Vector3().copy(camPos).add(camDir.multiplyScalar(4));
+       pt.y = 0; // Force to ground level
+       
+       this.spawnAtTarget(pt);
 
        // Clean up the nav menu UI if it's open, to prevent it from getting stuck
        const navMenu = document.getElementById('nav-menu');
@@ -46,14 +51,43 @@ AFRAME.registerComponent('shark-animator', {
        if (navMenu) navMenu.style.right = '-100%';
        if (navOverlay) navOverlay.classList.remove('visible');
     };
+
+    // Listen for the trigger from shark-detector (GPS)
+    this.el.sceneEl.addEventListener('sharkFound', () => {
+        // Automatically trigger a spawn in front of the user
+        if (!this.isRunning) {
+            window.manualSharkSpawn();
+        }
+    });
   },
 
-  startSequence: function () {
-    this.isRunning = true;
-    this.cycleNext();
+  createMarker: function() {
+      this.targetMarker = document.createElement('a-entity');
+      // A simple glowing ring on the ground
+      this.targetMarker.setAttribute('geometry', 'primitive: ring; radiusInner: 0.6; radiusOuter: 0.8;');
+      this.targetMarker.setAttribute('material', 'color: #00A9E0; shader: flat; transparent: true; opacity: 0.8;');
+      this.targetMarker.setAttribute('rotation', '-90 0 0');
+      this.targetMarker.setAttribute('position', '0 -1000 0'); // Hide initially
+      
+      // Animate the ring to pulse
+      this.targetMarker.setAttribute('animation__scale', 'property: scale; to: 1.2 1.2 1.2; dir: alternate; loop: true; dur: 1000');
+      this.targetMarker.setAttribute('animation__fade', 'property: material.opacity; to: 0.2; dir: alternate; loop: true; dur: 1000');
+
+      this.el.sceneEl.appendChild(this.targetMarker);
   },
 
-  cycleNext: function () {
+  spawnAtTarget: function (targetPoint) {
+      this.isRunning = true;
+      const root = document.getElementById('shark-root');
+      if (root) root.setAttribute('visible', 'true');
+
+      // Move marker to the target point (slightly above ground to avoid z-fighting)
+      this.targetMarker.setAttribute('position', `${targetPoint.x} ${targetPoint.y + 0.05} ${targetPoint.z}`);
+
+      this.cycleNext(targetPoint);
+  },
+
+  cycleNext: function (targetPoint) {
     if (!this.isRunning) return;
 
     if (this.activeEntity) {
@@ -65,44 +99,59 @@ AFRAME.registerComponent('shark-animator', {
     this.currentIndex = (this.currentIndex + 1) % this.data.models.length;
 
     const ent = document.createElement('a-entity');
-    ent.setAttribute('gltf-model', modelId);
-    // Play any embedded animations
-    ent.setAttribute('animation-mixer', 'loop: repeat; timeScale: 1.0; crossFadeDuration: 0.3;');
-    ent.setAttribute('scale', this.data.scale);
     
-    // Start facing somewhat diagonally towards the center from the startPos
-    ent.setAttribute('rotation', '0 60 0');
-    
-    // Keep it hidden until the heavy GLB is fully loaded and parsed
-    ent.setAttribute('visible', 'false');
-
-    // Enable real AR shadows
-    ent.setAttribute('shadow', 'cast: true');
-
-    // Wait for the mesh to actually load before triggering the swim animation
+    // Add event listener BEFORE setting gltf-model to catch cached synchronous loads just in case
     ent.addEventListener('model-loaded', () => {
       ent.setAttribute('visible', 'true');
-      this.runAnimationPhases(ent);
+      this.runAnimationPhases(ent, targetPoint);
     }, { once: true });
 
-    // Handle potential errors if a model is missing
     ent.addEventListener('model-error', () => {
       console.warn("Failed to load shark model:", modelId);
-      // Skip to the next shark if this one is broken
-      setTimeout(() => this.cycleNext(), 1000);
+      setTimeout(() => this.cycleNext(targetPoint), 1000);
     }, { once: true });
+
+    ent.setAttribute('gltf-model', modelId);
+    ent.setAttribute('animation-mixer', 'loop: repeat; timeScale: 1.0; crossFadeDuration: 0.3;');
+    ent.setAttribute('scale', this.data.scale);
+    ent.setAttribute('visible', 'false');
+    ent.setAttribute('shadow', 'cast: true');
 
     this.el.appendChild(ent);
     this.activeEntity = ent;
   },
 
-  runAnimationPhases: function (ent) {
-    const { startPos, pausePos, endPos, swimInDur, pauseDur, swimPastDur } = this.data;
+  runAnimationPhases: function (ent, targetPoint) {
+    const { swimInDur, pauseDur, swimPastDur } = this.data;
+    const cam = document.getElementById('camera');
+    const camPos = cam.object3D.position;
+
+    // Calculate directions
+    const dirToTarget = new THREE.Vector3().subVectors(targetPoint, camPos);
+    dirToTarget.y = 0;
+    if (dirToTarget.lengthSq() < 0.1) dirToTarget.set(0, 0, -1); // Fallback if exactly on camera
+    dirToTarget.normalize();
+
+    // Start point: 3 meters *behind* the camera along the line to the target
+    const startPos = new THREE.Vector3().copy(camPos).sub(dirToTarget.clone().multiplyScalar(3));
+    startPos.y = 0.5;
+
+    const pausePos = new THREE.Vector3().copy(targetPoint);
+    pausePos.y = 0.5;
+
+    // End point: 12 meters *past* the target point
+    const endPos = new THREE.Vector3().copy(targetPoint).add(dirToTarget.clone().multiplyScalar(12));
+    endPos.y = 0.5;
+
+    // Calculate rotation to face the target
+    // Three.js atan2(x, z) gives rotation around Y. A-Frame rotates CCW around Y.
+    const yaw = Math.atan2(dirToTarget.x, dirToTarget.z) * (180 / Math.PI);
+    const facingYaw = yaw;
 
     // 1. Swim In
     ent.setAttribute('position', startPos);
+    ent.setAttribute('rotation', `0 ${facingYaw} 0`);
     
-    // Swim in position animation
     ent.setAttribute('animation__swimin', {
       property: 'position',
       from: `${startPos.x} ${startPos.y} ${startPos.z}`,
@@ -111,19 +160,10 @@ AFRAME.registerComponent('shark-animator', {
       easing: 'easeOutSine'
     });
 
-    // Rotate to face the user once arrived
-    ent.setAttribute('animation__rotatein', {
-      property: 'rotation',
-      to: '0 0 0',
-      dur: swimInDur,
-      easing: 'easeOutSine'
-    });
-
     setTimeout(() => {
       if (!this.isRunning || this.activeEntity !== ent) return;
       
       // 2. Pause
-      // Add a slight bobbing motion during pause to simulate water buoyance
       ent.setAttribute('animation__bob', {
         property: 'position',
         to: `${pausePos.x} ${pausePos.y + 0.3} ${pausePos.z}`,
@@ -133,10 +173,9 @@ AFRAME.registerComponent('shark-animator', {
         easing: 'easeInOutSine'
       });
 
-      // Subtle rotation back and forth
       ent.setAttribute('animation__sway', {
         property: 'rotation',
-        to: '0 10 0',
+        to: `0 ${facingYaw + 10} 0`,
         dir: 'alternate',
         loop: true,
         dur: 2500,
@@ -150,15 +189,6 @@ AFRAME.registerComponent('shark-animator', {
         ent.removeAttribute('animation__bob');
         ent.removeAttribute('animation__sway');
         
-        // Face the exit point
-        ent.setAttribute('animation__rotateout', {
-          property: 'rotation',
-          to: '0 -75 0', // Face to the right
-          dur: 1000,
-          easing: 'easeInOutQuad'
-        });
-
-        // Swim away
         ent.setAttribute('animation__swimpast', {
           property: 'position',
           to: `${endPos.x} ${endPos.y} ${endPos.z}`,
@@ -166,7 +196,6 @@ AFRAME.registerComponent('shark-animator', {
           easing: 'easeInSine'
         });
 
-        // 4. Fade Out Simulation (Scaling down to zero)
         ent.setAttribute('animation__fade', {
           property: 'scale',
           to: '0.001 0.001 0.001',
@@ -178,7 +207,7 @@ AFRAME.registerComponent('shark-animator', {
         setTimeout(() => {
           if (!this.isRunning || this.activeEntity !== ent) return;
           // Loop to the next shark
-          this.cycleNext();
+          this.cycleNext(targetPoint);
         }, swimPastDur);
 
       }, pauseDur);
