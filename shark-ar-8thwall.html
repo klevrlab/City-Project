@@ -61,6 +61,22 @@
             font-family: inherit;
         }
 
+        #spawn-btn {
+            position: fixed;
+            top: 64px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(40, 200, 120, 0.25);
+            border: 1px solid rgba(40, 200, 120, 0.4);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            font-family: inherit;
+        }
+
         #loading {
             position: fixed;
             inset: 0;
@@ -93,6 +109,7 @@
 
 <body>
     <button id="gyro-btn" onclick="fixGyro()">Fix Gyro (iOS)</button>
+    <button id="spawn-btn" onclick="if(window.forceSpawnShark) window.forceSpawnShark()">Force Spawn</button>
     <!-- XRExtras will provide its own loading screen if xrextras-loading is used -->
     
     <!-- 8th Wall A-Frame scene -->

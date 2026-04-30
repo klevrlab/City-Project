@@ -17,6 +17,12 @@ AFRAME.registerComponent('shark-detector', {
       gpsActive: false
     };
 
+    // Expose for debugging/manual trigger
+    window.forceSpawnShark = () => {
+      console.log("Manual spawn triggered");
+      this.onSharkFound();
+    };
+
     // Wait for scene to be ready
     if (this.el.sceneEl.hasLoaded) {
       this.waitForReality();
