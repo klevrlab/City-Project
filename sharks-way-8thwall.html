@@ -45,7 +45,7 @@
             margin: 0;
             overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #000;
+            background: transparent;
         }
 
         #topbar {
@@ -228,6 +228,7 @@
 
     <!-- 8th Wall A-Frame scene -->
     <a-scene id="xrscene" 
+        xrextras-almost-there
         xrextras-runtime-error
         xrextras-loading
         xrweb
@@ -240,6 +241,13 @@
             <a-asset-item id="stella-shark" src="./assets/3D-models/STELLA_CAI_SHARK_SJSU_TEST1.glb"></a-asset-item>
             <a-asset-item id="maria-shark" src="./assets/3D-models/MARIA_SHARK_ANIMATED.glb"></a-asset-item>
         </a-assets>
+
+        <!-- Lighting for AR Shadows -->
+        <a-entity light="type: ambient; intensity: 0.5;"></a-entity>
+        <a-entity light="type: directional; castShadow: true; intensity: 0.8; shadowMapHeight: 2048; shadowMapWidth: 2048; shadowCameraTop: 20; shadowCameraBottom: -20; shadowCameraRight: 20; shadowCameraLeft: -20; target: #camera" position="5 10 5"></a-entity>
+
+        <!-- Shadow Ground Plane -->
+        <a-plane id="ground" position="0 0.4 0" rotation="-90 0 0" width="50" height="50" material="shader: shadow; opacity: 0.4;" shadow="receive: true"></a-plane>
 
         <!-- Shark Content -->
         <a-entity id="shark-root" position="0 0 0" visible="false" shark-animator>

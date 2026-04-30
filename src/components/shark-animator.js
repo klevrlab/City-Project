@@ -76,14 +76,8 @@ AFRAME.registerComponent('shark-animator', {
     // Keep it hidden until the heavy GLB is fully loaded and parsed
     ent.setAttribute('visible', 'false');
 
-    // Enhancements: add some subtle environmental effects
-    const shadow = document.createElement('a-cylinder');
-    shadow.setAttribute('radius', '1.2');
-    shadow.setAttribute('height', '0.01');
-    shadow.setAttribute('color', '#004c54');
-    shadow.setAttribute('opacity', '0.4');
-    shadow.setAttribute('position', '0 -0.8 0');
-    ent.appendChild(shadow);
+    // Enable real AR shadows
+    ent.setAttribute('shadow', 'cast: true');
 
     // Wait for the mesh to actually load before triggering the swim animation
     ent.addEventListener('model-loaded', () => {
