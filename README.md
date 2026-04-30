@@ -65,7 +65,7 @@ City-Project/
 ├── assets/
 │   ├── 3D-models/          # GLB files
 │   ├── Markers/            # AR patterns
-│   ├── the-big-game.svg
+│   ├── SharkLogo.png
 │   └── video.mp4
 ├── data/
 │   ├── shark-locations.json

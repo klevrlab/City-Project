@@ -8,7 +8,7 @@
       "description": "Checkpoint A",
       "latitude": 37.336861,
       "longitude": -121.894361,
-      "icon": "./assets/the-big-game.svg",
+      "icon": "./assets/SharkLogo.png",
       "sharkeyMessage": "You've reached Checkpoint A! Keep going to Label B!",
       "eventInfo": {
         "name": "The Big Game",
@@ -22,7 +22,7 @@
       "description": "Checkpoint B",
       "latitude": 37.334222,
       "longitude": -121.900417,
-      "icon": "./assets/the-big-game.svg",
+      "icon": "./assets/SharkLogo.png",
       "sharkeyMessage": "Congratulations! You've reached Checkpoint B!",
       "eventInfo": {
         "name": "The Big Game",
