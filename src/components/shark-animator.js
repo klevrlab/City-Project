@@ -26,12 +26,25 @@ AFRAME.registerComponent('shark-animator', {
       }
     });
 
-    // Expose a manual cycle trigger
-    window.forceNextSharkAnimation = () => {
-       if (!this.isRunning) this.startSequence();
-       else {
+    // Expose a clean manual cycle trigger that also handles UI cleanup
+    window.manualSharkSpawn = () => {
+       console.log("Manual shark spawn/cycle triggered");
+       
+       // Ensure the root is visible
+       const root = document.getElementById('shark-root');
+       if (root) root.setAttribute('visible', 'true');
+
+       if (!this.isRunning) {
+           this.startSequence();
+       } else {
            this.cycleNext(); // Skip to next immediately
        }
+
+       // Clean up the nav menu UI if it's open, to prevent it from getting stuck
+       const navMenu = document.getElementById('nav-menu');
+       const navOverlay = document.getElementById('nav-overlay');
+       if (navMenu) navMenu.style.right = '-100%';
+       if (navOverlay) navOverlay.classList.remove('visible');
     };
   },
 
@@ -59,6 +72,9 @@ AFRAME.registerComponent('shark-animator', {
     
     // Start facing somewhat diagonally towards the center from the startPos
     ent.setAttribute('rotation', '0 60 0');
+    
+    // Keep it hidden until the heavy GLB is fully loaded and parsed
+    ent.setAttribute('visible', 'false');
 
     // Enhancements: add some subtle environmental effects
     const shadow = document.createElement('a-cylinder');
@@ -69,10 +85,21 @@ AFRAME.registerComponent('shark-animator', {
     shadow.setAttribute('position', '0 -0.8 0');
     ent.appendChild(shadow);
 
+    // Wait for the mesh to actually load before triggering the swim animation
+    ent.addEventListener('model-loaded', () => {
+      ent.setAttribute('visible', 'true');
+      this.runAnimationPhases(ent);
+    }, { once: true });
+
+    // Handle potential errors if a model is missing
+    ent.addEventListener('model-error', () => {
+      console.warn("Failed to load shark model:", modelId);
+      // Skip to the next shark if this one is broken
+      setTimeout(() => this.cycleNext(), 1000);
+    }, { once: true });
+
     this.el.appendChild(ent);
     this.activeEntity = ent;
-
-    this.runAnimationPhases(ent);
   },
 
   runAnimationPhases: function (ent) {
