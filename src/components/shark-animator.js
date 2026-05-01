@@ -8,7 +8,7 @@ AFRAME.registerComponent('shark-animator', {
     swimInDur: { type: 'number', default: 4000 },
     pauseDur: { type: 'number', default: 5000 },
     swimPastDur: { type: 'number', default: 4000 },
-    scale: { type: 'vec3', default: {x: 0.8, y: 0.8, z: 0.8} }
+    scale: { type: 'vec3', default: {x: 0.4, y: 0.4, z: 0.4} }
   },
 
   init: function () {
@@ -28,6 +28,12 @@ AFRAME.registerComponent('shark-animator', {
             this.spawnAtTarget(pt);
         });
     }
+
+    // Show instructions when AR is ready
+    window.addEventListener('realityready', () => {
+        const instruction = document.getElementById('tap-instruction');
+        if (instruction && !this.isRunning) instruction.classList.add('visible');
+    });
 
     // Expose a clean manual cycle trigger that also handles UI cleanup
     window.manualSharkSpawn = () => {
@@ -80,6 +86,10 @@ AFRAME.registerComponent('shark-animator', {
       this.isRunning = true;
       const root = document.getElementById('shark-root');
       if (root) root.setAttribute('visible', 'true');
+
+      // Hide instruction
+      const instruction = document.getElementById('tap-instruction');
+      if (instruction) instruction.classList.remove('visible');
 
       // Move marker to the target point (slightly above ground to avoid z-fighting)
       this.targetMarker.setAttribute('position', `${targetPoint.x} ${targetPoint.y + 0.05} ${targetPoint.z}`);

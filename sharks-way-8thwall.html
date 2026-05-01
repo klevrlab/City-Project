@@ -150,6 +150,30 @@
             width: 160px;
             border: 1px solid rgba(0, 169, 224, 0.3);
         }
+
+        #tap-instruction {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 109, 117, 0.85);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            z-index: 2000;
+            pointer-events: none;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            border: 1px solid rgba(0, 169, 224, 0.5);
+        }
+        #tap-instruction.visible {
+            opacity: 1;
+        }
     </style>
 </head>
 
@@ -166,6 +190,9 @@
             </svg>
         </button>
     </div>
+
+    <!-- Tap Instruction Overlay -->
+    <div id="tap-instruction">👆 Tap the ground to spawn the shark!</div>
 
     <!-- Navigation Menu -->
     <div id="nav-overlay"></div>
