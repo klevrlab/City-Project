@@ -35,8 +35,8 @@ AFRAME.registerComponent('shark-animator', {
       {
         label: 'Jimmy Swimmer',
         model: '#jimmy-swimmer',
-        motion: 'hoverTrack',
-        y: 1.1,
+        motion: 'riseFromGround',
+        y: 1.0,
         scale: '0.4 0.4 0.4',
         rotationOffsetY: 0
       },
@@ -46,7 +46,7 @@ AFRAME.registerComponent('shark-animator', {
         motion: 'wavePose',
         y: 0.45,
         scale: '0.55 0.55 0.55',
-        rotationOffsetY: 0
+        rotationOffsetY: 180
       },
       {
         label: 'Diving Shark',
@@ -62,15 +62,7 @@ AFRAME.registerComponent('shark-animator', {
         motion: 'enterCenter',
         y: 0.55,
         scale: '0.4 0.4 0.4',
-        rotationOffsetY: 0
-      },
-      {
-        label: 'Little Italy Patrol',
-        model: '#little-italy-shark',
-        motion: 'patrolLoop',
-        y: 0.65,
-        scale: '0.34 0.34 0.34',
-        rotationOffsetY: 0
+        rotationOffsetY: 180
       }
     ];
 
@@ -238,86 +230,184 @@ AFRAME.registerComponent('shark-animator', {
     const facingYaw = baseYaw + (experience.rotationOffsetY || 0);
     const y = Number(experience.y || 0.5);
 
-    if (experience.motion === 'hoverTrack') {
-      const hoverPos = new THREE.Vector3(targetPoint.x, y + 0.45, targetPoint.z);
-      ent.setAttribute('position', `${hoverPos.x} ${hoverPos.y} ${hoverPos.z}`);
+    if (experience.motion === 'riseFromGround') {
+      // Jimmy: emerges from below ground with a fade-in, hovers above the painting
+      // long enough for the viewer to walk around it, then sinks back with a fade-out.
+      const startY = -0.6;
+      const hoverY = y + 0.35;
+      const sinkY = -0.4;
+      const x = targetPoint.x;
+      const z = targetPoint.z;
+
+      ent.setAttribute('position', `${x} ${startY} ${z}`);
       ent.setAttribute('rotation', `0 ${facingYaw} 0`);
-      ent.setAttribute('animation__hover', {
+
+      this._setEntityOpacity(ent, 0);
+
+      ent.setAttribute('animation__rise', {
         property: 'position',
-        from: `${hoverPos.x} ${(hoverPos.y - 0.16).toFixed(3)} ${hoverPos.z}`,
-        to: `${hoverPos.x} ${(hoverPos.y + 0.16).toFixed(3)} ${hoverPos.z}`,
-        dir: 'alternate',
-        loop: true,
-        dur: 950,
-        easing: 'easeInOutSine'
+        from: `${x} ${startY} ${z}`,
+        to: `${x} ${hoverY} ${z}`,
+        dur: 1800,
+        easing: 'easeOutCubic'
       });
-      this.queue(() => this.cycleNext(targetPoint), 4200);
+      this._fadeEntity(ent, 0, 1, 1800);
+
+      // Gentle hover bob once the rise completes.
+      this.queue(() => {
+        if (!this.isRunning || this.activeEntity !== ent) return;
+        ent.setAttribute('animation__hoverBob', {
+          property: 'position',
+          from: `${x} ${(hoverY - 0.12).toFixed(3)} ${z}`,
+          to: `${x} ${(hoverY + 0.12).toFixed(3)} ${z}`,
+          dir: 'alternate',
+          loop: true,
+          dur: 1100,
+          easing: 'easeInOutSine'
+        });
+      }, 1800);
+
+      // Linger so visitors can circle the model.
+      const lingerMs = 6000;
+
+      // Sink + fade out as the cycle ends.
+      this.queue(() => {
+        if (!this.isRunning || this.activeEntity !== ent) return;
+        ent.removeAttribute('animation__hoverBob');
+        ent.setAttribute('animation__sink', {
+          property: 'position',
+          from: `${x} ${hoverY} ${z}`,
+          to: `${x} ${sinkY} ${z}`,
+          dur: 1500,
+          easing: 'easeInCubic'
+        });
+        this._fadeEntity(ent, 1, 0, 1500);
+      }, 1800 + lingerMs);
+
+      this.queue(() => this.cycleNext(targetPoint), 1800 + lingerMs + 1500 + 200);
       return;
     }
 
     if (experience.motion === 'wavePose') {
-      const posePos = new THREE.Vector3(targetPoint.x, y, targetPoint.z - 0.35);
-      ent.setAttribute('position', `${posePos.x} ${posePos.y} ${posePos.z}`);
+      // Sharkie rises out of the ground with a fade-in (matching Jimmy), holds the
+      // pose long enough for a selfie, then sinks back with a fade-out.
+      const x = targetPoint.x;
+      const z = targetPoint.z - 0.35;
+      const startY = -0.6;
+      const poseY = y;
+      const sinkY = -0.4;
+
+      ent.setAttribute('position', `${x} ${startY} ${z}`);
       ent.setAttribute('rotation', `0 ${facingYaw} 0`);
-      ent.setAttribute('animation__poseSway', {
-        property: 'rotation',
-        from: `0 ${(facingYaw - 10).toFixed(3)} 0`,
-        to: `0 ${(facingYaw + 10).toFixed(3)} 0`,
-        dir: 'alternate',
-        loop: true,
-        dur: 1400,
-        easing: 'easeInOutSine'
+      this._setEntityOpacity(ent, 0);
+
+      ent.setAttribute('animation__rise', {
+        property: 'position',
+        from: `${x} ${startY} ${z}`,
+        to: `${x} ${poseY} ${z}`,
+        dur: 1800,
+        easing: 'easeOutCubic'
       });
-      this.queue(() => this.cycleNext(targetPoint), 3600);
+      this._fadeEntity(ent, 0, 1, 1800);
+
+      // Start the wave sway once Sharkie is up.
+      this.queue(() => {
+        if (!this.isRunning || this.activeEntity !== ent) return;
+        ent.setAttribute('animation__poseSway', {
+          property: 'rotation',
+          from: `0 ${(facingYaw - 8).toFixed(3)} 0`,
+          to: `0 ${(facingYaw + 8).toFixed(3)} 0`,
+          dir: 'alternate',
+          loop: true,
+          dur: 1800,
+          easing: 'easeInOutSine'
+        });
+      }, 1800);
+
+      const lingerMs = 5500;
+
+      // Sink + fade out before handing off to the next cycle.
+      this.queue(() => {
+        if (!this.isRunning || this.activeEntity !== ent) return;
+        ent.removeAttribute('animation__poseSway');
+        ent.setAttribute('animation__sink', {
+          property: 'position',
+          from: `${x} ${poseY} ${z}`,
+          to: `${x} ${sinkY} ${z}`,
+          dur: 1500,
+          easing: 'easeInCubic'
+        });
+        this._fadeEntity(ent, 1, 0, 1500);
+      }, 1800 + lingerMs);
+
+      this.queue(() => this.cycleNext(targetPoint), 1800 + lingerMs + 1500 + 200);
       return;
     }
 
     if (experience.motion === 'diveArc') {
-      const start = new THREE.Vector3(targetPoint.x, y + 2.4, targetPoint.z + 5.4);
-      const mid = new THREE.Vector3(targetPoint.x, y + 0.2, targetPoint.z + 0.3);
-      const end = new THREE.Vector3(targetPoint.x, y - 0.2, targetPoint.z - 8.0);
-      ent.setAttribute('position', `${start.x} ${start.y} ${start.z}`);
-      ent.setAttribute('rotation', `0 ${facingYaw} -8`);
+      // Steep, near-vertical descent that flattens out at the painting, lingers,
+      // then swims forward past the viewer. Nose-pitch is animated so the shark
+      // actually looks like it's plunging head-first.
+      const startPos = new THREE.Vector3(targetPoint.x, y + 5.0, targetPoint.z + 0.6);
+      const midPos = new THREE.Vector3(targetPoint.x, y + 0.35, targetPoint.z);
+      const endPos = new THREE.Vector3(targetPoint.x, y + 0.35, targetPoint.z - 7.0);
+
+      ent.setAttribute('position', `${startPos.x} ${startPos.y} ${startPos.z}`);
+      ent.setAttribute('rotation', `-65 ${facingYaw} 0`);
+
       ent.setAttribute('animation__diveIn', {
         property: 'position',
-        from: `${start.x} ${start.y} ${start.z}`,
-        to: `${mid.x} ${mid.y} ${mid.z}`,
-        dur: 1400,
+        from: `${startPos.x} ${startPos.y} ${startPos.z}`,
+        to: `${midPos.x} ${midPos.y} ${midPos.z}`,
+        dur: 1800,
         easing: 'easeInQuad'
       });
+      ent.setAttribute('animation__divePitch', {
+        property: 'rotation',
+        from: `-65 ${facingYaw.toFixed(3)} 0`,
+        to: `-5 ${facingYaw.toFixed(3)} 0`,
+        dur: 1800,
+        easing: 'easeOutSine'
+      });
+
+      // Linger at the painting.
       this.queue(() => {
         if (!this.isRunning || this.activeEntity !== ent) return;
+        ent.removeAttribute('animation__diveIn');
+        ent.removeAttribute('animation__divePitch');
+        ent.setAttribute('animation__diveHover', {
+          property: 'position',
+          from: `${midPos.x} ${(midPos.y - 0.1).toFixed(3)} ${midPos.z}`,
+          to: `${midPos.x} ${(midPos.y + 0.1).toFixed(3)} ${midPos.z}`,
+          dir: 'alternate',
+          loop: true,
+          dur: 1000,
+          easing: 'easeInOutSine'
+        });
+      }, 1800);
+
+      // Swim forward past the viewer.
+      this.queue(() => {
+        if (!this.isRunning || this.activeEntity !== ent) return;
+        ent.removeAttribute('animation__diveHover');
         ent.setAttribute('animation__diveOut', {
           property: 'position',
-          from: `${mid.x} ${mid.y} ${mid.z}`,
-          to: `${end.x} ${end.y} ${end.z}`,
-          dur: 1900,
-          easing: 'easeOutSine'
+          from: `${midPos.x} ${midPos.y} ${midPos.z}`,
+          to: `${endPos.x} ${endPos.y} ${endPos.z}`,
+          dur: 2000,
+          easing: 'easeInSine'
         });
-      }, 1400);
-      this.queue(() => this.cycleNext(targetPoint), 3500);
+      }, 1800 + 3500);
+
+      this.queue(() => this.cycleNext(targetPoint), 1800 + 3500 + 2000 + 200);
       return;
     }
 
-    if (experience.motion === 'patrolLoop') {
-      const westPos = new THREE.Vector3(targetPoint.x - 2.3, y, targetPoint.z - 2.0);
-      const eastPos = new THREE.Vector3(targetPoint.x + 2.3, y, targetPoint.z - 2.0);
-      ent.setAttribute('position', `${westPos.x} ${westPos.y} ${westPos.z}`);
-      ent.setAttribute('rotation', `0 ${facingYaw} 0`);
-      ent.setAttribute('animation__patrol', {
-        property: 'position',
-        from: `${westPos.x} ${westPos.y} ${westPos.z}`,
-        to: `${eastPos.x} ${eastPos.y} ${eastPos.z}`,
-        dir: 'alternate',
-        loop: true,
-        dur: 2600,
-        easing: 'easeInOutSine'
-      });
-      this.queue(() => this.cycleNext(targetPoint), 5200);
-      return;
-    }
+    // Default motion (Maria, Stella): enter center, hover, swim through.
+    const swimInDur = 2500;
+    const centerDwellDur = 4500;
+    const swimOutDur = 2500;
 
-    // Default motion: enter center, hover, swim through.
     const startPos = new THREE.Vector3().copy(camPos).sub(dirToTarget.clone().multiplyScalar(3.4));
     startPos.y = y;
     const centerPos = new THREE.Vector3(targetPoint.x, y, targetPoint.z);
@@ -330,7 +420,7 @@ AFRAME.registerComponent('shark-animator', {
       property: 'position',
       from: `${startPos.x} ${startPos.y} ${startPos.z}`,
       to: `${centerPos.x} ${centerPos.y} ${centerPos.z}`,
-      dur: 2000,
+      dur: swimInDur,
       easing: 'easeOutSine'
     });
 
@@ -345,7 +435,7 @@ AFRAME.registerComponent('shark-animator', {
         dur: 900,
         easing: 'easeInOutSine'
       });
-    }, 2000);
+    }, swimInDur);
 
     this.queue(() => {
       if (!this.isRunning || this.activeEntity !== ent) return;
@@ -354,11 +444,49 @@ AFRAME.registerComponent('shark-animator', {
         property: 'position',
         from: `${centerPos.x} ${centerPos.y} ${centerPos.z}`,
         to: `${endPos.x} ${endPos.y} ${endPos.z}`,
-        dur: 1900,
+        dur: swimOutDur,
         easing: 'easeInSine'
       });
-    }, 3900);
+    }, swimInDur + centerDwellDur);
 
-    this.queue(() => this.cycleNext(targetPoint), 6000);
+    this.queue(() => this.cycleNext(targetPoint), swimInDur + centerDwellDur + swimOutDur + 200);
+  },
+
+  // ─── helpers ─────────────────────────────────────────────────────────────
+  // Walk the GLTF mesh tree and set each material to a target opacity.
+  _setEntityOpacity: function (ent, opacity) {
+    if (!ent) return;
+    const apply = () => {
+      const mesh = ent.getObject3D('mesh');
+      if (!mesh) return false;
+      mesh.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        mats.forEach((mat) => {
+          mat.transparent = true;
+          mat.opacity = opacity;
+          mat.depthWrite = opacity >= 0.99;
+          mat.needsUpdate = true;
+        });
+      });
+      return true;
+    };
+    if (!apply()) {
+      ent.addEventListener('model-loaded', apply, { once: true });
+    }
+  },
+
+  // Smoothly fade an entity's materials between two opacity values over a duration.
+  _fadeEntity: function (ent, fromOpacity, toOpacity, durationMs) {
+    if (!ent) return;
+    const start = performance.now();
+    const tick = (now) => {
+      if (!this.isRunning || this.activeEntity !== ent) return;
+      const t = Math.min((now - start) / durationMs, 1);
+      const opacity = fromOpacity + (toOpacity - fromOpacity) * t;
+      this._setEntityOpacity(ent, opacity);
+      if (t < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   }
 });
