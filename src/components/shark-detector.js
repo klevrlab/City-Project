@@ -6,7 +6,13 @@ AFRAME.registerComponent('shark-detector', {
     gpsTargetLat: { type: 'number', default: 37.33564048861824 },
     gpsTargetLng: { type: 'number', default: -121.8978303846544 },
     gpsRadius: { type: 'number', default: 250 },
-    useGps: { type: 'boolean', default: true }
+    useGps: { type: 'boolean', default: true },
+    // Little Italy "always-on" bounding box (West / East corners from the task spec).
+    littleItalyWestLat: { type: 'number', default: 37.334778 },
+    littleItalyWestLng: { type: 'number', default: -121.899222 },
+    littleItalyEastLat: { type: 'number', default: 37.335444 },
+    littleItalyEastLng: { type: 'number', default: -121.896778 },
+    littleItalyPaddingDeg: { type: 'number', default: 0.0006 }
   },
 
   init: function () {
@@ -14,7 +20,10 @@ AFRAME.registerComponent('shark-detector', {
       sharkVisible: false,
       dismissedAt: 0,
       gpsWatchId: null,
-      gpsActive: false
+      gpsActive: false,
+      gpsPingCount: 0,
+      alwaysOn: false,
+      inLittleItaly: false
     };
 
     // Expose for debugging/manual trigger
@@ -69,6 +78,7 @@ AFRAME.registerComponent('shark-detector', {
 
     this.state.gpsWatchId = navigator.geolocation.watchPosition(
       (pos) => {
+        this.state.gpsPingCount += 1;
         // Fallback in case MathUtils is not loaded
         let d = 999999;
         if (window.MathUtils && window.MathUtils.haversineMeters) {
@@ -87,11 +97,36 @@ AFRAME.registerComponent('shark-detector', {
 
         console.log(`GPS Distance to Shark: ${d.toFixed(2)}m`);
         this.state.gpsActive = d <= this.data.gpsRadius;
-        
+
+        const inLittleItaly = this.isInLittleItaly(pos.coords.latitude, pos.coords.longitude);
+        const enteredLittleItaly = inLittleItaly && !this.state.inLittleItaly;
+        const leftLittleItaly = !inLittleItaly && this.state.inLittleItaly;
+        this.state.inLittleItaly = inLittleItaly;
+        this.state.alwaysOn = inLittleItaly;
+
+        if (leftLittleItaly) {
+          console.log("Left Little Italy zone — always-on rotation disabled");
+          this.el.sceneEl.emit('sharkAlwaysOnExit');
+        }
+
         const cooldown = performance.now() - this.state.dismissedAt > 3000;
-        
-        if (this.state.gpsActive && cooldown && !this.state.sharkVisible) {
-          this.onSharkFound();
+
+        if (enteredLittleItaly) {
+          console.log("Entered Little Italy zone — always-on rotation enabled");
+          this.state.sharkVisible = false;
+          this.onSharkFound({
+            trigger: 'little-italy',
+            alwaysOn: true,
+            pingCount: this.state.gpsPingCount,
+            position: { lat: pos.coords.latitude, lng: pos.coords.longitude }
+          });
+        } else if (this.state.gpsActive && cooldown && !this.state.sharkVisible) {
+          this.onSharkFound({
+            trigger: 'gps',
+            alwaysOn: false,
+            pingCount: this.state.gpsPingCount,
+            distanceMeters: d
+          });
         }
       },
       (err) => { 
@@ -102,7 +137,7 @@ AFRAME.registerComponent('shark-detector', {
     );
   },
 
-  onSharkFound: function () {
+  onSharkFound: function (detail) {
     if (this.state.sharkVisible) return;
     this.state.sharkVisible = true;
     
@@ -114,16 +149,32 @@ AFRAME.registerComponent('shark-detector', {
         root.setAttribute('visible', true);
     }
     
-    this.el.sceneEl.emit('sharkFound');
+    this.el.sceneEl.emit('sharkFound', detail || { trigger: 'manual', pingCount: this.state.gpsPingCount });
     if (window.AudioUtils) window.AudioUtils.playSound('found');
   },
 
   dismissShark: function () {
+    // While in Little Italy we ignore dismiss requests so the rotation stays "always on".
+    if (this.state.alwaysOn) {
+      console.log("Dismiss ignored — Little Italy always-on rotation active");
+      return;
+    }
     this.state.sharkVisible = false;
     this.state.dismissedAt = performance.now();
-    
+
     const root = document.getElementById('shark-root');
     if (root) root.setAttribute('visible', false);
+  },
+
+  // Little Italy always-on zone test — uses a padded bounding box around the
+  // configured West / East coordinates so users near the edges still trigger it.
+  isInLittleItaly: function (lat, lng) {
+    const pad = this.data.littleItalyPaddingDeg;
+    const minLat = Math.min(this.data.littleItalyWestLat, this.data.littleItalyEastLat) - pad;
+    const maxLat = Math.max(this.data.littleItalyWestLat, this.data.littleItalyEastLat) + pad;
+    const minLng = Math.min(this.data.littleItalyWestLng, this.data.littleItalyEastLng) - pad;
+    const maxLng = Math.max(this.data.littleItalyWestLng, this.data.littleItalyEastLng) + pad;
+    return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
   },
 
   remove: function () {

@@ -685,7 +685,7 @@
             background: transparent !important;
         }
 
-        /* March Madness promo: bouncing basketball */
+        /* Legacy promo (disabled via ENABLE_GAME_DAY_BANNER) */
         #basketball-promo {
             position: fixed;
             left: 24px;
@@ -967,7 +967,7 @@
             style="background: transparent; overflow: visible;"></model-viewer>
     </div>
 
-    <!-- March Madness promo basketball -->
+    <!-- Legacy promo (disabled via ENABLE_GAME_DAY_BANNER) -->
     <div id="basketball-promo" aria-hidden="true">
         <div class="basketball-shell">
             <model-viewer
@@ -995,8 +995,8 @@
     <!-- Info panel (bottom-right) -->
     <div id="info-panel">
         <img id="event-icon" src="./assets/SharkLogo.png" alt="Event" onerror="this.style.display='none'">
-        <h2>Sharks Way Tour</h2>
-        <p>Point camera at a shark painting</p>
+        <h2>Welcome to Sharks Way</h2>
+        <p>Point your phone at a Sharks Way mural to bring the street to life.</p>
         <p class="status-text" id="gps-status" style="display:none;"></p>
     </div>
 
@@ -1335,7 +1335,7 @@
                         if (rig) {
                             if (self.rigTunerHideTimer) clearTimeout(self.rigTunerHideTimer);
                             rig.setAttribute('visible', true);
-                            rig.setAttribute('rotation', rigIndex === 0 ? '0 270 0' : '0 0 0');
+                            rig.setAttribute('rotation', rigIndex === 0 ? '0 0 0' : '0 0 0');
                             rig.setAttribute('scale', '0.85 0.85 0.85');
                             rig.setAttribute('position', `${RIG0_TUNER.x.toFixed(2)} ${RIG0_TUNER.y.toFixed(2)} 2.50`);
                             rig.setAttribute('animation__swimPass', {
@@ -1509,7 +1509,7 @@
                     var totalDuration = swimInDuration + chillDuration + swimOutDuration;
 
                     rig.setAttribute('visible', true);
-                    rig.setAttribute('rotation', sharkIndex === 0 ? '0 270 0' : '0 0 0');
+                    rig.setAttribute('rotation', sharkIndex === 0 ? '0 0 0' : '0 0 0');
                     rig.setAttribute('position', `0 ${startY} ${startZ}`);
                     rig.removeAttribute('animation__swimPass');
                     rig.removeAttribute('animation__swimIn');
@@ -1631,6 +1631,7 @@
         const THRESHOLD = 0.55;
         const EMBEDDINGS_URL = './data/shark-embeddings-browser.json';
         const CACHE_KEY = 'shark-embeddings-v5';
+        const ENABLE_GAME_DAY_BANNER = false;
         const MARCH_MADNESS_PROMO_END_UTC = '2026-04-07T00:00:00Z';
 
         // GPS fallback: keep shark "active" near Sharks Way (San Jose)
@@ -1916,30 +1917,32 @@
         }
 
         // ─── EVENT DATA (from marker-demo) ───
+        // Approved SJ26 March Activations copy — avoid "Super Bowl", "March Madness",
+        // and NCAA branding per PR guidance.
         const dummyEvents = [
             {
-                title: "The Big Game",
-                date: "February 9, 2026",
-                time: "3:30 PM PST",
-                location: "SAP Center, San Jose",
-                sharkeyMessage: "Hey there! I'm Sharkie, and this is where the magic happens! SAP Center hosts over 200 events per year. Arrive early to grab some teal gear!",
+                title: "Free Throw at SAP Center",
+                date: "March 26 & 28, 2026",
+                time: "7:30 PM – 10:00 PM",
+                location: "SAP Center at San Jose",
+                sharkeyMessage: "Free Throw is a projection-mapping activation by G. Craig Hobbs with SJSU's CADRE Media Lab, celebrating the college basketball tournament at SAP Center on March 26 & 28.",
                 icon: "./assets/SharkLogo.png"
             },
             {
-                title: "March Madness Watch Party",
-                date: "March 15-April 6, 2026",
-                time: "Various Times",
-                location: "Downtown San Jose",
-                sharkeyMessage: "Downtown SJ is buzzing! Over 40 restaurants and bars showing the games. San Pedro Square Market has the best viewing atmosphere!",
-                icon: "./march-madness.svg"
+                title: "Minis & Trophy – Arena Green West",
+                date: "March 26 & 28, 2026",
+                time: "1:00 PM – 10:00 PM",
+                location: "Arena Green West, San Jose",
+                sharkeyMessage: "Portable interactive light sculptures by SJSU Professor Esteban Garcia Bravo with the CADRE Media Lab, Digital Media Art, and Spatial Art programs.",
+                icon: "./assets/SharkLogo.png"
             },
             {
-                title: "World Cup Viewing",
-                date: "June-July 2026",
-                time: "Match Times Vary",
+                title: "International Football – Watch Together",
+                date: "June – July 2026",
+                time: "Match times vary",
                 location: "San Pedro Square Market",
-                sharkeyMessage: "¡Hola! This historic market has been a gathering place since 1863. Try food from different countries while watching their teams play!",
-                icon: "./world-cup.svg"
+                sharkeyMessage: "Watch the world's biggest football matches in downtown San José — San Pedro Square Market has been a community gathering place since 1863.",
+                icon: "./assets/SharkLogo.png"
             }
         ];
 
@@ -2063,6 +2066,7 @@
         }
 
         function isMarchMadnessPromoActive(now = new Date()) {
+            if (!ENABLE_GAME_DAY_BANNER) return false;
             return now.getTime() < Date.parse(MARCH_MADNESS_PROMO_END_UTC);
         }
 

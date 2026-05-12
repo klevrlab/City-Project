@@ -330,7 +330,7 @@ aws s3 cp sharks-way-backup-*.tar.gz s3://your-bucket/backups/
 ### Version Control
 ```bash
 # Tag releases
-git tag -a v1.0 -m "Super Bowl LX Release"
+git tag -a v1.0 -m "Immersion 2026 Release"
 git push origin v1.0
 
 # Create release branch

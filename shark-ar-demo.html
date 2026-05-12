@@ -622,7 +622,7 @@
                         <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,169,224,0.2);border:2px solid #00A9E0;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;font-weight:700;">1</div>
                         <div style="flex:1;">
                             <div style="font-weight:600;font-size:14px;">SAP Center</div>
-                            <div style="font-size:12px;color:rgba(255,255,255,0.5);">The Big Game · Feb 9, 2026</div>
+                            <div style="font-size:12px;color:rgba(255,255,255,0.5);">Free Throw · Mar 26 &amp; 28, 2026</div>
                         </div>
                         <div class="eoe-badge" style="font-size:11px;padding:3px 8px;border-radius:20px;background:rgba(0,169,224,0.15);color:#00A9E0;border:1px solid rgba(0,169,224,0.3);">Stop 1</div>
                     </div>
@@ -630,8 +630,8 @@
                     <div class="eoe-stop" data-stop="1" style="display:flex;align-items:center;gap:14px;">
                         <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,169,224,0.2);border:2px solid #00A9E0;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;font-weight:700;">2</div>
                         <div style="flex:1;">
-                            <div style="font-weight:600;font-size:14px;">Downtown San Jose</div>
-                            <div style="font-size:12px;color:rgba(255,255,255,0.5);">March Madness · Mar 15–Apr 6</div>
+                            <div style="font-weight:600;font-size:14px;">Arena Green West</div>
+                            <div style="font-size:12px;color:rgba(255,255,255,0.5);">Minis &amp; Trophy · Mar 26 &amp; 28, 2026</div>
                         </div>
                         <div class="eoe-badge" style="font-size:11px;padding:3px 8px;border-radius:20px;background:rgba(0,169,224,0.15);color:#00A9E0;border:1px solid rgba(0,169,224,0.3);">Stop 2</div>
                     </div>
@@ -1098,31 +1098,32 @@
             visitedStops: new Set()
         };
 
-        // ─── EVENT DATA (from marker-demo) ───
+        // Approved SJ26 March Activations copy — avoid "Super Bowl", "March Madness",
+        // and NCAA branding per PR guidance.
         const dummyEvents = [
             {
-                title: "The Big Game",
-                date: "February 9, 2026",
-                time: "3:30 PM PST",
-                location: "SAP Center, San Jose",
-                sharkeyMessage: "Hey there! I'm Sharkie, and this is where the magic happens! SAP Center hosts over 200 events per year. Arrive early to grab some teal gear!",
+                title: "Free Throw at SAP Center",
+                date: "March 26 & 28, 2026",
+                time: "7:30 PM – 10:00 PM",
+                location: "SAP Center at San Jose",
+                sharkeyMessage: "Free Throw is a projection-mapping activation by G. Craig Hobbs with SJSU's CADRE Media Lab, celebrating the college basketball tournament at SAP Center on March 26 & 28.",
                 icon: "./assets/SharkLogo.png"
             },
             {
-                title: "March Madness Watch Party",
-                date: "March 15-April 6, 2026",
-                time: "Various Times",
-                location: "Downtown San Jose",
-                sharkeyMessage: "Downtown SJ is buzzing! Over 40 restaurants and bars showing the games. San Pedro Square Market has the best viewing atmosphere!",
-                icon: "./march-madness.svg"
+                title: "Minis & Trophy – Arena Green West",
+                date: "March 26 & 28, 2026",
+                time: "1:00 PM – 10:00 PM",
+                location: "Arena Green West, San Jose",
+                sharkeyMessage: "Portable interactive light sculptures by SJSU Professor Esteban Garcia Bravo with the CADRE Media Lab, Digital Media Art, and Spatial Art programs.",
+                icon: "./assets/SharkLogo.png"
             },
             {
-                title: "World Cup Viewing",
-                date: "June-July 2026",
-                time: "Match Times Vary",
+                title: "International Football – Watch Together",
+                date: "June – July 2026",
+                time: "Match times vary",
                 location: "San Pedro Square Market",
-                sharkeyMessage: "¡Hola! This historic market has been a gathering place since 1863. Try food from different countries while watching their teams play!",
-                icon: "./world-cup.svg"
+                sharkeyMessage: "Watch the world's biggest football matches in downtown San José — San Pedro Square Market has been a community gathering place since 1863.",
+                icon: "./assets/SharkLogo.png"
             }
         ];
 

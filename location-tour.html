@@ -1456,11 +1456,12 @@
             })
             .catch(error => {
                 console.error('❌ Error loading shark locations:', error);
-                // Fallback to default locations if JSON fails
+                // Approved SJ26 March Activations copy — avoid "Super Bowl",
+                // "March Madness", and NCAA branding per PR guidance.
                 tourStops = [
-                    { id: 'stop1', name: "SAP Center", event: "The Big Game", lat: 37.3326, lng: -121.9010 },
-                    { id: 'stop2', name: "Downtown SJ", event: "March Madness", lat: 37.3382, lng: -121.8863 },
-                    { id: 'stop3', name: "San Pedro Square", event: "World Cup", lat: 37.3369, lng: -121.8936 }
+                    { id: 'stop1', name: "SAP Center", event: "Free Throw", lat: 37.3326, lng: -121.9010 },
+                    { id: 'stop2', name: "Arena Green West", event: "Minis & Trophy", lat: 37.3382, lng: -121.8985 },
+                    { id: 'stop3', name: "San Pedro Square", event: "International Football", lat: 37.3369, lng: -121.8936 }
                 ];
                 createSharkEntities();
                 // Initialize map once we have shark locations

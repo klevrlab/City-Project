@@ -1,6 +1,6 @@
 {
   "tourName": "Sharks Way AR Tour",
-  "description": "Discover AR sharks across San Jose during Super Bowl LX",
+  "description": "Discover AR sharks along the Sharks Way corridor between downtown San José and SAP Center as part of Immersion 2026.",
   "sharks": [
     {
       "id": "shark-1",
@@ -11,8 +11,8 @@
       "icon": "./assets/SharkLogo.png",
       "sharkeyMessage": "You've reached Checkpoint A! Keep going to Label B!",
       "eventInfo": {
-        "name": "The Big Game",
-        "date": "February 9, 2026",
+        "name": "Free Throw at SAP Center",
+        "date": "March 26 & 28, 2026",
         "venue": "Checkpoint A"
       }
     },
@@ -25,8 +25,8 @@
       "icon": "./assets/SharkLogo.png",
       "sharkeyMessage": "Congratulations! You've reached Checkpoint B!",
       "eventInfo": {
-        "name": "The Big Game",
-        "date": "February 9, 2026",
+        "name": "Free Throw at SAP Center",
+        "date": "March 26 & 28, 2026",
         "venue": "Checkpoint B"
       }
     }

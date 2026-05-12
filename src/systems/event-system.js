@@ -3,33 +3,36 @@
  */
 AFRAME.registerSystem('event-system', {
   init: function () {
+    // Approved SJ26 March Activations copy — avoid "Super Bowl", "March Madness", and
+    // NCAA branding per PR guidance. Highlight the SJSU + City of San José + SAP Center
+    // + San Jose Sports Authority partnership instead.
     this.dummyEvents = [
       {
-        title: "The Big Game",
-        date: "February 9, 2026",
-        time: "3:30 PM PST",
-        location: "SAP Center, San Jose",
-        description: "Experience the ultimate showdown! Join thousands of fans for an unforgettable game day.",
-        sharkeyMessage: "Hey there! I'm Sharkie, and this is where the magic happens! SAP Center hosts over 200 events per year. Arrive early to grab some teal gear!",
-        icon: "./assets/the-big-game.svg"
+        title: "Free Throw at SAP Center",
+        date: "March 26 & 28, 2026",
+        time: "7:30 PM – 10:00 PM",
+        location: "SAP Center at San Jose",
+        description: "Large-scale interactive projection mapping by G. Craig Hobbs with students from SJSU's CADRE Media Lab, celebrating the college basketball tournament at SAP Center.",
+        sharkeyMessage: "Free Throw turns the SAP Center plaza into a playable canvas of light and motion — a partnership of the San Jose Sports Authority, the City of San José, SJSU, and SAP Center at San Jose.",
+        icon: "./assets/SharkLogo.png"
       },
       {
-        title: "March Madness Watch Party",
-        date: "March 15-April 6, 2026",
-        time: "Various Times",
-        location: "Downtown San Jose",
-        description: "Catch all the tournament action on giant screens across downtown venues.",
-        sharkeyMessage: "Downtown SJ is buzzing! Over 40 restaurants and bars showing the games. San Pedro Square Market has the best viewing atmosphere!",
-        icon: "./march-madness.svg"
+        title: "Minis & Trophy – Arena Green West",
+        date: "March 26 & 28, 2026",
+        time: "1:00 PM – 10:00 PM",
+        location: "Arena Green West, San Jose",
+        description: "Portable interactive light sculptures by SJSU Professor Esteban Garcia Bravo with the CADRE Media Lab, Digital Media Art, and Spatial Art programs. Trophy is on display alongside the college basketball tournament at SAP Center.",
+        sharkeyMessage: "Six-foot illuminated cubes you can walk around and interact with — built by SJSU students and faculty as part of Immersion 2026.",
+        icon: "./assets/SharkLogo.png"
       },
       {
-        title: "World Cup Viewing",
-        date: "June-July 2026",
-        time: "Match Times Vary",
+        title: "International Football – Watch Together",
+        date: "June – July 2026",
+        time: "Match times vary",
         location: "San Pedro Square Market",
-        description: "Cheer for your team with fans from around the world in the heart of SJ.",
-        sharkeyMessage: "¡Hola! This historic market has been a gathering place since 1863. Try food from different countries while watching their teams play!",
-        icon: "./world-cup.svg"
+        description: "Watch the world's biggest football matches in the heart of downtown San José with neighbors and visitors from around the world.",
+        sharkeyMessage: "San Pedro Square Market has been a downtown gathering place since 1863 — a great spot to share a meal while you watch the matches.",
+        icon: "./assets/SharkLogo.png"
       }
     ];
     this.currentEventIndex = 0;
