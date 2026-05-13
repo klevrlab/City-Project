@@ -231,8 +231,8 @@ AFRAME.registerComponent('shark-animator', {
     const y = Number(experience.y || 0.5);
 
     if (experience.motion === 'riseFromGround') {
-      // Jimmy: emerges from below ground with a fade-in, hovers above the painting
-      // long enough for the viewer to walk around it, then sinks back with a fade-out.
+      // Jimmy: emerges smoothly from below ground, hovers above the painting long
+      // enough for the viewer to walk around it, then sinks back.
       const startY = -0.6;
       const hoverY = y + 0.35;
       const sinkY = -0.4;
@@ -242,8 +242,6 @@ AFRAME.registerComponent('shark-animator', {
       ent.setAttribute('position', `${x} ${startY} ${z}`);
       ent.setAttribute('rotation', `0 ${facingYaw} 0`);
 
-      this._setEntityOpacity(ent, 0);
-
       ent.setAttribute('animation__rise', {
         property: 'position',
         from: `${x} ${startY} ${z}`,
@@ -251,7 +249,6 @@ AFRAME.registerComponent('shark-animator', {
         dur: 1800,
         easing: 'easeOutCubic'
       });
-      this._fadeEntity(ent, 0, 1, 1800);
 
       // Gentle hover bob once the rise completes.
       this.queue(() => {
@@ -270,7 +267,7 @@ AFRAME.registerComponent('shark-animator', {
       // Linger so visitors can circle the model.
       const lingerMs = 6000;
 
-      // Sink + fade out as the cycle ends.
+      // Sink back into the ground as the cycle ends.
       this.queue(() => {
         if (!this.isRunning || this.activeEntity !== ent) return;
         ent.removeAttribute('animation__hoverBob');
@@ -281,7 +278,6 @@ AFRAME.registerComponent('shark-animator', {
           dur: 1500,
           easing: 'easeInCubic'
         });
-        this._fadeEntity(ent, 1, 0, 1500);
       }, 1800 + lingerMs);
 
       this.queue(() => this.cycleNext(targetPoint), 1800 + lingerMs + 1500 + 200);
@@ -289,8 +285,8 @@ AFRAME.registerComponent('shark-animator', {
     }
 
     if (experience.motion === 'wavePose') {
-      // Sharkie rises out of the ground with a fade-in (matching Jimmy), holds the
-      // pose long enough for a selfie, then sinks back with a fade-out.
+      // Sharkie rises smoothly out of the ground (no fade), holds the pose long
+      // enough for a selfie, then sinks back.
       const x = targetPoint.x;
       const z = targetPoint.z - 0.35;
       const startY = -0.6;
@@ -299,7 +295,6 @@ AFRAME.registerComponent('shark-animator', {
 
       ent.setAttribute('position', `${x} ${startY} ${z}`);
       ent.setAttribute('rotation', `0 ${facingYaw} 0`);
-      this._setEntityOpacity(ent, 0);
 
       ent.setAttribute('animation__rise', {
         property: 'position',
@@ -308,7 +303,6 @@ AFRAME.registerComponent('shark-animator', {
         dur: 1800,
         easing: 'easeOutCubic'
       });
-      this._fadeEntity(ent, 0, 1, 1800);
 
       // Start the wave sway once Sharkie is up.
       this.queue(() => {
@@ -326,7 +320,7 @@ AFRAME.registerComponent('shark-animator', {
 
       const lingerMs = 5500;
 
-      // Sink + fade out before handing off to the next cycle.
+      // Sink back into the ground before handing off to the next cycle.
       this.queue(() => {
         if (!this.isRunning || this.activeEntity !== ent) return;
         ent.removeAttribute('animation__poseSway');
@@ -337,7 +331,6 @@ AFRAME.registerComponent('shark-animator', {
           dur: 1500,
           easing: 'easeInCubic'
         });
-        this._fadeEntity(ent, 1, 0, 1500);
       }, 1800 + lingerMs);
 
       this.queue(() => this.cycleNext(targetPoint), 1800 + lingerMs + 1500 + 200);
@@ -345,61 +338,28 @@ AFRAME.registerComponent('shark-animator', {
     }
 
     if (experience.motion === 'diveArc') {
-      // Steep, near-vertical descent that flattens out at the painting, lingers,
-      // then swims forward past the viewer. Nose-pitch is animated so the shark
-      // actually looks like it's plunging head-first.
-      const startPos = new THREE.Vector3(targetPoint.x, y + 5.0, targetPoint.z + 0.6);
-      const midPos = new THREE.Vector3(targetPoint.x, y + 0.35, targetPoint.z);
-      const endPos = new THREE.Vector3(targetPoint.x, y + 0.35, targetPoint.z - 7.0);
+      // The diving-shark GLB has its own dive animation baked in, so just plant it
+      // at the painting and let animation-mixer drive the motion. Anchored above
+      // the ground at the painting's anchor point with a gentle bob.
+      const x = targetPoint.x;
+      const z = targetPoint.z;
+      const anchorY = y;
 
-      ent.setAttribute('position', `${startPos.x} ${startPos.y} ${startPos.z}`);
-      ent.setAttribute('rotation', `-65 ${facingYaw} 0`);
+      ent.setAttribute('position', `${x} ${anchorY} ${z}`);
+      ent.setAttribute('rotation', `0 ${facingYaw} 0`);
 
-      ent.setAttribute('animation__diveIn', {
+      // Subtle bob so it doesn't look frozen if the GLB animation has a quiet moment.
+      ent.setAttribute('animation__diveBob', {
         property: 'position',
-        from: `${startPos.x} ${startPos.y} ${startPos.z}`,
-        to: `${midPos.x} ${midPos.y} ${midPos.z}`,
-        dur: 1800,
-        easing: 'easeInQuad'
-      });
-      ent.setAttribute('animation__divePitch', {
-        property: 'rotation',
-        from: `-65 ${facingYaw.toFixed(3)} 0`,
-        to: `-5 ${facingYaw.toFixed(3)} 0`,
-        dur: 1800,
-        easing: 'easeOutSine'
+        from: `${x} ${(anchorY - 0.08).toFixed(3)} ${z}`,
+        to: `${x} ${(anchorY + 0.08).toFixed(3)} ${z}`,
+        dir: 'alternate',
+        loop: true,
+        dur: 1200,
+        easing: 'easeInOutSine'
       });
 
-      // Linger at the painting.
-      this.queue(() => {
-        if (!this.isRunning || this.activeEntity !== ent) return;
-        ent.removeAttribute('animation__diveIn');
-        ent.removeAttribute('animation__divePitch');
-        ent.setAttribute('animation__diveHover', {
-          property: 'position',
-          from: `${midPos.x} ${(midPos.y - 0.1).toFixed(3)} ${midPos.z}`,
-          to: `${midPos.x} ${(midPos.y + 0.1).toFixed(3)} ${midPos.z}`,
-          dir: 'alternate',
-          loop: true,
-          dur: 1000,
-          easing: 'easeInOutSine'
-        });
-      }, 1800);
-
-      // Swim forward past the viewer.
-      this.queue(() => {
-        if (!this.isRunning || this.activeEntity !== ent) return;
-        ent.removeAttribute('animation__diveHover');
-        ent.setAttribute('animation__diveOut', {
-          property: 'position',
-          from: `${midPos.x} ${midPos.y} ${midPos.z}`,
-          to: `${endPos.x} ${endPos.y} ${endPos.z}`,
-          dur: 2000,
-          easing: 'easeInSine'
-        });
-      }, 1800 + 3500);
-
-      this.queue(() => this.cycleNext(targetPoint), 1800 + 3500 + 2000 + 200);
+      this.queue(() => this.cycleNext(targetPoint), 7000);
       return;
     }
 
