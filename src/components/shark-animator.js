@@ -46,7 +46,7 @@ AFRAME.registerComponent('shark-animator', {
         motion: 'wavePose',
         y: 0.45,
         scale: '0.55 0.55 0.55',
-        rotationOffsetY: 180
+        rotationOffsetY: 0
       },
       {
         label: 'Diving Shark',
@@ -62,7 +62,7 @@ AFRAME.registerComponent('shark-animator', {
         motion: 'enterCenter',
         y: 0.55,
         scale: '0.4 0.4 0.4',
-        rotationOffsetY: 180
+        rotationOffsetY: 0
       }
     ];
 
