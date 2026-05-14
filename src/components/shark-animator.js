@@ -23,12 +23,15 @@ AFRAME.registerComponent('shark-animator', {
       east: { lat: 37.335444, lng: -121.896778 }
     };
 
+    // Extra world-space lift so geometry stays clearly above the shadow receiver.
+    this.FLOOR_CLEARANCE = 0.03;
+
     this.experiences = [
       {
         label: 'Maria Swimmer',
         model: '#maria-swimmer',
         motion: 'enterCenter',
-        y: 0.55,
+        y: 0.28,
         scale: '0.42 0.42 0.42',
         rotationOffsetY: 0
       },
@@ -44,7 +47,7 @@ AFRAME.registerComponent('shark-animator', {
         label: 'Sharkie Waving',
         model: '#sharkie-wave',
         motion: 'wavePose',
-        y: 0.45,
+        y: 0.26,
         scale: '0.55 0.55 0.55',
         rotationOffsetY: 0
       },
@@ -60,7 +63,7 @@ AFRAME.registerComponent('shark-animator', {
         label: 'Stella Swimmer',
         model: '#stella-swimmer',
         motion: 'enterCenter',
-        y: 0.55,
+        y: 0.28,
         scale: '0.4 0.4 0.4',
         rotationOffsetY: 0
       }
@@ -199,6 +202,12 @@ AFRAME.registerComponent('shark-animator', {
 
     const ent = document.createElement('a-entity');
     ent.addEventListener('model-loaded', () => {
+      if (experience.motion !== 'diveArc') {
+        this.alignGltfBottomToOrigin(ent);
+      }
+      if (experience.motion === 'wavePose' || experience.motion === 'enterCenter') {
+        this.fixGltfTransparentSorting(ent);
+      }
       ent.setAttribute('visible', 'true');
       this.runAnimationPhases(ent, targetPoint, experience);
     }, { once: true });
@@ -228,7 +237,8 @@ AFRAME.registerComponent('shark-animator', {
     dirToTarget.normalize();
     const baseYaw = Math.atan2(dirToTarget.x, dirToTarget.z) * (180 / Math.PI);
     const facingYaw = baseYaw + (experience.rotationOffsetY || 0);
-    const y = Number(experience.y || 0.5);
+    const baseY = Number(experience.y || 0.5);
+    const y = baseY + (this.FLOOR_CLEARANCE || 0);
 
     if (experience.motion === 'riseFromGround') {
       // Jimmy: emerges smoothly from below ground, hovers above the painting long
@@ -388,8 +398,8 @@ AFRAME.registerComponent('shark-animator', {
       if (!this.isRunning || this.activeEntity !== ent) return;
       ent.setAttribute('animation__hover', {
         property: 'position',
-        from: `${centerPos.x} ${(centerPos.y - 0.12).toFixed(3)} ${centerPos.z}`,
-        to: `${centerPos.x} ${(centerPos.y + 0.12).toFixed(3)} ${centerPos.z}`,
+        from: `${centerPos.x} ${(centerPos.y - 0.06).toFixed(3)} ${centerPos.z}`,
+        to: `${centerPos.x} ${(centerPos.y + 0.06).toFixed(3)} ${centerPos.z}`,
         dir: 'alternate',
         loop: true,
         dur: 900,
@@ -410,6 +420,42 @@ AFRAME.registerComponent('shark-animator', {
     }, swimInDur + centerDwellDur);
 
     this.queue(() => this.cycleNext(targetPoint), swimInDur + centerDwellDur + swimOutDur + 200);
+  },
+
+  // Reduces "see-through" face sorting (back of mouth / inner shell drawing on top of
+  // the snout) by forcing front faces only and writing depth for semi-transparent parts.
+  fixGltfTransparentSorting: function (ent) {
+    const root = ent.getObject3D('mesh');
+    if (!root || typeof THREE === 'undefined') return;
+    root.traverse((child) => {
+      if (!child.isMesh || !child.material) return;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      mats.forEach((mat) => {
+        if (!mat) return;
+        mat.side = THREE.FrontSide;
+        mat.depthTest = true;
+        const isTransparent = mat.transparent === true ||
+          (mat.opacity != null && mat.opacity < 0.999);
+        if (isTransparent) {
+          mat.depthWrite = true;
+          mat.needsUpdate = true;
+        }
+      });
+    });
+  },
+
+  // Shift loaded GLTF mesh so the world-space bottom of its bounding box sits at
+  // local y=0 on this entity. Stops belly/center pivots from clipping the floor plane.
+  alignGltfBottomToOrigin: function (ent) {
+    const mesh = ent.getObject3D('mesh');
+    if (!mesh || typeof THREE === 'undefined') return;
+    try {
+      mesh.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(mesh);
+      mesh.position.y += -box.min.y;
+    } catch (e) {
+      /* ignore bbox errors */
+    }
   },
 
   // ─── helpers ─────────────────────────────────────────────────────────────
