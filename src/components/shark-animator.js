@@ -36,6 +36,14 @@ AFRAME.registerComponent('shark-animator', {
         rotationOffsetY: 0
       },
       {
+        label: 'Stella Swimmer',
+        model: '#stella-swimmer',
+        motion: 'enterCenter',
+        y: 0.28,
+        scale: '0.38 0.38 0.38',
+        rotationOffsetY: 0
+      },
+      {
         label: 'Jimmy Swimmer',
         model: '#jimmy-swimmer',
         motion: 'riseFromGround',
@@ -57,14 +65,6 @@ AFRAME.registerComponent('shark-animator', {
         motion: 'diveArc',
         y: 0.65,
         scale: '0.42 0.42 0.42',
-        rotationOffsetY: 0
-      },
-      {
-        label: 'Stella Swimmer',
-        model: '#stella-swimmer',
-        motion: 'enterCenter',
-        y: 0.28,
-        scale: '0.4 0.4 0.4',
         rotationOffsetY: 0
       }
     ];
