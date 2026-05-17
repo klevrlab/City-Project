@@ -1,0 +1,2390 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Sharks Way - Shark Painting Demo</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="./src/css/map-component.css" />
+    <link rel="stylesheet" href="./src/css/progress-tracker.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="./src/utils/checkpoint-loader.js"></script>
+    <script src="./src/utils/shared-map-markers.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1"></script>
+    <script src="./src/utils/shark-embedding-detector.js"></script>
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
+    <script src="https://unpkg.com/three@0.126.0/examples/js/loaders/GLTFLoader.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: white;
+            overflow: hidden;
+            position: fixed;
+            inset: 0;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: none;
+        }
+
+        /* Camera feed */
+        #video {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+        }
+
+        #debug-canvas {
+            display: none;
+        }
+
+        /* Loading overlay */
+        #loading {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 22, 26, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            transition: opacity 0.5s ease;
+        }
+
+        #loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(0, 169, 224, 0.2);
+            border-top-color: #00A9E0;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #loading h2 {
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+
+        #loading p {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+            text-align: center;
+            max-width: 280px;
+            line-height: 1.5;
+        }
+
+        #loading-status {
+            margin-top: 12px;
+            font-size: 12px;
+            color: #00A9E0;
+        }
+
+        /* Info panel (bottom-right) — from marker-demo */
+        #info-panel {
+            position: fixed;
+            top: 50px;
+            left: 20px;
+            background: rgba(0, 109, 117, 0.15);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            color: white;
+            padding: 18px 16px;
+            border-radius: 20px;
+            z-index: 100;
+            width: 140px;
+            height: auto;
+            border: 1px solid rgba(0, 169, 224, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        #info-panel h2 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            font-weight: 700;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            letter-spacing: 0.3px;
+            line-height: 1.3;
+        }
+
+        #info-panel p {
+            margin: 6px 0;
+            font-size: 12px;
+            line-height: 1.4;
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        #info-panel .status-text {
+            font-size: 10px;
+            opacity: 0.7;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(0, 169, 224, 0.2);
+            line-height: 1.3;
+        }
+
+        /* Event info slide-in (left) — from marker-demo */
+        #event-info {
+            position: fixed;
+            top: 170px;
+            left: -460px;
+            transform: translateY(-50%);
+            background: rgba(0, 109, 117, 0.15);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            color: white;
+            padding: 16px 20px;
+            border-radius: 16px;
+            z-index: 1000;
+            max-width: 280px;
+            border: 1px solid rgba(0, 169, 224, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 109, 117, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transition: left 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        #event-info.visible {
+            left: 20px;
+        }
+
+        #event-info h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        #event-info .event-details {
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        #event-info .event-details p {
+            margin: 6px 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .icon {
+            width: 16px;
+            height: 16px;
+            vertical-align: middle;
+            margin-right: 6px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .cta-button {
+            background: rgba(0, 169, 224, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 169, 224, 0.5);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 169, 224, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            display: block;
+            width: 100%;
+        }
+
+        .cta-button:active {
+            transform: scale(0.95);
+            background: rgba(0, 169, 224, 0.5);
+        }
+
+        #event-icon {
+            width: clamp(122px, 20.28vw, 203px);
+            height: clamp(122px, 20.28vw, 203px);
+            margin: 0 auto 10px;
+            display: block;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+            object-fit: contain;
+        }
+
+        #progress-tracker .gps-status {
+            font-size: 9px;
+            opacity: 0.6;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(0, 169, 224, 0.2);
+        }
+
+
+        /* 3D Model overlay */
+        #model-overlay {
+            position: fixed;
+            bottom: 10%;
+            left: 50%;
+            transform: translateX(-50%) scale(0);
+            width: 420px;
+            height: 420px;
+            z-index: 50;
+            transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55), opacity 0.3s ease;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #model-overlay.visible {
+            transform: translateX(-50%) scale(1);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        model-viewer {
+            width: 100%;
+            height: 100%;
+            --poster-color: transparent;
+            background: transparent;
+        }
+
+        /* Glow ring behind the model */
+        #model-glow {
+            position: absolute;
+            inset: -20px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0, 169, 224, 0.15) 0%, transparent 70%);
+            animation: glowPulse 3s ease-in-out infinite;
+            z-index: -1;
+        }
+
+        @keyframes glowPulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 0.6;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 1;
+            }
+        }
+
+        /* Shark name label under model */
+        #shark-label {
+            position: fixed;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(0, 109, 117, 0.25);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(0, 169, 224, 0.4);
+            border-radius: 30px;
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 700;
+            z-index: 60;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 169, 224, 0.2);
+        }
+
+        #shark-label.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        #shark-label .label-name {
+            color: #00A9E0;
+        }
+
+        #shark-label .label-score {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-left: 8px;
+        }
+
+        /* Scanning animation */
+        #scan-line {
+            position: fixed;
+            left: 10%;
+            right: 10%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00A9E0, transparent);
+            box-shadow: 0 0 12px #00A9E0;
+            opacity: 0;
+            z-index: 5;
+            animation: scanMove 2.5s ease-in-out infinite;
+        }
+
+        #scan-line.active {
+            opacity: 0.6;
+        }
+
+        @keyframes scanMove {
+            0% {
+                top: 15%;
+            }
+
+            50% {
+                top: 85%;
+            }
+
+            100% {
+                top: 15%;
+            }
+        }
+
+        /* Corner brackets */
+        .corner {
+            position: fixed;
+            width: 30px;
+            height: 30px;
+            border-color: rgba(0, 169, 224, 0.5);
+            border-style: solid;
+            border-width: 0;
+            z-index: 5;
+        }
+
+        .corner.tl {
+            top: 12%;
+            left: 10%;
+            border-top-width: 2px;
+            border-left-width: 2px;
+            border-radius: 4px 0 0 0;
+        }
+
+        .corner.tr {
+            top: 12%;
+            right: 10%;
+            border-top-width: 2px;
+            border-right-width: 2px;
+            border-radius: 0 4px 0 0;
+        }
+
+        .corner.bl {
+            bottom: 12%;
+            left: 10%;
+            border-bottom-width: 2px;
+            border-left-width: 2px;
+            border-radius: 0 0 0 4px;
+        }
+
+        .corner.br {
+            bottom: 12%;
+            right: 10%;
+            border-bottom-width: 2px;
+            border-right-width: 2px;
+            border-radius: 0 0 4px 0;
+        }
+
+        /* Top bar */
+        #topbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 12px 14px;
+            background: linear-gradient(to bottom, rgba(0, 22, 26, 0.7) 0%, transparent 100%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        #topbar h1 {
+            font-size: 14px;
+            font-weight: 700;
+            flex: 1;
+        }
+
+        #topbar .back {
+            color: #00A9E0;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        #hamburger-btn {
+            background: rgba(0, 169, 224, 0.25);
+            border: 1px solid rgba(0, 169, 224, 0.4);
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 0;
+            margin-left: auto;
+            position: relative;
+            z-index: 101;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #hamburger-btn:active {
+            transform: scale(0.95);
+            background: rgba(0, 169, 224, 0.4);
+        }
+
+        #hamburger-btn svg {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        #topbar .top-btn {
+            background: rgba(0, 169, 224, 0.25);
+            border: 1px solid rgba(0, 169, 224, 0.4);
+            color: #fff;
+            border-radius: 20px;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        #topbar .top-btn:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+
+        #topbar .top-btn.top-btn--warn {
+            border-color: rgba(255, 177, 0, 0.6);
+            background: rgba(255, 177, 0, 0.18);
+        }
+
+        #trained-badge {
+            margin-left: auto;
+            background: rgba(0, 169, 224, 0.25);
+            border: 1px solid rgba(0, 169, 224, 0.4);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: translateX(-50%) scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: translateX(-50%) scale(1.05);
+                opacity: 0.9;
+            }
+        }
+
+        /* Navigation Menu */
+        #nav-menu {
+            position: fixed;
+            top: 0;
+            right: -100%;
+            width: 280px;
+            height: 100vh;
+            background: rgba(0, 22, 26, 0.95);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-left: 1px solid rgba(0, 169, 224, 0.3);
+            z-index: 150;
+            transition: right 0.3s ease;
+            padding: 60px 20px 20px;
+            overflow-y: auto;
+        }
+
+        #nav-menu.open {
+            right: 0;
+        }
+
+        #nav-menu .close-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(0, 169, 224, 0.25);
+            border: 1px solid rgba(0, 169, 224, 0.4);
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 24px;
+            line-height: 1;
+            -webkit-tap-highlight-color: transparent;
+            padding: 0;
+        }
+
+        #nav-menu h2 {
+            color: #00A9E0;
+            font-size: 18px;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        #nav-menu .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            margin-bottom: 8px;
+            background: rgba(0, 169, 224, 0.1);
+            border: 1px solid rgba(0, 169, 224, 0.2);
+            border-radius: 12px;
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        #nav-menu .nav-link:hover,
+        #nav-menu .nav-link:active {
+            background: rgba(0, 169, 224, 0.25);
+            border-color: rgba(0, 169, 224, 0.4);
+            transform: translateX(-4px);
+        }
+
+        #nav-menu .nav-link svg {
+            width: 20px;
+            height: 20px;
+            stroke: #00A9E0;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        #nav-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 140;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        #nav-overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        @media (max-width: 480px) {
+            #info-panel {
+                top: 50px;
+                left: 10px;
+                width: 150px;
+                height: auto;
+                padding: 14px 12px;
+            }
+
+            #info-panel h2 {
+                font-size: 13px;
+            }
+
+            #info-panel p {
+                font-size: 11px;
+            }
+
+            #event-info {
+                max-width: 90%;
+                padding: 14px 16px;
+            }
+
+            #event-info.visible {
+                left: 10px;
+            }
+
+            #event-info h3 {
+                font-size: 15px;
+            }
+
+            #event-info .event-details {
+                font-size: 12px;
+            }
+
+            #model-overlay {
+                width: 340px;
+                height: 340px;
+            }
+
+            .cta-button {
+                padding: 10px 16px;
+                font-size: 13px;
+            }
+
+            #topbar .top-btn {
+                padding: 5px 8px;
+                font-size: 10px;
+            }
+
+            #nav-menu {
+                width: 85%;
+                max-width: 320px;
+            }
+        }
+
+        /* Shark + video plane overlay (fallback, no AR) */
+        #shark-plane-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+
+        #shark-plane-overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #shark-plane-overlay a-scene {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+
+        #shark-plane-overlay canvas {
+            background: transparent !important;
+        }
+
+        /* Legacy promo (disabled via ENABLE_GAME_DAY_BANNER) */
+        #basketball-promo {
+            position: fixed;
+            left: 24px;
+            bottom: 22%;
+            width: 120px;
+            height: 120px;
+            z-index: 95;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(14px) scale(0.7);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            will-change: transform, opacity;
+        }
+        #basketball-promo.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+        #basketball-promo .basketball-shell {
+            width: 100%;
+            height: 100%;
+            animation: basketballBounce 1.15s ease-in-out infinite;
+            transform-origin: center bottom;
+        }
+        #basketball-model-viewer {
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            --poster-color: transparent;
+            filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.45));
+        }
+        @keyframes basketballBounce {
+            0% { transform: translateY(0) scale(1, 1); }
+            20% { transform: translateY(-26px) scale(1.03, 0.97); }
+            45% { transform: translateY(-92px) scale(1.04, 0.96); }
+            70% { transform: translateY(-20px) scale(0.98, 1.02); }
+            100% { transform: translateY(0) scale(1, 1); }
+        }
+
+        @media (max-width: 480px) {
+            #basketball-promo {
+                width: 92px;
+                height: 92px;
+                left: 12px;
+                bottom: 24%;
+            }
+        }
+        
+        /* ── Sharks Way: map FAB icon (page-scoped) ── */
+        @keyframes map-fab-pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 4px 18px rgba(0, 109, 117, 0.55), 0 0 0 0 rgba(0, 169, 224, 0.4);
+            }
+
+            60% {
+                box-shadow: 0 4px 18px rgba(0, 109, 117, 0.55), 0 0 0 8px rgba(0, 169, 224, 0);
+            }
+        }
+
+        #map-container {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(0, 18, 24, 0.82);
+            backdrop-filter: blur(20px) saturate(200%);
+            -webkit-backdrop-filter: blur(20px) saturate(200%);
+            border: 1.5px solid rgba(0, 169, 224, 0.45);
+            box-shadow: 0 4px 18px rgba(0, 109, 117, 0.55),
+                0 0 0 0 rgba(0, 169, 224, 0.4);
+            overflow: visible;
+            animation: map-fab-pulse 3s ease-in-out infinite;
+            transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                height 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                border-radius 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.3s ease,
+                animation 0s;
+            right: 14px;
+            bottom: 22px;
+        }
+
+        #map-container.expanded {
+            width: min(300px, calc(100vw - 28px));
+            height: min(300px, 45vh);
+            border-radius: 16px;
+            overflow: hidden;
+            animation: none;
+            box-shadow: 0 8px 40px rgba(0, 109, 117, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        }
+
+        /* map tile */
+        #mini-map {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease 0.15s;
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+        }
+
+        #map-container.expanded #mini-map {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* FAB button */
+        #toggle-map {
+            position: absolute;
+            inset: 0;
+            width: 50px;
+            height: 50px;
+            background: transparent;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 1001;
+            padding: 0;
+            font-size: unset;
+            font-weight: unset;
+            border-radius: 50%;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        #toggle-map:active {
+            transform: scale(0.85);
+        }
+
+        /* map SVG icon */
+        .map-fab-icon {
+            width: 26px;
+            height: 26px;
+            display: block;
+            flex-shrink: 0;
+        }
+
+        /* close icon */
+        .map-icon-close {
+            display: none;
+            width: 15px;
+            height: 15px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .map-icon-close svg {
+            width: 15px;
+            height: 15px;
+        }
+
+        #map-container.expanded .map-fab-icon {
+            display: none;
+        }
+
+        #map-container.expanded .map-icon-close {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #map-container.expanded #toggle-map {
+            inset: auto;
+            top: 7px;
+            right: 7px;
+            width: 27px;
+            height: 27px;
+            background: rgba(0, 18, 24, 0.78);
+            border: 1px solid rgba(0, 169, 224, 0.35);
+            border-radius: 50%;
+            backdrop-filter: blur(8px);
+        }
+
+        /* responsive */
+        @media (max-width: 480px) {
+            #map-container {
+                width: 46px;
+                height: 46px;
+                right: 10px;
+                bottom: 16px;
+            }
+
+            #toggle-map {
+                width: 46px;
+                height: 46px;
+            }
+
+            .map-fab-icon {
+                width: 24px;
+                height: 24px;
+            }
+
+            #map-container.expanded {
+                width: min(260px, calc(100vw - 20px));
+                height: min(260px, 40vh);
+            }
+        }
+
+        */
+    </style>
+</head>
+
+<body>
+    <!-- Camera feed -->
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="debug-canvas" width="224" height="224"></canvas>
+
+    <!-- Loading overlay -->
+    <div id="loading">
+        <div class="spinner"></div>
+        <h2>Sharks Way</h2>
+        <p>Getting everything ready...</p>
+        <div id="loading-status">Please wait</div>
+    </div>
+
+    <!-- Top bar -->
+    <div id="topbar">
+        <a href="./index.html" class="back">&larr;</a>
+        <h1>Sharks Way</h1>
+        <button id="hamburger-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+        </button>
+    </div>
+
+    <!-- Navigation Menu -->
+    <div id="nav-overlay"></div>
+    <div id="nav-menu">
+        <button class="close-btn" id="close-menu">&times;</button>
+        <h2>Navigation</h2>
+        <a href="./sharks-way.html" class="nav-link">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
+            </svg>
+            Sharks Way
+        </a>
+        <a href="./location-tour.html" class="nav-link">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <circle cx="12" cy="10" r="3" />
+                <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z" />
+            </svg>
+            Location Tour
+        </a>
+        <a href="./marker-demo.html" class="nav-link">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+            Marker
+        </a>
+        <a href="./selfie-ar.html" class="nav-link">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+            </svg>
+            Selfie with Sammy
+        </a>
+        <a href="./selfie-ar.html?character=sharkey" class="nav-link">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+            </svg>
+            Selfie with Sharkie
+        </a>
+    </div>
+
+    <!-- 3D Plushie overlay -->
+    <div id="model-overlay">
+        <div id="model-glow"></div>
+        <model-viewer id="shark-model-viewer" src="./assets/shark.glb" auto-rotate rotation-per-second="30deg"
+            camera-orbit="0deg 75deg 4m" field-of-view="30deg" min-field-of-view="20deg" max-field-of-view="45deg"
+            disable-zoom interaction-prompt="none" environment-image="neutral" shadow-intensity="0.5"
+            style="background: transparent; overflow: visible;"></model-viewer>
+    </div>
+
+    <!-- Legacy promo (disabled via ENABLE_GAME_DAY_BANNER) -->
+    <div id="basketball-promo" aria-hidden="true">
+        <div class="basketball-shell">
+            <model-viewer
+                id="basketball-model-viewer"
+                src="./assets/3D-models/basketball_animation.glb"
+                auto-rotate
+                rotation-per-second="60deg"
+                camera-orbit="0deg 75deg auto"
+                field-of-view="28deg"
+                min-field-of-view="20deg"
+                max-field-of-view="45deg"
+                disable-zoom
+                interaction-prompt="none"
+                environment-image="neutral"
+                shadow-intensity="0.2"
+            ></model-viewer>
+        </div>
+    </div>
+
+    <!-- Shark label -->
+    <div id="shark-label">
+        <span class="label-name" id="labelName">Shark Found!</span>
+    </div>
+
+    <!-- Info panel (bottom-right) -->
+    <div id="info-panel">
+        <img id="event-icon" src="./assets/SharkLogo.png" alt="Event" onerror="this.style.display='none'">
+        <h2>Welcome to Sharks Way</h2>
+        <p>Point your phone at a Sharks Way mural to bring the street to life.</p>
+        <p class="status-text" id="gps-status" style="display:none;"></p>
+    </div>
+
+    <!-- Event info slide-in -->
+    <div id="event-info">
+        <h3 id="event-title">Event Loading...</h3>
+        <div class="event-details">
+            <p id="event-date"></p>
+            <p id="event-location"></p>
+        </div>
+        <div id="sharkey-message"
+            style="font-size: 12px; margin-top: 8px; color: rgba(255,255,255,0.8); line-height: 1.5;"></div>
+        <button class="cta-button" id="learn-more">
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
+                <path d="M17 2 12 7 7 2" />
+            </svg>
+            Learn More
+        </button>
+        <button class="cta-button" id="dismiss-event"
+            style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); margin-top: 6px;">
+            Dismiss
+        </button>
+    </div>
+
+    <!-- Progress tracker -->
+    <div id="progress-tracker">
+        <div style="font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none;">
+                <!-- <circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> -->
+                Checkpoints
+        </div>
+        <div class="stop-item" data-checkpoint="A" id="checkpoint-a">
+            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="m9 12 2 2 4-4"></path>
+            </svg>
+            Loading...
+        </div>
+        <div class="stop-item" data-checkpoint="B" id="checkpoint-b">
+            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="m9 12 2 2 4-4"></path>
+            </svg>
+            Loading...
+        </div>
+        <!-- <div class="gps-status" id="gps-status">GPS: Waiting...</div> -->
+    </div>
+
+    <!-- Map Component -->
+    <div id="map-container">
+        <button id="toggle-map" aria-label="Open map">
+            <!--
+                Map FAB icon: a clean folded-map + location pin drawn in white/teal
+                Visible at 26×26px, crisp on dark backgrounds
+            -->
+            <svg class="map-fab-icon" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- map sheet left fold -->
+                <polygon points="2,5 9,3 9,21 2,23" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)"
+                    stroke-width="1.2" stroke-linejoin="round" />
+                <!-- map sheet middle -->
+                <polygon points="9,3 17,5 17,23 9,21" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.55)"
+                    stroke-width="1.2" stroke-linejoin="round" />
+                <!-- map sheet right fold -->
+                <polygon points="17,5 24,3 24,21 17,23" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)"
+                    stroke-width="1.2" stroke-linejoin="round" />
+                <!-- route line on map -->
+                <path d="M5 14 Q7 10 9 12 Q11 14 13 10" stroke="#00A9E0" stroke-width="1.3" stroke-linecap="round"
+                    stroke-linejoin="round" fill="none" />
+                <!-- pin body -->
+                <path
+                    d="M19 4.5 C17.07 4.5 15.5 6.07 15.5 8 C15.5 10.5 19 14.5 19 14.5 C19 14.5 22.5 10.5 22.5 8 C22.5 6.07 20.93 4.5 19 4.5Z"
+                    fill="#00A9E0" stroke="rgba(0,18,24,0.4)" stroke-width="0.8" />
+                <!-- pin inner dot -->
+                <circle cx="19" cy="8" r="1.6" fill="rgba(0,18,24,0.55)" />
+            </svg>
+            <!-- Close icon (shown when expanded) -->
+            <span class="map-icon-close">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+            </span>
+        </button>
+        <div id="mini-map"></div>
+    </div>
+
+    <!-- Shark animation + video plane (fallback mode) -->
+    <div id="shark-plane-overlay">
+        <a-scene id="mural-shark-scene" embedded vr-mode-ui="enabled: false"
+            renderer="alpha: true; antialias: true; colorManagement: true;" shadow="type: pcfsoft">
+            <a-assets>
+                <video id="videoTexture" src="./assets/video.mp4" autoplay loop muted playsinline
+                    crossorigin="anonymous" preload="auto"></video>
+                <a-asset-item id="sharkModel1" src="./assets/3D-models/STELLA_CAI_SHARK_SJSU_TEST1.glb"></a-asset-item>
+                <a-asset-item id="sharkModel2" src="./assets/3D-models/SHAUN_SHARK_ANIMATED.glb"></a-asset-item>
+            </a-assets>
+            <a-entity id="mural-shark-root" mural-shark-content></a-entity>
+            <a-entity camera="fov: 55; zoom: 1.0" position="0 1.35 3.1" look-controls="enabled: false"></a-entity>
+            <a-entity light="type: ambient; intensity: 0.9; color: #ffffff"></a-entity>
+            <a-entity
+                light="type: directional; intensity: 1.1; color: #ffffff; castShadow: true; shadowMapWidth: 1024; shadowMapHeight: 1024; shadowCameraLeft: -12; shadowCameraRight: 12; shadowCameraTop: 12; shadowCameraBottom: -12; shadowCameraNear: 0.5; shadowCameraFar: 30; shadowBias: -0.0001"
+                position="2 4 2"></a-entity>
+            <a-plane id="shadow-ground" position="0 -2 0" rotation="-90 0 0" width="24" height="24"
+                material="color: #1a1a1a; transparent: true; opacity: 0.5; depthWrite: false"
+                shadow="cast: false; receive: true"></a-plane>
+        </a-scene>
+    </div>
+
+    <script>
+        const SEARCH_PARAMS = new URLSearchParams(window.location.search || '');
+        const CAVEMAN_DEBUG = false;
+        const CAVEMAN_FREEZE = false;
+        const CAVEMAN_RIG0_TUNER = false;
+        const CAVEMAN_TUNER_RIG_INDEX = 1;
+
+        function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+        function getResponsiveScale() {
+            const minDim = Math.min(window.innerWidth || 0, window.innerHeight || 0);
+            if (minDim <= 420) return 0.6;
+            if (minDim <= 720) return 0.8;
+            return 1.0;
+        }
+        function applyVideoPlaneLayout(opts) {
+            const { videoEl, planeEl, shadowEl } = opts || {};
+            if (!planeEl) return;
+            const scale = getResponsiveScale();
+            const baseHeight = 1.0 * scale;
+            const aspect = (videoEl && videoEl.videoWidth && videoEl.videoHeight)
+                ? (videoEl.videoWidth / videoEl.videoHeight) : 1;
+            const width = clamp(baseHeight * aspect, 0.9 * scale, 1.6 * scale);
+            const posX = 0.85 * scale, posZ = -0.85 * scale, videoY = 0.12 * scale;
+            const shadowY = 0.01, shadowPad = 0.18 * scale;
+            planeEl.setAttribute('position', `${posX} ${videoY} ${posZ}`);
+            planeEl.setAttribute('width', width);
+            planeEl.setAttribute('height', baseHeight);
+            if (shadowEl) {
+                shadowEl.setAttribute('position', `${posX} ${shadowY} ${posZ}`);
+                shadowEl.setAttribute('width', width + shadowPad);
+                shadowEl.setAttribute('height', baseHeight + shadowPad);
+            }
+        }
+
+        if (typeof AFRAME !== 'undefined') {
+            AFRAME.registerComponent('video-fact-cycle', {
+                schema: {
+                    intervalMs: { type: 'number', default: 8000 },
+                    visibleMs: { type: 'number', default: 4000 },
+                    animMs: { type: 'number', default: 500 },
+                    videoId: { type: 'string', default: 'videoTexture' },
+                    shadowSelector: { type: 'string', default: '.video-shadow' }
+                },
+                init: function () {
+                    this._timer = null;
+                    this._cycle = this._cycle.bind(this);
+                    this.shadowEl = this.el.parentElement && this.data.shadowSelector
+                        ? this.el.parentElement.querySelector(this.data.shadowSelector) : null;
+                },
+                playOnce: function () { this._cycle(); },
+                stop: function () {
+                    if (this._timer) { clearInterval(this._timer); this._timer = null; }
+                    this.el.removeAttribute('animation__factIn');
+                    this.el.removeAttribute('animation__factOut');
+                    this.el.setAttribute('scale', '0.001 0.001 0.001');
+                    if (this.shadowEl) {
+                        this.shadowEl.removeAttribute('animation__shadowIn');
+                        this.shadowEl.removeAttribute('animation__shadowOut');
+                        this.shadowEl.setAttribute('scale', '0.001 0.001 0.001');
+                    }
+                    const videoEl = document.getElementById(this.data.videoId);
+                    if (videoEl) videoEl.pause();
+                },
+                _cycle: function () {
+                    const videoEl = document.getElementById(this.data.videoId);
+                    if (videoEl) {
+                        const duration = Number.isFinite(videoEl.duration) ? videoEl.duration : 0;
+                        if (duration > 4) {
+                            const maxStart = Math.max(duration - 4, 0.1);
+                            videoEl.currentTime = Math.random() * maxStart;
+                        }
+                        videoEl.play().catch(function () { });
+                    }
+                    this.el.setAttribute('scale', '0.001 0.001 0.001');
+                    this.el.setAttribute('animation__factIn', {
+                        property: 'scale', from: '0.001 0.001 0.001', to: '1 1 1',
+                        dur: this.data.animMs, easing: 'easeOutBack'
+                    });
+                    if (this.shadowEl) {
+                        this.shadowEl.setAttribute('scale', '0.001 0.001 0.001');
+                        this.shadowEl.setAttribute('animation__shadowIn', {
+                            property: 'scale', from: '0.001 0.001 0.001', to: '1 1 1',
+                            dur: this.data.animMs, easing: 'easeOutBack'
+                        });
+                    }
+                    const self = this;
+                    setTimeout(function () {
+                        self.el.setAttribute('animation__factOut', {
+                            property: 'scale', from: '1 1 1', to: '0.001 0.001 0.001',
+                            dur: self.data.animMs, easing: 'easeInCubic'
+                        });
+                        if (self.shadowEl) {
+                            self.shadowEl.setAttribute('animation__shadowOut', {
+                                property: 'scale', from: '1 1 1', to: '0.001 0.001 0.001',
+                                dur: self.data.animMs, easing: 'easeInCubic'
+                            });
+                        }
+                        if (videoEl) videoEl.pause();
+                    }, this.data.visibleMs);
+                }
+            });
+
+            AFRAME.registerComponent('mural-shark-content', {
+                init: function () {
+                    const self = this;
+                    self.root = self.el;
+                    self.cyclingActive = false;
+                    self.currentSharkIndex = 0;
+                    self.sharkTimers = [];
+                    self.modelDebug = [{ loaded: false, mesh: false, size: '-' }, { loaded: false, mesh: false, size: '-' }];
+                    self.debugEl = document.getElementById('caveman-debug');
+                    self.debugText = '';
+                    self.root.innerHTML = [
+                        '<a-plane class="video-shadow" visible="false" position="0.85 0.01 -0.85" rotation="-90 0 0" width="1.2" height="1.2" material="color: #000000; opacity: 0.22; transparent: true; depthWrite: false"></a-plane>',
+                        '<a-plane class="shark-video-plane" visible="false" position="0.85 0.05 -0.85" rotation="-90 0 0" width="1.0" height="1.0" material="shader: flat; src: #videoTexture; transparent: true; color: #000000"></a-plane>',
+                        '<a-entity class="shark-rig-1" visible="false" position="0 1.0 0" rotation="0 0 0" scale="0.55 0.55 0.55">',
+                        '  <a-box class="debug-proxy" visible="false" depth="0.8" height="0.35" width="1.6" material="color: #ff00ff; opacity: 0.95"></a-box>',
+                        '  <a-entity class="shark-model-1" gltf-model="#sharkModel1" position="0 -0.85 0" rotation="0 0 0" animation-mixer="loop: repeat; timeScale: 1.0" shadow="cast: true; receive: false"></a-entity>',
+                        '</a-entity>',
+                        '<a-entity class="shark-rig-2" visible="false" position="0 1.0 0" rotation="0 0 0" scale="0.55 0.55 0.55">',
+                        '  <a-box class="debug-proxy" visible="false" depth="0.8" height="0.35" width="1.6" material="color: #00ff00; opacity: 0.95"></a-box>',
+                        '  <a-entity class="shark-model-2" gltf-model="#sharkModel2" position="0 -0.85 0" rotation="0 180 0" animation-mixer="loop: repeat; timeScale: 1.0" shadow="cast: true; receive: false"></a-entity>',
+                        '</a-entity>'
+                    ].join('');
+                    self.sharkVideoPlane = self.root.querySelector('.shark-video-plane');
+                    self.sharkVideoShadow = self.root.querySelector('.video-shadow');
+                    if (self.sharkVideoPlane) {
+                        self.sharkVideoPlane.setAttribute('video-fact-cycle', 'intervalMs: 8000; visibleMs: 4000; animMs: 500; videoId: videoTexture');
+                    }
+                    self.sharkRigs = [self.root.querySelector('.shark-rig-1'), self.root.querySelector('.shark-rig-2')];
+                    self.sharkModels = [self.root.querySelector('.shark-model-1'), self.root.querySelector('.shark-model-2')];
+                    self.debugProxies = Array.from(self.root.querySelectorAll('.debug-proxy'));
+                    if (CAVEMAN_DEBUG) {
+                        (self.debugProxies || []).forEach(function (proxy) { proxy.setAttribute('visible', true); });
+                        (self.sharkRigs || []).forEach(function (rig) {
+                            if (!rig || !rig.object3D || typeof THREE === 'undefined') return;
+                            if (rig.object3D.getObjectByName('debug-axes')) return;
+                            var axes = new THREE.AxesHelper(0.8);
+                            axes.name = 'debug-axes';
+                            rig.object3D.add(axes);
+                        });
+                        if (self.debugEl) self.debugEl.hidden = false;
+                    }
+                    self.updateDebug = function (extra) {
+                        if (!CAVEMAN_DEBUG || !self.debugEl) return;
+                        var r0 = (self.sharkRigs && self.sharkRigs[0]) ? self.sharkRigs[0].getAttribute('position') : null;
+                        var r1 = (self.sharkRigs && self.sharkRigs[1]) ? self.sharkRigs[1].getAttribute('position') : null;
+                        var lines = [
+                            'CAVEMAN DEBUG ON',
+                            'cycling=' + self.cyclingActive + ' idx=' + self.currentSharkIndex,
+                            'rig0 vis=' + !!(self.sharkRigs && self.sharkRigs[0] && self.sharkRigs[0].getAttribute('visible')) + ' pos=' + (r0 ? `${r0.x.toFixed(2)},${r0.y.toFixed(2)},${r0.z.toFixed(2)}` : '-'),
+                            'rig1 vis=' + !!(self.sharkRigs && self.sharkRigs[1] && self.sharkRigs[1].getAttribute('visible')) + ' pos=' + (r1 ? `${r1.x.toFixed(2)},${r1.y.toFixed(2)},${r1.z.toFixed(2)}` : '-'),
+                            `m1 loaded=${self.modelDebug[0].loaded} mesh=${self.modelDebug[0].mesh} bbox=${self.modelDebug[0].size}`,
+                            `m2 loaded=${self.modelDebug[1].loaded} mesh=${self.modelDebug[1].mesh} bbox=${self.modelDebug[1].size}`,
+                            extra || ''
+                        ];
+                        self.debugEl.textContent = lines.filter(Boolean).join('\n');
+                    };
+                    self.sharkModels.forEach(function (modelEl, idx) {
+                        if (!modelEl) return;
+                        modelEl.addEventListener('model-loaded', function () {
+                            var mesh = modelEl.getObject3D('mesh');
+                            self.modelDebug[idx].loaded = true;
+                            self.modelDebug[idx].mesh = !!mesh;
+                            if (mesh && typeof THREE !== 'undefined') {
+                                try {
+                                    var box = new THREE.Box3().setFromObject(mesh);
+                                    var size = new THREE.Vector3();
+                                    box.getSize(size);
+                                    self.modelDebug[idx].size = `${size.x.toFixed(2)}x${size.y.toFixed(2)}x${size.z.toFixed(2)}`;
+
+                                    // Recenter model around rig origin once so rig coords are meaningful.
+                                    if (!modelEl.dataset.centered) {
+                                        var center = new THREE.Vector3();
+                                        box.getCenter(center);
+                                        var basePos = modelEl.getAttribute('position') || { x: 0, y: 0, z: 0 };
+                                        var px = Number(basePos.x || 0) - center.x;
+                                        var py = Number(basePos.y || 0) - center.y;
+                                        var pz = Number(basePos.z || 0) - center.z;
+                                        modelEl.setAttribute('position', `${px} ${py} ${pz}`);
+                                        modelEl.dataset.centered = 'true';
+                                    }
+                                } catch (e) {
+                                    self.modelDebug[idx].size = 'bbox_err';
+                                }
+                            }
+                            console.log('[CAVEMAN] model-loaded', idx, self.modelDebug[idx]);
+                            self.updateDebug('model-loaded ' + idx);
+                        });
+                        modelEl.addEventListener('model-error', function (e) {
+                            self.modelDebug[idx].loaded = false;
+                            self.modelDebug[idx].mesh = false;
+                            self.modelDebug[idx].size = 'load_err';
+                            console.warn('[CAVEMAN] model-error', idx, e && e.detail);
+                            self.updateDebug('model-error ' + idx);
+                        });
+                    });
+                    self.updateVideoLayout = function () {
+                        applyVideoPlaneLayout({
+                            videoEl: document.getElementById('videoTexture'),
+                            planeEl: self.sharkVideoPlane,
+                            shadowEl: self.sharkVideoShadow
+                        });
+                    };
+                    self.updateVideoLayout();
+                    window.addEventListener('resize', self.updateVideoLayout);
+                    self.updateDebug('init');
+                },
+                show: function () {
+                    var self = this;
+                    if (CAVEMAN_DEBUG && CAVEMAN_RIG0_TUNER) {
+                        if (self.sharkVideoPlane) self.sharkVideoPlane.setAttribute('visible', false);
+                        if (self.sharkVideoShadow) self.sharkVideoShadow.setAttribute('visible', false);
+                        (self.sharkRigs || []).forEach(function (rig) {
+                            if (!rig) return;
+                            rig.removeAttribute('animation__swimPass');
+                            rig.removeAttribute('animation__swimIn');
+                            rig.removeAttribute('animation__swimOut');
+                            rig.removeAttribute('animation__bob');
+                            rig.setAttribute('visible', false);
+                        });
+                        self.cyclingActive = false;
+                        var rigIndex = CAVEMAN_TUNER_RIG_INDEX;
+                        var rig = (self.sharkRigs || [])[rigIndex];
+                        if (rig) {
+                            if (self.rigTunerHideTimer) clearTimeout(self.rigTunerHideTimer);
+                            rig.setAttribute('visible', true);
+                            rig.setAttribute('rotation', rigIndex === 0 ? '0 0 0' : '0 0 0');
+                            rig.setAttribute('scale', '0.85 0.85 0.85');
+                            rig.setAttribute('position', `${RIG0_TUNER.x.toFixed(2)} ${RIG0_TUNER.y.toFixed(2)} 2.50`);
+                            rig.setAttribute('animation__swimPass', {
+                                property: 'position',
+                                from: `${RIG0_TUNER.x.toFixed(2)} ${RIG0_TUNER.y.toFixed(2)} 2.50`,
+                                to: `${RIG0_TUNER.x.toFixed(2)} ${RIG0_TUNER.y.toFixed(2)} -15.00`,
+                                dur: 3600,
+                                easing: 'easeInOutSine'
+                            });
+                            var model0 = (self.sharkModels || [])[rigIndex];
+                            if (model0) {
+                                var mesh0 = model0.getObject3D('mesh');
+                                if (mesh0) {
+                                    mesh0.traverse(function (child) {
+                                        if (!child.isMesh || !child.material) return;
+                                        var mats = Array.isArray(child.material) ? child.material : [child.material];
+                                        mats.forEach(function (mat) {
+                                            mat.transparent = true;
+                                            mat.opacity = 1.0;
+                                            mat.needsUpdate = true;
+                                        });
+                                    });
+                                }
+                            }
+                            setTimeout(function () {
+                                var modelAtFade = (self.sharkModels || [])[rigIndex];
+                                if (!modelAtFade) return;
+                                var meshAtFade = modelAtFade.getObject3D('mesh');
+                                if (!meshAtFade) return;
+                                var fadeStart = performance.now();
+                                var fadeDuration = 650;
+                                function fadeStep(now) {
+                                    var t = Math.min((now - fadeStart) / fadeDuration, 1);
+                                    var opacity = 1 - t;
+                                    meshAtFade.traverse(function (child) {
+                                        if (!child.isMesh || !child.material) return;
+                                        var mats = Array.isArray(child.material) ? child.material : [child.material];
+                                        mats.forEach(function (mat) {
+                                            mat.transparent = true;
+                                            mat.opacity = opacity;
+                                            mat.needsUpdate = true;
+                                        });
+                                    });
+                                    if (t < 1) requestAnimationFrame(fadeStep);
+                                }
+                                requestAnimationFrame(fadeStep);
+                            }, 3400);
+                            self.rigTunerHideTimer = setTimeout(function () {
+                                rig.removeAttribute('animation__swimPass');
+                                rig.setAttribute('visible', false);
+                                var modelAtHide = (self.sharkModels || [])[rigIndex];
+                                if (modelAtHide) {
+                                    var meshAtHide = modelAtHide.getObject3D('mesh');
+                                    if (meshAtHide) {
+                                        meshAtHide.traverse(function (child) {
+                                            if (!child.isMesh || !child.material) return;
+                                            var mats = Array.isArray(child.material) ? child.material : [child.material];
+                                            mats.forEach(function (mat) {
+                                                mat.transparent = true;
+                                                mat.opacity = 1.0;
+                                                mat.needsUpdate = true;
+                                            });
+                                        });
+                                    }
+                                }
+                            }, 4100);
+                        }
+                        self.updateDebug('show: rig' + rigIndex + ' tuner mode');
+                        return;
+                    }
+                    if (CAVEMAN_DEBUG && CAVEMAN_FREEZE) {
+                        if (self.sharkVideoPlane) self.sharkVideoPlane.setAttribute('visible', false);
+                        if (self.sharkVideoShadow) self.sharkVideoShadow.setAttribute('visible', false);
+                        (self.sharkRigs || []).forEach(function (rig, i) {
+                            if (!rig) return;
+                            rig.removeAttribute('animation__swimPass');
+                            rig.removeAttribute('animation__swimIn');
+                            rig.removeAttribute('animation__swimOut');
+                            rig.removeAttribute('animation__bob');
+                            if (i === 0) {
+                                rig.setAttribute('visible', true);
+                                rig.setAttribute('position', '0 0 -1');
+                                rig.setAttribute('scale', '2 2 2');
+                            } else {
+                                rig.setAttribute('visible', false);
+                            }
+                        });
+                        self.cyclingActive = false;
+                        self.updateDebug('show: freeze rig0 center');
+                        return;
+                    }
+                    if (self.sharkVideoPlane) {
+                        var videoEl = document.getElementById('videoTexture');
+                        var showPlane = function () {
+                            self.sharkVideoPlane.setAttribute('visible', true);
+                            if (self.sharkVideoShadow) self.sharkVideoShadow.setAttribute('visible', true);
+                            var cycle = self.sharkVideoPlane.components['video-fact-cycle'];
+                            if (cycle) cycle.playOnce();
+                        };
+                        var hidePlane = function () {
+                            self.sharkVideoPlane.setAttribute('visible', false);
+                            if (self.sharkVideoShadow) self.sharkVideoShadow.setAttribute('visible', false);
+                        };
+
+                        if (videoEl) {
+                            if (videoEl.readyState >= 2) {
+                                showPlane();
+                            } else {
+                                hidePlane();
+                                videoEl.addEventListener('loadeddata', showPlane, { once: true });
+                            }
+                            var playPromise = videoEl.play();
+                            if (playPromise && typeof playPromise.catch === 'function') {
+                                playPromise.catch(function () {
+                                    hidePlane();
+                                });
+                            }
+                        } else {
+                            hidePlane();
+                        }
+                    }
+                    if (self.cyclingActive) return;
+                    self.cyclingActive = true;
+                    self.currentSharkIndex = 0;
+                    self.animateNextShark();
+                    self.updateDebug('show: cycling start');
+                },
+                hide: function () {
+                    var self = this;
+                    self.cyclingActive = false;
+                    (self.sharkTimers || []).forEach(function (t) { if (t) clearTimeout(t); });
+                    self.sharkTimers = [];
+                    (self.sharkRigs || []).forEach(function (rig) {
+                        if (!rig) return;
+                        rig.removeAttribute('animation__swimPass');
+                        rig.removeAttribute('animation__swimIn');
+                        rig.removeAttribute('animation__swimOut');
+                        rig.removeAttribute('animation__bob');
+                        rig.setAttribute('visible', false);
+                    });
+                    (self.sharkModels || []).forEach(function (modelEl) {
+                        if (!modelEl) return;
+                        modelEl.removeAttribute('animation__bobModel');
+                    });
+                    if (self.sharkVideoPlane) {
+                        self.sharkVideoPlane.setAttribute('visible', false);
+                        if (self.sharkVideoShadow) self.sharkVideoShadow.setAttribute('visible', false);
+                        var cycle = self.sharkVideoPlane.components['video-fact-cycle'];
+                        if (cycle) cycle.stop();
+                    }
+                    self.updateDebug('hide');
+                },
+                animateNextShark: function () {
+                    var self = this;
+                    if (!self.cyclingActive) return;
+                    var sharkIndex = self.currentSharkIndex % 2;
+                    var rig = (self.sharkRigs || [])[sharkIndex];
+                    var modelEl = (self.sharkModels || [])[sharkIndex];
+                    if (!rig) return;
+
+                    // Start a bit further away, glide into the center,
+                    // chill there briefly, then swim off into the distance.
+                    var startY = sharkIndex === 0 ? 0.82 : 0.72;
+                    var startZ = 8.0;
+                    var centerZ = -2;
+                    var endZ = -8.0;
+
+                    var swimInDuration = 1800;
+                    var chillDuration = 3200;
+                    var swimOutDuration = 2400;
+                    var totalDuration = swimInDuration + chillDuration + swimOutDuration;
+
+                    rig.setAttribute('visible', true);
+                    rig.setAttribute('rotation', sharkIndex === 0 ? '0 0 0' : '0 0 0');
+                    rig.setAttribute('position', `0 ${startY} ${startZ}`);
+                    rig.removeAttribute('animation__swimPass');
+                    rig.removeAttribute('animation__swimIn');
+                    rig.removeAttribute('animation__swimOut');
+
+                    if (modelEl) {
+                        var modelPos = modelEl.getAttribute('position') || { x: 0, y: 0, z: 0 };
+                        var mx = Number(modelPos.x || 0);
+                        var my = Number(modelPos.y || 0);
+                        var mz = Number(modelPos.z || 0);
+                        modelEl.setAttribute('animation__bobModel', {
+                            property: 'position',
+                            from: `${mx.toFixed(3)} ${(my - 0.08).toFixed(3)} ${mz.toFixed(3)}`,
+                            to: `${mx.toFixed(3)} ${(my + 0.08).toFixed(3)} ${mz.toFixed(3)}`,
+                            dir: 'alternate',
+                            dur: 520,
+                            easing: 'easeInOutSine',
+                            loop: true
+                        });
+                        var mesh = modelEl.getObject3D('mesh');
+                        if (mesh) {
+                            mesh.traverse(function (child) {
+                                if (!child.isMesh || !child.material) return;
+                                var mats = Array.isArray(child.material) ? child.material : [child.material];
+                                mats.forEach(function (mat) {
+                                    mat.transparent = true;
+                                    mat.opacity = 1.0;
+                                    mat.needsUpdate = true;
+                                });
+                            });
+                        }
+                    }
+
+                    rig.setAttribute('animation__swimIn', {
+                        property: 'position',
+                        from: `0 ${startY} ${startZ}`,
+                        to: `0 ${startY} ${centerZ}`,
+                        dur: swimInDuration,
+                        easing: 'easeOutSine'
+                    });
+
+                    var swimOutTimer = setTimeout(function () {
+                        if (!self.cyclingActive) return;
+                        rig.setAttribute('animation__swimOut', {
+                            property: 'position',
+                            from: `0 ${startY} ${centerZ}`,
+                            to: `0 ${startY} ${endZ}`,
+                            dur: swimOutDuration,
+                            easing: 'easeInSine'
+                        });
+                    }, swimInDuration + chillDuration);
+                    self.sharkTimers.push(swimOutTimer);
+
+                    var fadeDuration = 620;
+                    var fadeLeadMs = 700;
+                    var fadeDelay = Math.max(totalDuration - fadeLeadMs, 0);
+                    var fadeTimer = setTimeout(function () {
+                        if (!self.cyclingActive || !modelEl) return;
+                        var fadeMesh = modelEl.getObject3D('mesh');
+                        if (!fadeMesh) return;
+                        var fadeStart = performance.now();
+                        function fadeStep(now) {
+                            if (!self.cyclingActive) return;
+                            var t = Math.min((now - fadeStart) / fadeDuration, 1);
+                            var opacity = 1 - t;
+                            fadeMesh.traverse(function (child) {
+                                if (!child.isMesh || !child.material) return;
+                                var mats = Array.isArray(child.material) ? child.material : [child.material];
+                                mats.forEach(function (mat) {
+                                    mat.transparent = true;
+                                    mat.opacity = opacity;
+                                    mat.needsUpdate = true;
+                                });
+                            });
+                            if (t < 1) requestAnimationFrame(fadeStep);
+                        }
+                        requestAnimationFrame(fadeStep);
+                    }, fadeDelay);
+                    self.sharkTimers.push(fadeTimer);
+
+                    var hideTimer = setTimeout(function () {
+                        rig.removeAttribute('animation__swimIn');
+                        rig.removeAttribute('animation__swimOut');
+                        rig.setAttribute('visible', false);
+                        if (modelEl) {
+                            modelEl.removeAttribute('animation__bobModel');
+                            var meshAtHide = modelEl.getObject3D('mesh');
+                            if (meshAtHide) {
+                                meshAtHide.traverse(function (child) {
+                                    if (!child.isMesh || !child.material) return;
+                                    var mats = Array.isArray(child.material) ? child.material : [child.material];
+                                    mats.forEach(function (mat) {
+                                        mat.transparent = true;
+                                        mat.opacity = 1.0;
+                                        mat.needsUpdate = true;
+                                    });
+                                });
+                            }
+                        }
+                        self.currentSharkIndex = (self.currentSharkIndex + 1) % 2;
+                        if (self.cyclingActive) {
+                            var nextTimer = setTimeout(function () {
+                                self.animateNextShark();
+                            }, 220);
+                            self.sharkTimers.push(nextTimer);
+                        }
+                    }, totalDuration + 40);
+                    self.sharkTimers.push(hideTimer);
+                    self.updateDebug('animate idx=' + sharkIndex);
+                },
+                remove: function () {
+                    this.hide();
+                    if (this.updateVideoLayout) window.removeEventListener('resize', this.updateVideoLayout);
+                }
+            });
+        }
+
+        // ─── CONFIG ───
+        const THRESHOLD = 0.55;
+        const EMBEDDINGS_URL = './data/shark-embeddings-browser.json';
+        const CACHE_KEY = 'shark-embeddings-v5';
+        const ENABLE_GAME_DAY_BANNER = false;
+        const MARCH_MADNESS_PROMO_END_UTC = '2026-04-07T00:00:00Z';
+
+        // GPS fallback: keep shark "active" near Sharks Way (San Jose)
+        // NOTE: Update these coordinates if you have a more precise spot.
+        const GPS_TARGET = { lat: 37.33564048861824, lng: -121.8978303846544 }; // Sharks Way (exact)
+        const GPS_RADIUS_M = 250; // "remotely close" radius
+
+        // ─── UI REFS ───
+        const ui = {
+            video: document.getElementById('video'),
+            debugCanvas: document.getElementById('debug-canvas'),
+            loading: document.getElementById('loading'),
+            loadingStatus: document.getElementById('loading-status'),
+            modelOverlay: document.getElementById('model-overlay'),
+            basketballPromo: document.getElementById('basketball-promo'),
+            sharkPlaneOverlay: document.getElementById('shark-plane-overlay'),
+            sharkLabel: document.getElementById('shark-label'),
+            labelName: document.getElementById('labelName'),
+            eventInfo: document.getElementById('event-info'),
+            infoPanel: document.getElementById('info-panel'),
+            gpsStatus: document.getElementById('gps-status')
+        };
+
+        const muralSceneEl = document.getElementById('mural-shark-scene');
+        if (muralSceneEl) {
+            muralSceneEl.addEventListener('render-target-loaded', function () {
+                if (muralSceneEl.renderer) {
+                    muralSceneEl.renderer.setClearColor(0x000000, 0);
+                }
+                if (muralSceneEl.canvas) {
+                    muralSceneEl.canvas.style.background = 'transparent';
+                }
+                if (CAVEMAN_DEBUG && muralSceneEl.object3D && typeof THREE !== 'undefined') {
+                    var existingWorldAxes = muralSceneEl.object3D.getObjectByName('debug-world-axes');
+                    if (!existingWorldAxes) {
+                        var worldAxes = new THREE.AxesHelper(1.2);
+                        worldAxes.name = 'debug-world-axes';
+                        worldAxes.position.set(0, 0, 0);
+                        muralSceneEl.object3D.add(worldAxes);
+                    }
+                }
+            });
+        }
+
+        // ─── STATE ───
+        const STATE = {
+            model: null,
+            stream: null,
+            running: false,
+            enrolled: [],
+            sharkGroups: {},
+            lastMatchTime: 0,
+            frameCount: 0,
+            lastFpsTime: performance.now(),
+            recentScores: [],
+            ROLLING_N: 5,
+            sharkVisible: false,
+            dismissedAt: 0,
+            currentEventIndex: 0,
+            visitedStops: new Set(),
+            gpsWatchId: null,
+            gpsActive: false,
+            gpsDistanceM: null,
+            currentPosition: null,
+            basketballPromoTimer: null,
+            bannerDismissTimer: null,
+            checkpointA: { visited: false, active: false },
+            checkpointB: { visited: false, active: false }
+        };
+
+        // ─── GPS CHECKPOINT SYSTEM ───
+        const CHECKPOINTS = {
+            A: {
+                lat: 37.336861,  // 37°20'12.7"N
+                lng: -121.894361, // 121°53'39.7"W
+                name: 'Label A'
+            },
+            B: {
+                lat: 37.334222,  // 37°20'03.2"N
+                lng: -121.900417, // 121°54'01.5"W
+                name: 'Label B'
+            }
+        };
+
+        const GPS_CONFIG = {
+            proximityThreshold: 50, // meters - consider "at" checkpoint
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 5000
+        };
+
+        // Convert DMS to Decimal (for reference)
+        function dmsToDecimal(degrees, minutes, seconds, direction) {
+            let decimal = degrees + minutes / 60 + seconds / 3600;
+            if (direction === 'S' || direction === 'W') {
+                decimal = -decimal;
+            }
+            return decimal;
+        }
+
+        // Calculate distance based solely on longitude difference
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            // Simplified to use only longitude difference for consistency
+            // At San Jose latitude (~37.33°N), 1 degree of longitude is approx 88,000 meters.
+            return Math.abs(lon2 - lon1) * 88000;
+        }
+
+        // Add log entry to console
+        function addGPSLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[GPS ${timestamp}] ${message}`;
+
+            switch (type) {
+                case 'checkpoint':
+                    console.log('%c' + logMessage, 'color: #00FF88; font-weight: bold');
+                    break;
+                case 'error':
+                    console.error(logMessage);
+                    break;
+                default:
+                    console.log(logMessage);
+                    break;
+            }
+        }
+
+        // Update checkpoint status in UI
+        function updateCheckpointUI() {
+            const checkpointAEl = document.getElementById('checkpoint-a');
+            const checkpointBEl = document.getElementById('checkpoint-b');
+
+            console.log('[GPS] Updating UI - A visited:', STATE.checkpointA.visited, 'active:', STATE.checkpointA.active, '| B visited:', STATE.checkpointB.visited, 'active:', STATE.checkpointB.active);
+
+            // Update Checkpoint A
+            checkpointAEl.classList.remove('visited', 'active');
+            const svgA = checkpointAEl.querySelector('.check-icon');
+            if (svgA) {
+                const circleA = svgA.querySelector('circle');
+                const pathA = svgA.querySelector('path');
+
+                if (STATE.checkpointA.visited) {
+                    checkpointAEl.classList.add('visited');
+                    console.log('[GPS] Checkpoint A marked with checkmark');
+                }
+            }
+            if (STATE.checkpointA.active) {
+                checkpointAEl.classList.add('active');
+            }
+
+            // Update Checkpoint B
+            checkpointBEl.classList.remove('visited', 'active');
+            const svgB = checkpointBEl.querySelector('.check-icon');
+            if (svgB) {
+                const circleB = svgB.querySelector('circle');
+                const pathB = svgB.querySelector('path');
+
+                if (STATE.checkpointB.visited) {
+                    checkpointBEl.classList.add('visited');
+                    console.log('[GPS] Checkpoint B marked with checkmark');
+                }
+            }
+            if (STATE.checkpointB.active) {
+                checkpointBEl.classList.add('active');
+            }
+        }
+
+        // Determine checkpoint status based on simple longitude check
+        // "left of both check both, left of one check one, left of none check none"
+        function evaluateCheckpoints(position) {
+            const { latitude, longitude, accuracy } = position.coords;
+
+            addGPSLog(`Position: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (±${accuracy.toFixed(1)}m)`);
+
+            let checkedCount = 0;
+            let status = '';
+
+            // Check if user's longitude is "left of" (less than or equal to) the checkpoint's longitude
+            if (longitude <= CHECKPOINTS.A.lng) {
+                if (!STATE.checkpointA.visited) {
+                    addGPSLog(`✓ Passed Checkpoint A`, 'checkpoint');
+                }
+                STATE.checkpointA.visited = true;
+                checkedCount++;
+            } else {
+                STATE.checkpointA.visited = false;
+            }
+
+            if (longitude <= CHECKPOINTS.B.lng) {
+                if (!STATE.checkpointB.visited) {
+                    addGPSLog(`✓ Passed Checkpoint B`, 'checkpoint');
+                }
+                STATE.checkpointB.visited = true;
+                checkedCount++;
+            } else {
+                STATE.checkpointB.visited = false;
+            }
+
+            // Set active state for UI and descriptive status
+            if (STATE.checkpointA.visited && STATE.checkpointB.visited) {
+                STATE.checkpointA.active = false;
+                STATE.checkpointB.active = true;
+                status = 'Left of both (checked both)';
+            } else if (STATE.checkpointA.visited) {
+                STATE.checkpointA.active = false;
+                STATE.checkpointB.active = true;
+                status = 'Left of one (checked A)';
+            } else {
+                STATE.checkpointA.active = true;
+                STATE.checkpointB.active = false;
+                status = 'Right of both (none checked)';
+            }
+
+            // Update GPS status display
+            const gpsStatus = document.getElementById('gps-status');
+            if (gpsStatus) {
+                gpsStatus.textContent = `GPS: Longitude ${longitude.toFixed(5)} - ${status}`;
+            }
+
+            // Update UI
+            updateCheckpointUI();
+        }
+
+        // Handle GPS errors
+        function handleGPSError(error) {
+            let errorMsg = '';
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMsg = 'GPS permission denied';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMsg = 'GPS position unavailable';
+                    break;
+                case error.TIMEOUT:
+                    errorMsg = 'GPS request timeout';
+                    break;
+                default:
+                    errorMsg = 'GPS unknown error';
+                    break;
+            }
+
+            addGPSLog(errorMsg, 'error');
+
+            const gpsStatus = document.getElementById('gps-status');
+            if (gpsStatus) {
+                gpsStatus.textContent = `GPS: ${errorMsg}`;
+            }
+        }
+
+        // Start GPS tracking
+        function startGPSTracking() {
+            if (!navigator.geolocation) {
+                addGPSLog('Geolocation not supported', 'error');
+                return;
+            }
+
+            // Initialize UI with empty circles
+            updateCheckpointUI();
+
+            addGPSLog('Starting GPS tracking...');
+            addGPSLog(`Checkpoint A: ${CHECKPOINTS.A.lat.toFixed(6)}, ${CHECKPOINTS.A.lng.toFixed(6)}`);
+            addGPSLog(`Checkpoint B: ${CHECKPOINTS.B.lat.toFixed(6)}, ${CHECKPOINTS.B.lng.toFixed(6)}`);
+
+            STATE.gpsWatchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    STATE.currentPosition = position;
+                    evaluateCheckpoints(position);
+                },
+                handleGPSError,
+                {
+                    enableHighAccuracy: GPS_CONFIG.enableHighAccuracy,
+                    timeout: GPS_CONFIG.timeout,
+                    maximumAge: GPS_CONFIG.maximumAge
+                }
+            );
+        }
+
+        // Stop GPS tracking
+        function stopGPSTracking() {
+            if (STATE.gpsWatchId !== null) {
+                navigator.geolocation.clearWatch(STATE.gpsWatchId);
+                STATE.gpsWatchId = null;
+                addGPSLog('GPS tracking stopped');
+            }
+        }
+
+        // ─── EVENT DATA (from marker-demo) ───
+        // Approved SJ26 March Activations copy — avoid "Super Bowl", "March Madness",
+        // and NCAA branding per PR guidance.
+        const dummyEvents = [
+            {
+                title: "Free Throw at SAP Center",
+                date: "March 26 & 28, 2026",
+                time: "7:30 PM – 10:00 PM",
+                location: "SAP Center at San Jose",
+                sharkeyMessage: "Free Throw is a projection-mapping activation by G. Craig Hobbs with SJSU's CADRE Media Lab, celebrating the college basketball tournament at SAP Center on March 26 & 28.",
+                icon: "./assets/SharkLogo.png"
+            },
+            {
+                title: "Minis & Trophy – Arena Green West",
+                date: "March 26 & 28, 2026",
+                time: "1:00 PM – 10:00 PM",
+                location: "Arena Green West, San Jose",
+                sharkeyMessage: "Portable interactive light sculptures by SJSU Professor Esteban Garcia Bravo with the CADRE Media Lab, Digital Media Art, and Spatial Art programs.",
+                icon: "./assets/SharkLogo.png"
+            },
+            {
+                title: "International Football – Watch Together",
+                date: "June – July 2026",
+                time: "Match times vary",
+                location: "San Pedro Square Market",
+                sharkeyMessage: "Watch the world's biggest football matches in downtown San José — San Pedro Square Market has been a community gathering place since 1863.",
+                icon: "./assets/SharkLogo.png"
+            }
+        ];
+
+        // ─── SOUND ───
+        function playSound(type) {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                if (type === 'found') {
+                    oscillator.frequency.value = 800;
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.3);
+                } else if (type === 'tap') {
+                    oscillator.frequency.value = 1200;
+                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.1);
+                }
+            } catch (e) { /* ignore audio errors */ }
+        }
+
+        // ─── EVENT UI (from marker-demo) ───
+        function showEvent(event) {
+            document.getElementById('event-title').textContent = event.title;
+            document.getElementById('event-date').innerHTML = `<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>${event.date} &bull; ${event.time}`;
+            document.getElementById('event-location').innerHTML = `<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${event.location}`;
+            document.getElementById('sharkey-message').textContent = event.sharkeyMessage;
+            document.getElementById('event-icon').src = event.icon;
+            ui.eventInfo.classList.add('visible');
+
+            STATE.visitedStops.add(STATE.currentEventIndex);
+
+            if (STATE.bannerDismissTimer) clearTimeout(STATE.bannerDismissTimer);
+            STATE.bannerDismissTimer = setTimeout(() => {
+                STATE.bannerDismissTimer = null;
+                hideEvent();
+            }, 5000);
+        }
+
+        function hideEvent() {
+            ui.eventInfo.classList.remove('visible');
+        }
+
+        // updateProgress removed - now using updateCheckpointUI() for GPS-based checkpoints
+
+        document.getElementById('learn-more').addEventListener('click', () => {
+            playSound('tap');
+            alert(`Ready to attend ${dummyEvents[STATE.currentEventIndex].title}?\n\nIn the full version, this would:\n- Show ticket options\n- Add to calendar\n- Share with friends\n- Get directions`);
+            STATE.currentEventIndex = (STATE.currentEventIndex + 1) % dummyEvents.length;
+            dismissAll();
+        });
+
+        document.getElementById('dismiss-event').addEventListener('click', () => {
+            playSound('tap');
+            dismissAll();
+        });
+
+        // ─── NAVIGATION MENU ───
+        const navMenu = document.getElementById('nav-menu');
+        const navOverlay = document.getElementById('nav-overlay');
+        const hamburgerBtn = document.getElementById('hamburger-btn');
+        const closeMenuBtn = document.getElementById('close-menu');
+
+        function openMenu() {
+            navMenu.classList.add('open');
+            navOverlay.classList.add('visible');
+            playSound('tap');
+        }
+
+        function closeMenu() {
+            navMenu.classList.remove('open');
+            navOverlay.classList.remove('visible');
+            playSound('tap');
+        }
+
+        hamburgerBtn.addEventListener('click', openMenu);
+        hamburgerBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            openMenu();
+        });
+
+        closeMenuBtn.addEventListener('click', closeMenu);
+        closeMenuBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            closeMenu();
+        });
+
+        navOverlay.addEventListener('click', closeMenu);
+        navOverlay.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            closeMenu();
+        });
+
+        // Close menu on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && navMenu.classList.contains('open')) {
+                closeMenu();
+            }
+        });
+
+        function showFallbackSharks() {
+            if (ui.sharkPlaneOverlay) ui.sharkPlaneOverlay.classList.add('visible');
+            const muralSharkEl = document.getElementById('mural-shark-root');
+            if (muralSharkEl && muralSharkEl.components && muralSharkEl.components['mural-shark-content']) {
+                muralSharkEl.components['mural-shark-content'].show();
+            }
+        }
+
+        function hideFallbackSharks() {
+            const muralSharkEl = document.getElementById('mural-shark-root');
+            if (muralSharkEl && muralSharkEl.components && muralSharkEl.components['mural-shark-content']) {
+                muralSharkEl.components['mural-shark-content'].hide();
+            }
+            if (ui.sharkPlaneOverlay) ui.sharkPlaneOverlay.classList.remove('visible');
+        }
+
+        function isMarchMadnessPromoActive(now = new Date()) {
+            if (!ENABLE_GAME_DAY_BANNER) return false;
+            return now.getTime() < Date.parse(MARCH_MADNESS_PROMO_END_UTC);
+        }
+
+        function showBasketballPromo() {
+            if (!ui.basketballPromo || !isMarchMadnessPromoActive()) return;
+            if (STATE.basketballPromoTimer) {
+                clearTimeout(STATE.basketballPromoTimer);
+                STATE.basketballPromoTimer = null;
+            }
+            // Let the shark render first, then reveal promo.
+            STATE.basketballPromoTimer = setTimeout(() => {
+                ui.basketballPromo.classList.add('visible');
+                STATE.basketballPromoTimer = null;
+            }, 380);
+        }
+
+        function hideBasketballPromo() {
+            if (!ui.basketballPromo) return;
+            if (STATE.basketballPromoTimer) {
+                clearTimeout(STATE.basketballPromoTimer);
+                STATE.basketballPromoTimer = null;
+            }
+            ui.basketballPromo.classList.remove('visible');
+        }
+
+        // Force Animation debug button removed from UI.
+
+        const SED = window.SharkEmbeddingDetector;
+
+        async function loadEmbeddings() {
+            ui.loadingStatus.textContent = 'Almost ready...';
+            return SharkEmbeddingDetector.loadEmbeddings(STATE, STATE.model, {
+                embeddingsUrl: EMBEDDINGS_URL,
+                cacheKey: CACHE_KEY
+            });
+        }
+
+        async function loadModel() {
+            ui.loadingStatus.textContent = 'Preparing camera...';
+            STATE.model = await SharkEmbeddingDetector.loadModel((s) => { ui.loadingStatus.textContent = s; });
+        }
+
+        async function startCamera() {
+            ui.loadingStatus.textContent = 'Starting camera...';
+            STATE.stream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: {
+                    facingMode: { ideal: 'environment' },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            });
+            ui.video.srcObject = STATE.stream;
+            await new Promise(r => { ui.video.onloadedmetadata = r; });
+        }
+
+        async function getFrameEmbedding() {
+            return SharkEmbeddingDetector.getFrameEmbedding(STATE.model, ui.video, ui.debugCanvas);
+        }
+
+        // ─── SHARK FOUND / LOST ───
+        function onSharkFound(name, score) {
+            if (STATE.sharkVisible) return; // already showing
+            STATE.sharkVisible = true;
+            STATE.lastMatchTime = performance.now();
+
+            // Always use the A-Frame fallback sharks overlay.
+            showFallbackSharks();
+            showBasketballPromo();
+            // Show label
+            ui.labelName.textContent = 'Follow Sharkie';
+            ui.sharkLabel.classList.add('visible');
+
+            // Show event info + sound
+            showEvent(dummyEvents[STATE.currentEventIndex]);
+            playSound('found');
+
+        }
+
+        function onSharkLost() {
+            // Do nothing — shark stays until user dismisses
+        }
+
+        function dismissAll() {
+            STATE.sharkVisible = false;
+            STATE.dismissedAt = performance.now();
+            STATE.recentScores = [];
+            if (STATE.bannerDismissTimer) {
+                clearTimeout(STATE.bannerDismissTimer);
+                STATE.bannerDismissTimer = null;
+            }
+            ui.sharkLabel.classList.remove('visible');
+            hideFallbackSharks();
+            hideBasketballPromo();
+            hideEvent();
+        }
+
+        // ─── GPS FALLBACK ───
+        function haversineMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        function updateGpsStatusText() {
+            if (!ui.gpsStatus) return;
+            if (STATE.gpsDistanceM == null) {
+                ui.gpsStatus.textContent = 'GPS: waiting…';
+                return;
+            }
+            const d = STATE.gpsDistanceM;
+            const distText = d >= 1000 ? `${(d / 1000).toFixed(2)}km` : `${Math.round(d)}m`;
+            ui.gpsStatus.textContent = `GPS: ${distText} from Sharks Way`;
+        }
+
+        function startGpsWatch() {
+            if (!('geolocation' in navigator)) {
+                if (ui.gpsStatus) ui.gpsStatus.textContent = 'GPS: unavailable';
+                return;
+            }
+
+            try {
+                if (STATE.gpsWatchId != null) navigator.geolocation.clearWatch(STATE.gpsWatchId);
+            } catch (e) { /* ignore */ }
+
+            STATE.gpsWatchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    const d = haversineMeters(lat, lng, GPS_TARGET.lat, GPS_TARGET.lng);
+                    STATE.gpsDistanceM = d;
+                    const inRange = d <= GPS_RADIUS_M;
+
+                    // If user is close, force the "found" state even if ML can't see the mural (night/low light).
+                    STATE.gpsActive = inRange;
+                    updateGpsStatusText();
+
+                    const cooldownOver = performance.now() - STATE.dismissedAt > 3000;
+                    if (inRange && cooldownOver && !STATE.sharkVisible) {
+                        onSharkFound('gps', 1.0);
+                    }
+                },
+                (err) => {
+                    console.warn('GPS error:', err);
+                    STATE.gpsDistanceM = null;
+                    STATE.gpsActive = false;
+                    if (ui.gpsStatus) ui.gpsStatus.textContent = 'GPS: blocked';
+                },
+                { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
+            );
+        }
+
+        // ─── MAIN LOOP ───
+        async function loop() {
+            if (!STATE.running) return;
+
+            try {
+                if (!STATE.model || !STATE.stream || STATE.enrolled.length === 0) {
+                    requestAnimationFrame(loop);
+                    return;
+                }
+
+                const embedding = await getFrameEmbedding();
+                if (!embedding) {
+                    requestAnimationFrame(loop);
+                    return;
+                }
+                const rawMatch = SharkEmbeddingDetector.bestMatch(STATE, embedding);
+                const smoothed = SharkEmbeddingDetector.rollingScore(STATE, rawMatch);
+
+                const cooldownOver = performance.now() - STATE.dismissedAt > 3000;
+                const mlMatch = cooldownOver && smoothed.name && smoothed.score >= THRESHOLD && smoothed.confidence >= 0.4;
+                const gpsMatch = cooldownOver && STATE.gpsActive;
+
+                if (mlMatch || gpsMatch) {
+                    STATE.lastMatchTime = performance.now();
+                    onSharkFound(smoothed.name, smoothed.score);
+                } else {
+                    onSharkLost();
+                }
+            } catch (e) {
+                console.error('Loop error:', e);
+            }
+
+            requestAnimationFrame(loop);
+        }
+
+        // ─── INIT ───
+        async function init() {
+            try {
+                await loadModel();
+                await loadEmbeddings();
+                await startCamera();
+                startGpsWatch();
+
+                ui.loading.classList.add('hidden');
+
+                STATE.running = true;
+                loop();
+
+                // Start GPS tracking
+                startGPSTracking();
+            } catch (e) {
+                ui.loadingStatus.textContent = 'Something went wrong. Please refresh.';
+                console.error(e);
+            }
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            stopGPSTracking();
+        });
+
+        // Map functionality
+        var map = null;
+        var userMarker = null;
+        var userLat = null;
+        var userLng = null;
+
+        function initializeMap() {
+            if (map) {
+                console.log('[MAP] Map already initialized');
+                return;
+            }
+
+            console.log('[MAP] Initializing map...');
+            var mapContainer = document.getElementById('mini-map');
+            if (!mapContainer) {
+                console.error('[MAP] Map container not found!');
+                return;
+            }
+
+            map = L.map(mapContainer, {
+                zoomControl: false,
+                attributionControl: true
+            }).setView([37.3352, -121.8811], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19
+            }).addTo(map);
+
+            console.log('[MAP] Map initialized successfully');
+        }
+
+        function updateMap() {
+            if (!map) {
+                console.log('[MAP] Map not initialized, cannot update');
+                return;
+            }
+            if (!userLat || !userLng) {
+                console.log('[MAP] No GPS position yet');
+                return;
+            }
+
+            console.log('[MAP] Updating map with position:', userLat, userLng);
+            map.setView([userLat, userLng], 16);
+
+            // Use shared marker system
+            var mapContainer = document.getElementById('map-container');
+            var isExpanded = mapContainer.classList.contains('expanded');
+            userMarker = updateMapMarkers(map, userLat, userLng, userMarker, isExpanded);
+            console.log('[MAP] Map updated with markers');
+        }
+
+        document.getElementById('toggle-map').addEventListener('click', function () {
+            var mapContainer = document.getElementById('map-container');
+            var isExpanded = mapContainer.classList.toggle('expanded');
+
+
+            setTimeout(function () {
+                if (map) {
+                    map.invalidateSize();
+                    updateMap();
+                }
+            }, 400);
+        });
+
+        if (navigator.geolocation) {
+            console.log('[GPS] Starting geolocation watch...');
+            navigator.geolocation.watchPosition(
+                function (position) {
+                    userLat = position.coords.latitude;
+                    userLng = position.coords.longitude;
+                    console.log('[GPS] Position updated:', userLat, userLng, 'accuracy:', position.coords.accuracy + 'm');
+
+                    if (!map) {
+                        console.log('[GPS] Map not initialized, initializing now...');
+                        initializeMap();
+                    }
+                    updateMap();
+                },
+                function (error) {
+                    console.error('[GPS] Geolocation error:', error.code, error.message);
+                },
+                { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+            );
+        } else {
+            console.error('[GPS] Geolocation not supported by this browser');
+        }
+
+        setTimeout(function () {
+            if (!map) {
+                initializeMap();
+            }
+        }, 1000);
+
+        init();
+    </script>
+
+    <!-- GPS Tracking for Checkpoints -->
+    <script src="./src/utils/shared-gps-tracking.js"></script>
+</body>
+
+</html>
