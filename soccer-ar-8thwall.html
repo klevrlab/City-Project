@@ -78,6 +78,12 @@
             display: none;
         }
 
+        #timer {
+            display: none;
+            min-width: 54px;
+            text-align: center;
+        }
+
         #reset-btn {
             display: none;
             position: fixed;
@@ -157,6 +163,17 @@
             padding: 12px 22px;
         }
 
+        #toast[data-variant="summary"] {
+            background: rgba(0, 22, 26, 0.92);
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0;
+            line-height: 1.35;
+            padding: 14px 18px;
+            white-space: pre-line;
+            max-width: 86vw;
+        }
+
         #tap-instruction {
             font-size: 14px;
             line-height: 1.4;
@@ -168,6 +185,7 @@
     <div id="topbar">
         <a href="./index.html" class="back" aria-label="Back to home">&larr;</a>
         <h1>Soccer AR Prototype</h1>
+        <span id="timer" class="pill" data-ui-overlay>00:30</span>
         <span id="score" class="pill" data-ui-overlay>Goals 0 / 0</span>
     </div>
 

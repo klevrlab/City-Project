@@ -39,6 +39,14 @@
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.4);
+      } else if (type === 'bonus') {
+        oscillator.type = 'triangle';
+        oscillator.frequency.setValueAtTime(660, audioContext.currentTime);
+        oscillator.frequency.linearRampToValueAtTime(990, audioContext.currentTime + 0.12);
+        gainNode.gain.setValueAtTime(0.22, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.2);
       }
     } catch (e) { }
   }

@@ -17,6 +17,7 @@ AFRAME.registerComponent('soccer-game', {
     maxGoalDistanceFromPlayer: { type: 'number', default: 10.0 },
     // Re-anchor field only if player has moved this far from initial placement origin.
     reanchorDistanceFromOrigin: { type: 'number', default: 4.0 },
+    challengeDurationSec: { type: 'number', default: 30 },
     kickDurationMs: { type: 'number', default: 1100 },
     minSwipePx: { type: 'number', default: 30 },
     resetDelayMs: { type: 'number', default: 1200 },
@@ -45,8 +46,15 @@ AFRAME.registerComponent('soccer-game', {
     this.touchStartT = 0;
     this.kickRafId = null;
     this.resetTimerId = null;
-    this.score = 0;
+    this.score = 0; // points
+    this.goals = 0;
     this.attempts = 0;
+    this.streak = 0;
+    this.bestZone = 'None';
+    this.challengeActive = false;
+    this.challengeTimerId = null;
+    this.challengeEndsAtMs = 0;
+    this.pendingRoundSummary = false;
     this.aimDots = [];
     this.aimVisible = false;
     this.fieldOriginCameraPos = null;
@@ -112,6 +120,92 @@ AFRAME.registerComponent('soccer-game', {
     const pt = e.detail && e.detail.intersection && e.detail.intersection.point;
     if (!pt) return;
     this.placeField(pt.clone ? pt.clone() : new THREE.Vector3(pt.x, pt.y, pt.z));
+  },
+
+  zoneLabel: function (zone) {
+    if (zone === 'top_corner') return 'Top Corner';
+    if (zone === 'corner') return 'Corner';
+    if (zone === 'center') return 'Center';
+    return 'Goal';
+  },
+
+  zonePoints: function (zone) {
+    if (zone === 'top_corner') return 2;
+    return 1;
+  },
+
+  classifyGoalZone: function (lateral, y) {
+    const halfW = this.data.goalWidth / 2;
+    const absLat = Math.abs(lateral);
+    const nearPost = absLat >= halfW * 0.62;
+    const high = y >= this.data.goalHeight * 0.72;
+    const center = absLat <= halfW * 0.22 && y <= this.data.goalHeight * 0.68;
+    if (nearPost && high) return 'top_corner';
+    if (nearPost) return 'corner';
+    if (center) return 'center';
+    return 'goal';
+  },
+
+  startChallengeIfNeeded: function () {
+    if (this.challengeActive) return;
+    this.challengeActive = true;
+    this.challengeEndsAtMs = Date.now() + this.data.challengeDurationSec * 1000;
+    this.score = 0;
+    this.goals = 0;
+    this.attempts = 0;
+    this.streak = 0;
+    this.bestZone = 'None';
+    this.pendingRoundSummary = false;
+    this.updateTimer();
+    this.updateScore();
+    const timerEl = document.getElementById('timer');
+    if (timerEl) timerEl.style.display = 'inline-block';
+
+    if (this.challengeTimerId) clearInterval(this.challengeTimerId);
+    this.challengeTimerId = setInterval(() => {
+      this.updateTimer();
+      if (Date.now() >= this.challengeEndsAtMs) {
+        this.finishChallengeRound();
+      }
+    }, 200);
+  },
+
+  updateTimer: function () {
+    const timerEl = document.getElementById('timer');
+    if (!timerEl) return;
+    if (!this.challengeActive) {
+      timerEl.style.display = 'none';
+      return;
+    }
+    const remainingMs = Math.max(0, this.challengeEndsAtMs - Date.now());
+    const secs = Math.ceil(remainingMs / 1000);
+    const mm = String(Math.floor(secs / 60)).padStart(2, '0');
+    const ss = String(secs % 60).padStart(2, '0');
+    timerEl.style.display = 'inline-block';
+    timerEl.textContent = `${mm}:${ss}`;
+  },
+
+  finishChallengeRound: function () {
+    if (!this.challengeActive) return;
+    this.challengeActive = false;
+    if (this.challengeTimerId) {
+      clearInterval(this.challengeTimerId);
+      this.challengeTimerId = null;
+    }
+    this.updateTimer();
+
+    if (this.state === 'kicking') {
+      this.pendingRoundSummary = true;
+      return;
+    }
+    this.showRoundSummary();
+  },
+
+  showRoundSummary: function () {
+    const accuracy = this.attempts > 0 ? Math.round((this.goals / this.attempts) * 100) : 0;
+    const summary = `Time! ${this.data.challengeDurationSec}s complete\nPoints ${this.score} · Goals ${this.goals}/${this.attempts} · Accuracy ${accuracy}%\nBest ${this.bestZone}`;
+    this.showToast(summary, 'summary');
+    this.updateInstruction('Round complete. Swipe to start a new round');
   },
 
   hasMovedFarFromOrigin: function () {
@@ -197,6 +291,7 @@ AFRAME.registerComponent('soccer-game', {
     }
 
     this.state = 'placed';
+    this.startChallengeIfNeeded();
     this.updateInstruction('Swipe up to shoot — drag higher for more power · tap the ball for a straight kick');
     this.showReset(true);
     this.updateScore();
@@ -310,7 +405,7 @@ AFRAME.registerComponent('soccer-game', {
     if (speedPxPerMs > 1.2) power += Math.min((speedPxPerMs - 1.2) * 0.12, 0.18);
     power = Math.max(0.45, Math.min(power, 1.45));
 
-    return { dir: dir, power: power, fwdAmount: fwdAmount, distPx: distPx };
+    return { dir: dir, power: power, fwdAmount: fwdAmount, distPx: distPx, latNorm: latNorm };
   },
 
   updateAim: function (dir, power) {
@@ -389,7 +484,7 @@ AFRAME.registerComponent('soccer-game', {
 
     // Sub-threshold movement = tap → straight kick at default power.
     if (distPx < this.data.minSwipePx) {
-      this.kickToward(this.goalForward.clone(), 0.9);
+      this.kickToward(this.goalForward.clone(), 0.9, 0);
       return;
     }
 
@@ -403,11 +498,13 @@ AFRAME.registerComponent('soccer-game', {
       return;
     }
 
-    this.kickToward(shot.dir, shot.power);
+    this.kickToward(shot.dir, shot.power, shot.latNorm * 0.55);
   },
 
-  kickToward: function (direction, power) {
+  kickToward: function (direction, power, curveAmount) {
     if (this.state !== 'placed' || !this.ballEntity) return;
+    this.startChallengeIfNeeded();
+    if (!this.challengeActive) return;
     if (this.resetTimerId) {
       clearTimeout(this.resetTimerId);
       this.resetTimerId = null;
@@ -423,6 +520,8 @@ AFRAME.registerComponent('soccer-game', {
     this.kickTo = end.clone();
     this.kickArc = 0.5 + power * 1.0;
     this.kickGoalDetected = false;
+    this.kickCurveAmount = Math.max(-0.65, Math.min(curveAmount || 0, 0.65));
+    this.kickCurveRight = new THREE.Vector3(direction.z, 0, -direction.x).normalize();
 
     this.state = 'kicking';
     this.attempts += 1;
@@ -443,20 +542,24 @@ AFRAME.registerComponent('soccer-game', {
 
     const x = this.kickFrom.x + (this.kickTo.x - this.kickFrom.x) * eased;
     const z = this.kickFrom.z + (this.kickTo.z - this.kickFrom.z) * eased;
+    const curveOffset = this.kickCurveAmount * Math.sin(Math.PI * t) * this.data.goalDistance * 0.22;
+    const cx = this.kickCurveRight ? this.kickCurveRight.x * curveOffset : 0;
+    const cz = this.kickCurveRight ? this.kickCurveRight.z * curveOffset : 0;
     const baseY = this.data.ballRadius;
     const y = baseY + this.kickArc * Math.sin(Math.PI * t);
 
-    this.ballEntity.object3D.position.set(x, y, z);
+    this.ballEntity.object3D.position.set(x + cx, y, z + cz);
 
     if (!this.kickGoalDetected) {
-      const relX = x - this.goalCenter.x;
-      const relZ = z - this.goalCenter.z;
+      const relX = (x + cx) - this.goalCenter.x;
+      const relZ = (z + cz) - this.goalCenter.z;
       const alongForward = relX * this.goalForward.x + relZ * this.goalForward.z;
       const lateral = relX * this.goalRight.x + relZ * this.goalRight.z;
 
       if (alongForward >= 0 && Math.abs(lateral) <= this.data.goalWidth / 2 && y <= this.data.goalHeight) {
         this.kickGoalDetected = true;
-        this.onGoal();
+        const zone = this.classifyGoalZone(lateral, y);
+        this.onGoal(zone);
       }
     }
 
@@ -467,15 +570,33 @@ AFRAME.registerComponent('soccer-game', {
     }
   },
 
-  onGoal: function () {
-    this.score += 1;
+  onGoal: function (zone) {
+    const basePoints = this.zonePoints(zone);
+    this.goals += 1;
+    this.streak += 1;
+    let bonus = 0;
+    if (this.streak >= 2) bonus = 1;
+    this.score += basePoints + bonus;
+    if (this.bestZone === 'None' ||
+      (zone === 'top_corner') ||
+      (zone === 'corner' && this.bestZone !== 'Top Corner') ||
+      (zone === 'center' && this.bestZone === 'Goal')) {
+      this.bestZone = this.zoneLabel(zone);
+    }
     this.updateScore();
-    this.showToast('GOAL!', 'goal');
-    if (window.AudioUtils) window.AudioUtils.playSound('goal');
+    const msg = bonus > 0
+      ? `${this.zoneLabel(zone)} +${basePoints} · Streak +${bonus}`
+      : `${this.zoneLabel(zone)} +${basePoints}`;
+    this.showToast(msg, 'goal');
+    if (window.AudioUtils) {
+      window.AudioUtils.playSound('goal');
+      if (bonus > 0) window.AudioUtils.playSound('bonus');
+    }
   },
 
   onKickEnd: function () {
     if (!this.kickGoalDetected) {
+      this.streak = 0;
       this.showToast('Miss — try again', 'miss');
       this.updateScore();
     }
@@ -486,8 +607,13 @@ AFRAME.registerComponent('soccer-game', {
         this.ballEntity.object3D.position.copy(this.ballPlacementPos);
       }
       this.state = 'placed';
-      this.updateInstruction('Swipe up to shoot — drag higher for more power · tap the ball for a straight kick');
-      this.hideToast();
+      if (this.pendingRoundSummary) {
+        this.pendingRoundSummary = false;
+        this.showRoundSummary();
+      } else {
+        this.updateInstruction('Swipe up to shoot — drag higher for more power · tap the ball for a straight kick');
+        this.hideToast();
+      }
     }, this.data.resetDelayMs);
   },
 
@@ -500,6 +626,10 @@ AFRAME.registerComponent('soccer-game', {
     if (this.hintTimerId) {
       clearTimeout(this.hintTimerId);
       this.hintTimerId = null;
+    }
+    if (this.challengeTimerId) {
+      clearInterval(this.challengeTimerId);
+      this.challengeTimerId = null;
     }
     this.hideAim();
     for (let i = 0; i < this.aimDots.length; i++) {
@@ -519,9 +649,15 @@ AFRAME.registerComponent('soccer-game', {
     this.touchStartY = null;
     this.state = 'idle';
     this.score = 0;
+    this.goals = 0;
     this.attempts = 0;
+    this.streak = 0;
+    this.bestZone = 'None';
+    this.challengeActive = false;
+    this.pendingRoundSummary = false;
     this.fieldOriginCameraPos = null;
     this.hideToast();
+    this.updateTimer();
     this.updateInstruction('Tap the ground to place the soccer ball');
     this.showReset(false);
     this.updateScore();
@@ -564,6 +700,6 @@ AFRAME.registerComponent('soccer-game', {
       return;
     }
     el.style.display = 'inline-block';
-    el.textContent = `Goals ${this.score} / ${this.attempts}`;
+    el.textContent = `Pts ${this.score} · Goals ${this.goals}/${this.attempts} · Streak ${this.streak}`;
   }
 });
