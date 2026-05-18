@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Soccer AR Prototype (8th Wall)</title>
+
+    <!-- 8th Wall Engine & Extras (2026 Distributed Engine) -->
+    <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" crossorigin="anonymous" data-preload-chunks="slam" async></script>
+    <script src="https://cdn.8thwall.com/web/aframe/8frame-1.5.0.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js" crossorigin="anonymous" async></script>
+
+    <!-- Project Source -->
+    <script src="./src/utils/audio-utils.js"></script>
+    <script src="./src/utils/math-utils.js"></script>
+    <script src="./src/components/soccer-game.js"></script>
+    <script src="./src/app.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: transparent;
+            color: white;
+        }
+
+        #topbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 12px 14px;
+            background: linear-gradient(to bottom, rgba(0, 22, 26, 0.7) 0%, transparent 100%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 1001;
+            pointer-events: none;
+        }
+
+        #topbar a, #topbar h1, #topbar .pill {
+            pointer-events: auto;
+        }
+
+        #topbar h1 {
+            font-size: 14px;
+            font-weight: 700;
+            flex: 1;
+        }
+
+        #topbar .back {
+            color: #00A9E0;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 4px 6px;
+        }
+
+        .pill {
+            background: rgba(0, 169, 224, 0.25);
+            border: 1px solid rgba(0, 169, 224, 0.4);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            backdrop-filter: blur(8px);
+        }
+
+        #score {
+            display: none;
+        }
+
+        #reset-btn {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(40, 200, 120, 0.25);
+            border: 1px solid rgba(40, 200, 120, 0.45);
+        }
+
+        #tap-instruction {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 109, 117, 0.85);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 14px 22px;
+            border-radius: 30px;
+            font-size: 15px;
+            font-weight: 600;
+            z-index: 2000;
+            pointer-events: none;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(0, 169, 224, 0.5);
+            max-width: 80vw;
+        }
+
+        #tap-instruction.visible {
+            opacity: 1;
+        }
+
+        #toast {
+            position: fixed;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.85);
+            background: rgba(0, 22, 26, 0.85);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 18px 32px;
+            border-radius: 18px;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            z-index: 2100;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        #toast.visible {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        #toast[data-variant="goal"] {
+            background: rgba(40, 200, 120, 0.85);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        #toast[data-variant="miss"] {
+            background: rgba(0, 22, 26, 0.85);
+            font-size: 18px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="topbar">
+        <a href="./index.html" class="back" aria-label="Back to home">&larr;</a>
+        <h1>Soccer AR Prototype</h1>
+        <span id="score" class="pill" data-ui-overlay>Goals 0 / 0</span>
+    </div>
+
+    <div id="tap-instruction">Loading AR&hellip;</div>
+    <div id="toast"></div>
+
+    <button id="reset-btn" class="pill" data-ui-overlay>Reset</button>
+
+    <!-- 8th Wall A-Frame scene -->
+    <a-scene id="xrscene"
+        xrextras-almost-there
+        xrextras-runtime-error
+        xrextras-loading
+        xrweb
+        vr-mode-ui="enabled: false"
+        cursor="rayOrigin: mouse"
+        raycaster="objects: .clickable"
+        renderer="antialias: true; alpha: true; logarithmicDepthBuffer: true; colorManagement: true;">
+
+        <!-- Lighting + shadows -->
+        <a-entity light="type: ambient; intensity: 0.55;"></a-entity>
+        <a-entity light="type: directional; castShadow: true; intensity: 0.85; shadowMapHeight: 2048; shadowMapWidth: 2048; shadowCameraTop: 15; shadowCameraBottom: -15; shadowCameraRight: 15; shadowCameraLeft: -15; target: #camera" position="5 10 5"></a-entity>
+
+        <!-- Shadow Ground Plane (Clickable for placement) -->
+        <a-plane id="ground" class="clickable" position="0 0 0" rotation="-90 0 0" width="1000" height="1000" material="shader: shadow; opacity: 0.4;" shadow="receive: true"></a-plane>
+
+        <!-- Soccer field root -->
+        <a-entity id="soccer-root" position="0 0 0" soccer-game></a-entity>
+
+        <a-camera id="camera" position="0 1.6 0"></a-camera>
+    </a-scene>
+
+    <script>
+        window.addEventListener('xrloaded', () => {
+            console.log('8th Wall Engine Loaded — Soccer Prototype');
+        });
+    </script>
+</body>
+
+</html>
