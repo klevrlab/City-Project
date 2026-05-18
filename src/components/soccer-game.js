@@ -11,7 +11,17 @@ AFRAME.registerComponent('soccer-game', {
     goalDistance: { type: 'number', default: 6.0 },
     kickDurationMs: { type: 'number', default: 1100 },
     minSwipePx: { type: 'number', default: 30 },
-    resetDelayMs: { type: 'number', default: 1200 }
+    resetDelayMs: { type: 'number', default: 1200 },
+    // Max lateral deflection from "straight ahead" in degrees, regardless of how
+    // diagonal the swipe is. Keeps aiming predictable in a cone, not a full circle.
+    maxAimAngleDeg: { type: 'number', default: 22 },
+    // Minimum upward swipe ratio (0–1 of reference distance) required to fire.
+    minForwardRatio: { type: 'number', default: 0.15 },
+    // How far up the screen a "full power" swipe needs to travel, as fraction of screen height.
+    fullPowerScreenRatio: { type: 'number', default: 0.4 },
+    // Top dead zone (px) — touches that start above this are ignored (topbar area).
+    topDeadZonePx: { type: 'number', default: 60 },
+    aimDotCount: { type: 'number', default: 14 }
   },
 
   init: function () {
@@ -29,17 +39,23 @@ AFRAME.registerComponent('soccer-game', {
     this.resetTimerId = null;
     this.score = 0;
     this.attempts = 0;
+    this.aimDots = [];
+    this.aimVisible = false;
 
     this.onGroundClick = this.onGroundClick.bind(this);
     this.onTouchStart = this.onTouchStart.bind(this);
+    this.onTouchMove = this.onTouchMove.bind(this);
     this.onTouchEnd = this.onTouchEnd.bind(this);
+    this.onTouchCancel = this.onTouchCancel.bind(this);
     this.tickKick = this.tickKick.bind(this);
 
     const ground = document.getElementById('ground');
     if (ground) ground.addEventListener('click', this.onGroundClick);
 
     document.addEventListener('touchstart', this.onTouchStart, { passive: true });
+    document.addEventListener('touchmove', this.onTouchMove, { passive: true });
     document.addEventListener('touchend', this.onTouchEnd, { passive: true });
+    document.addEventListener('touchcancel', this.onTouchCancel, { passive: true });
 
     const showHint = () => this.updateInstruction('Tap the ground to place the soccer ball');
     if (this.el.sceneEl && this.el.sceneEl.hasLoaded) {
@@ -115,10 +131,28 @@ AFRAME.registerComponent('soccer-game', {
     this.goalEntity.object3D.position.y = 0;
     this.goalEntity.setAttribute('rotation', `0 ${goalYawDeg} 0`);
 
+    this.ensureAimGuide();
+
     this.state = 'placed';
-    this.updateInstruction('Swipe up toward the goal to kick (tap the ball for a straight kick)');
+    this.updateInstruction('Swipe up to shoot — drag higher for more power · tap the ball for a straight kick');
     this.showReset(true);
     this.updateScore();
+  },
+
+  ensureAimGuide: function () {
+    if (this.aimDots.length) return;
+    const count = this.data.aimDotCount;
+    for (let i = 0; i < count; i++) {
+      const dot = document.createElement('a-sphere');
+      // Front dots are bigger/brighter, back dots smaller/dimmer — reads as direction-of-travel.
+      const tInDots = (i + 1) / (count + 1);
+      const r = 0.025 + tInDots * 0.025;
+      dot.setAttribute('radius', r);
+      dot.setAttribute('material', `color: #00A9E0; shader: flat; transparent: true; opacity: ${(0.35 + tInDots * 0.55).toFixed(2)}`);
+      dot.setAttribute('visible', 'false');
+      this.el.appendChild(dot);
+      this.aimDots.push(dot);
+    }
   },
 
   ensureBall: function () {
@@ -183,51 +217,130 @@ AFRAME.registerComponent('soccer-game', {
     return !!target.closest('button, a, [data-ui-overlay]');
   },
 
+  // Convert an in-progress swipe (dx, dy in pixels, dt in ms) into a ground
+  // direction + power. Direction lives in a forward-biased cone around the
+  // goal direction, so casual diagonals still go mostly forward instead of
+  // wildly veering sideways.
+  computeSwipeShot: function (dx, dy, dt) {
+    const screenH = window.innerHeight || 800;
+    const screenW = window.innerWidth || 400;
+    const refUp = screenH * this.data.fullPowerScreenRatio;
+
+    // Forward intent = how far up the screen the user dragged, normalized.
+    const fwdAmount = Math.max(0, Math.min(-dy / refUp, 1));
+
+    // Lateral aim = horizontal drag normalized then clamped to ±1, mapped to ±maxAimAngleDeg.
+    const latNorm = Math.max(-1, Math.min(dx / (screenW * 0.35), 1));
+    const latRad = latNorm * (this.data.maxAimAngleDeg * Math.PI / 180);
+
+    // Rotate goalForward around +Y by latRad to keep aim in the forward cone.
+    const cos = Math.cos(latRad);
+    const sin = Math.sin(latRad);
+    const fx = this.goalForward.x * cos + this.goalForward.z * sin;
+    const fz = -this.goalForward.x * sin + this.goalForward.z * cos;
+    const dir = new THREE.Vector3(fx, 0, fz).normalize();
+
+    // Power: linear in forward intent, with a small flick-speed bonus.
+    const distPx = Math.hypot(dx, dy);
+    const speedPxPerMs = distPx / Math.max(dt || 1, 50);
+    let power = 0.45 + fwdAmount * 0.85;
+    if (speedPxPerMs > 1.2) power += Math.min((speedPxPerMs - 1.2) * 0.12, 0.18);
+    power = Math.max(0.45, Math.min(power, 1.45));
+
+    return { dir: dir, power: power, fwdAmount: fwdAmount, distPx: distPx };
+  },
+
+  updateAim: function (dir, power) {
+    if (!this.ballEntity || !this.aimDots.length) return;
+    const ballPos = this.ballEntity.object3D.position;
+    const distance = this.data.goalDistance * power;
+    const arcHeight = 0.5 + power * 1.0;
+    const count = this.aimDots.length;
+    for (let i = 0; i < count; i++) {
+      const t = (i + 1) / (count + 1);
+      const x = ballPos.x + dir.x * distance * t;
+      const z = ballPos.z + dir.z * distance * t;
+      const y = this.data.ballRadius + arcHeight * Math.sin(Math.PI * t);
+      this.aimDots[i].object3D.position.set(x, y, z);
+      this.aimDots[i].setAttribute('visible', 'true');
+    }
+    this.aimVisible = true;
+  },
+
+  hideAim: function () {
+    if (!this.aimVisible) return;
+    for (let i = 0; i < this.aimDots.length; i++) {
+      this.aimDots[i].setAttribute('visible', 'false');
+    }
+    this.aimVisible = false;
+  },
+
   onTouchStart: function (e) {
     if (this.state !== 'placed') return;
     if (!e.touches || e.touches.length === 0) return;
     if (this.isUiTarget(e.target)) { this.touchStartX = null; return; }
-    this.touchStartX = e.touches[0].clientX;
-    this.touchStartY = e.touches[0].clientY;
+    const t = e.touches[0];
+    // Top dead zone keeps the topbar from being a kick trigger.
+    if (t.clientY < this.data.topDeadZonePx) { this.touchStartX = null; return; }
+    this.touchStartX = t.clientX;
+    this.touchStartY = t.clientY;
     this.touchStartT = performance.now();
+    this.hideAim();
+  },
+
+  onTouchMove: function (e) {
+    if (this.state !== 'placed') return;
+    if (this.touchStartX == null) return;
+    const t = e.touches && e.touches[0];
+    if (!t) return;
+    const dx = t.clientX - this.touchStartX;
+    const dy = t.clientY - this.touchStartY;
+    const distPx = Math.hypot(dx, dy);
+    if (distPx < this.data.minSwipePx) { this.hideAim(); return; }
+    const shot = this.computeSwipeShot(dx, dy, performance.now() - this.touchStartT);
+    if (shot.fwdAmount < this.data.minForwardRatio * 0.6) { this.hideAim(); return; }
+    this.updateAim(shot.dir, shot.power);
+  },
+
+  onTouchCancel: function () {
+    this.touchStartX = null;
+    this.touchStartY = null;
+    this.hideAim();
   },
 
   onTouchEnd: function (e) {
-    if (this.state !== 'placed') return;
+    if (this.state !== 'placed') { this.hideAim(); return; }
     if (this.touchStartX == null) return;
-    if (this.isUiTarget(e.target)) { this.touchStartX = null; return; }
+    if (this.isUiTarget(e.target)) { this.touchStartX = null; this.hideAim(); return; }
     const t = e.changedTouches && e.changedTouches[0];
-    if (!t) { this.touchStartX = null; return; }
+    if (!t) { this.touchStartX = null; this.hideAim(); return; }
 
     const dx = t.clientX - this.touchStartX;
     const dy = t.clientY - this.touchStartY;
     const dt = performance.now() - this.touchStartT;
     this.touchStartX = null;
     this.touchStartY = null;
+    this.hideAim();
 
     const distPx = Math.hypot(dx, dy);
 
+    // Sub-threshold movement = tap → straight kick at default power.
     if (distPx < this.data.minSwipePx) {
-      this.kickToward(this.goalForward.clone(), 1.0);
+      this.kickToward(this.goalForward.clone(), 0.9);
       return;
     }
 
-    // Map screen swipe → ground XZ direction relative to camera facing.
-    // Screen-up (negative dy) = forward toward the goal.
-    const fwdAmount = -dy / distPx;
-    const rightAmount = dx / distPx;
-    const dir = new THREE.Vector3()
-      .copy(this.goalForward).multiplyScalar(fwdAmount)
-      .add(this.goalRight.clone().multiplyScalar(rightAmount));
-    dir.y = 0;
-    if (dir.lengthSq() < 0.0001) dir.copy(this.goalForward);
-    dir.normalize();
+    const shot = this.computeSwipeShot(dx, dy, dt);
 
-    const speedPxPerMs = distPx / Math.max(dt, 50);
-    let power = (distPx / 220) * (0.6 + Math.min(speedPxPerMs * 0.5, 0.8));
-    power = Math.max(0.45, Math.min(power, 1.4));
+    // Require upward intent — a pure sideways/downward drag shouldn't fire.
+    if (shot.fwdAmount < this.data.minForwardRatio) {
+      this.showToast('Swipe up to kick', 'hint');
+      if (this.hintTimerId) clearTimeout(this.hintTimerId);
+      this.hintTimerId = setTimeout(() => this.hideToast(), 900);
+      return;
+    }
 
-    this.kickToward(dir, power);
+    this.kickToward(shot.dir, shot.power);
   },
 
   kickToward: function (direction, power) {
@@ -251,6 +364,7 @@ AFRAME.registerComponent('soccer-game', {
     this.state = 'kicking';
     this.attempts += 1;
     this.updateInstruction('');
+    this.hideAim();
     if (window.AudioUtils) window.AudioUtils.playSound('kick');
 
     cancelAnimationFrame(this.kickRafId);
@@ -260,9 +374,12 @@ AFRAME.registerComponent('soccer-game', {
   tickKick: function (now) {
     const dur = this.data.kickDurationMs;
     const t = Math.min((now - this.kickStart) / dur, 1);
+    // Ease-out horizontal motion so the ball decelerates from "air drag" —
+    // feels heavier and lands softly. Y still uses sin(π·t) for clean arc.
+    const eased = 1 - Math.pow(1 - t, 2.2);
 
-    const x = this.kickFrom.x + (this.kickTo.x - this.kickFrom.x) * t;
-    const z = this.kickFrom.z + (this.kickTo.z - this.kickFrom.z) * t;
+    const x = this.kickFrom.x + (this.kickTo.x - this.kickFrom.x) * eased;
+    const z = this.kickFrom.z + (this.kickTo.z - this.kickFrom.z) * eased;
     const baseY = this.data.ballRadius;
     const y = baseY + this.kickArc * Math.sin(Math.PI * t);
 
@@ -306,7 +423,7 @@ AFRAME.registerComponent('soccer-game', {
         this.ballEntity.object3D.position.copy(this.ballPlacementPos);
       }
       this.state = 'placed';
-      this.updateInstruction('Swipe up toward the goal to kick (tap the ball for a straight kick)');
+      this.updateInstruction('Swipe up to shoot — drag higher for more power · tap the ball for a straight kick');
       this.hideToast();
     }, this.data.resetDelayMs);
   },
@@ -317,6 +434,16 @@ AFRAME.registerComponent('soccer-game', {
       clearTimeout(this.resetTimerId);
       this.resetTimerId = null;
     }
+    if (this.hintTimerId) {
+      clearTimeout(this.hintTimerId);
+      this.hintTimerId = null;
+    }
+    this.hideAim();
+    for (let i = 0; i < this.aimDots.length; i++) {
+      const d = this.aimDots[i];
+      if (d.parentNode) d.parentNode.removeChild(d);
+    }
+    this.aimDots = [];
     if (this.ballEntity && this.ballEntity.parentNode) {
       this.ballEntity.parentNode.removeChild(this.ballEntity);
     }
@@ -325,6 +452,8 @@ AFRAME.registerComponent('soccer-game', {
     }
     this.ballEntity = null;
     this.goalEntity = null;
+    this.touchStartX = null;
+    this.touchStartY = null;
     this.state = 'idle';
     this.score = 0;
     this.attempts = 0;
