@@ -9,6 +9,14 @@ AFRAME.registerComponent('soccer-game', {
     goalWidth: { type: 'number', default: 3.0 },
     goalHeight: { type: 'number', default: 1.5 },
     goalDistance: { type: 'number', default: 6.0 },
+    // Keep the placed ball within a comfortable interaction ring around player.
+    minBallDistanceFromPlayer: { type: 'number', default: 1.8 },
+    maxBallDistanceFromPlayer: { type: 'number', default: 4.0 },
+    // Keep goal from spawning too far out (or too close) relative to player.
+    minGoalDistanceFromPlayer: { type: 'number', default: 5.0 },
+    maxGoalDistanceFromPlayer: { type: 'number', default: 10.0 },
+    // Re-anchor field only if player has moved this far from initial placement origin.
+    reanchorDistanceFromOrigin: { type: 'number', default: 4.0 },
     kickDurationMs: { type: 'number', default: 1100 },
     minSwipePx: { type: 'number', default: 30 },
     resetDelayMs: { type: 'number', default: 1200 },
@@ -41,6 +49,7 @@ AFRAME.registerComponent('soccer-game', {
     this.attempts = 0;
     this.aimDots = [];
     this.aimVisible = false;
+    this.fieldOriginCameraPos = null;
 
     this.onGroundClick = this.onGroundClick.bind(this);
     this.onTouchStart = this.onTouchStart.bind(this);
@@ -98,15 +107,58 @@ AFRAME.registerComponent('soccer-game', {
 
   onGroundClick: function (e) {
     if (this.state === 'kicking') return;
+    // Keep field stable during normal play; only re-anchor after large player movement.
+    if (this.state === 'placed' && !this.hasMovedFarFromOrigin()) return;
     const pt = e.detail && e.detail.intersection && e.detail.intersection.point;
     if (!pt) return;
     this.placeField(pt.clone ? pt.clone() : new THREE.Vector3(pt.x, pt.y, pt.z));
   },
 
+  hasMovedFarFromOrigin: function () {
+    if (!this.fieldOriginCameraPos) return true;
+    const cam = document.getElementById('camera');
+    if (!cam) return false;
+    const camPos = cam.object3D.position;
+    const dx = camPos.x - this.fieldOriginCameraPos.x;
+    const dz = camPos.z - this.fieldOriginCameraPos.z;
+    return Math.hypot(dx, dz) >= this.data.reanchorDistanceFromOrigin;
+  },
+
+  clampPointToCameraDistance: function (point, minDist, maxDist) {
+    const cam = document.getElementById('camera');
+    if (!cam) {
+      point.y = 0;
+      return point;
+    }
+    const camPos = cam.object3D.position.clone();
+    const delta = new THREE.Vector3().subVectors(point, camPos);
+    delta.y = 0;
+
+    if (delta.lengthSq() < 0.0001) {
+      const fallback = this.getForwardPoint(minDist || 2.0);
+      fallback.y = 0;
+      return fallback;
+    }
+
+    const dist = delta.length();
+    const clamped = Math.min(Math.max(dist, minDist), maxDist);
+    delta.normalize().multiplyScalar(clamped);
+
+    const out = camPos.add(delta);
+    out.y = 0;
+    return out;
+  },
+
   placeField: function (ballPos) {
+    const constrainedBallPos = this.clampPointToCameraDistance(
+      ballPos.clone ? ballPos.clone() : new THREE.Vector3(ballPos.x, ballPos.y, ballPos.z),
+      this.data.minBallDistanceFromPlayer,
+      this.data.maxBallDistanceFromPlayer
+    );
+
     const cam = document.getElementById('camera');
     const camPos = cam ? cam.object3D.position.clone() : new THREE.Vector3();
-    const forward = new THREE.Vector3().subVectors(ballPos, camPos);
+    const forward = new THREE.Vector3().subVectors(constrainedBallPos, camPos);
     forward.y = 0;
     if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
     forward.normalize();
@@ -115,10 +167,15 @@ AFRAME.registerComponent('soccer-game', {
     // Perpendicular in XZ (right-hand of forward when looking down +Y).
     this.goalRight = new THREE.Vector3(forward.z, 0, -forward.x).normalize();
 
-    const goalPos = ballPos.clone().add(forward.clone().multiplyScalar(this.data.goalDistance));
+    let goalPos = constrainedBallPos.clone().add(forward.clone().multiplyScalar(this.data.goalDistance));
+    goalPos = this.clampPointToCameraDistance(
+      goalPos,
+      this.data.minGoalDistanceFromPlayer,
+      this.data.maxGoalDistanceFromPlayer
+    );
     goalPos.y = 0;
     this.goalCenter = goalPos.clone();
-    this.ballPlacementPos = ballPos.clone();
+    this.ballPlacementPos = constrainedBallPos.clone();
     this.ballPlacementPos.y = this.data.ballRadius;
 
     this.ensureBall();
@@ -132,6 +189,12 @@ AFRAME.registerComponent('soccer-game', {
     this.goalEntity.setAttribute('rotation', `0 ${goalYawDeg} 0`);
 
     this.ensureAimGuide();
+
+    // Anchor field origin to the player's current camera position so future
+    // incidental taps/swipes don't move the goal unless the player relocates.
+    if (cam) {
+      this.fieldOriginCameraPos = new THREE.Vector3(camPos.x, 0, camPos.z);
+    }
 
     this.state = 'placed';
     this.updateInstruction('Swipe up to shoot — drag higher for more power · tap the ball for a straight kick');
@@ -457,6 +520,7 @@ AFRAME.registerComponent('soccer-game', {
     this.state = 'idle';
     this.score = 0;
     this.attempts = 0;
+    this.fieldOriginCameraPos = null;
     this.hideToast();
     this.updateInstruction('Tap the ground to place the soccer ball');
     this.showReset(false);
