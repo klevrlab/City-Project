@@ -11,6 +11,7 @@ AFRAME.registerComponent('shark-animator', {
   init: function () {
     this.currentIndex = 0;
     this.isRunning = false;
+    this.alwaysOn = false;
     this.activeEntity = null;
     this.targetMarker = null;
     this.lastTriggerAt = 0;
@@ -458,41 +459,4 @@ AFRAME.registerComponent('shark-animator', {
     }
   },
 
-  // ─── helpers ─────────────────────────────────────────────────────────────
-  // Walk the GLTF mesh tree and set each material to a target opacity.
-  _setEntityOpacity: function (ent, opacity) {
-    if (!ent) return;
-    const apply = () => {
-      const mesh = ent.getObject3D('mesh');
-      if (!mesh) return false;
-      mesh.traverse((child) => {
-        if (!child.isMesh || !child.material) return;
-        const mats = Array.isArray(child.material) ? child.material : [child.material];
-        mats.forEach((mat) => {
-          mat.transparent = true;
-          mat.opacity = opacity;
-          mat.depthWrite = opacity >= 0.99;
-          mat.needsUpdate = true;
-        });
-      });
-      return true;
-    };
-    if (!apply()) {
-      ent.addEventListener('model-loaded', apply, { once: true });
-    }
-  },
-
-  // Smoothly fade an entity's materials between two opacity values over a duration.
-  _fadeEntity: function (ent, fromOpacity, toOpacity, durationMs) {
-    if (!ent) return;
-    const start = performance.now();
-    const tick = (now) => {
-      if (!this.isRunning || this.activeEntity !== ent) return;
-      const t = Math.min((now - start) / durationMs, 1);
-      const opacity = fromOpacity + (toOpacity - fromOpacity) * t;
-      this._setEntityOpacity(ent, opacity);
-      if (t < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }
 });

@@ -197,12 +197,13 @@
     <!-- Navigation Menu -->
     <div id="nav-overlay"></div>
     <div id="nav-menu">
+        <button id="close-menu" style="position:absolute; top:16px; right:16px; background:none; border:none; color:white; font-size:22px; cursor:pointer; line-height:1;" aria-label="Close menu">&times;</button>
         <h2 style="color:#00A9E0; font-size:18px; margin-bottom:20px;">Navigation</h2>
-        <a href="./sharks-way.html" class="nav-link">Sharks Way (Standard)</a>
+        <a href="./index.html" class="nav-link">Home</a>
         <a href="./location-tour.html" class="nav-link">Location Tour</a>
         <a href="./marker-demo.html" class="nav-link">Marker (AR.js)</a>
         <a href="./selfie-ar.html" class="nav-link">Selfie AR</a>
-        <a href="./sharks-way-8thwall.html" class="nav-link">Detection (8th Wall)</a>
+        <a href="./shark-ar-8thwall.html" class="nav-link">Full AR (8th Wall)</a>
         
         <h2 style="color:#00A9E0; font-size:18px; margin-top:30px; margin-bottom:20px;">Settings</h2>
         <button onclick="if(window.manualSharkSpawn) window.manualSharkSpawn();" class="nav-link" style="width:100%; text-align:left; border:none; cursor:pointer; font-family:inherit;">Force Spawn / Cycle</button>
@@ -269,7 +270,7 @@
             <a-asset-item id="jimmy-swimmer" src="./assets/3D-models/jimmy-shark-swimmer.glb"></a-asset-item>
             <a-asset-item id="sharkie-wave" src="./assets/3D-models/sharkieflipped.glb"></a-asset-item>
             <a-asset-item id="diving-shark" src="./assets/3D-models/maria-shark-jump-jimmy-txtr.glb"></a-asset-item>
-            <a-asset-item id="stella-swimmer" src="./assets/3D-models/stellaflipped.glb"></a-asset-item>
+            <a-asset-item id="stella-swimmer" src="./assets/3D-models/StellaFlipped.glb"></a-asset-item>
         </a-assets>
 
         <!-- Lighting for AR Shadows -->
@@ -286,27 +287,7 @@
         <a-camera id="camera" position="0 1.6 0"></a-camera>
     </a-scene>
 
-    <script>
-        // Start logic - 8th Wall components on a-scene will handle run()
-        const navMenu = document.getElementById('nav-menu');
-        const navOverlay = document.getElementById('nav-overlay');
-        const hamburgerBtn = document.getElementById('hamburger-btn');
-        
-        hamburgerBtn.addEventListener('click', () => {
-            navMenu.style.right = '0';
-            navOverlay.classList.add('visible');
-        });
-        
-        navOverlay.addEventListener('click', () => {
-            navMenu.style.right = '-100%';
-            navOverlay.classList.remove('visible');
-        });
-
-        // Map toggle
-        document.getElementById('toggle-map').addEventListener('click', () => {
-            document.getElementById('map-container').classList.toggle('expanded');
-        });
-    </script>
+    <!-- Nav and map interactions handled by tour-ui.js -->
 
     <!-- GPS Tracking for Checkpoints -->
     <script src="./src/utils/shared-gps-tracking.js"></script>

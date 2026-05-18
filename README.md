@@ -42,9 +42,9 @@ npx localtunnel --port 8080
 AI-powered shark painting detection with the always-on Little Italy shark rotation.
 
 ### 2. Sharks Way (8th Wall)
-**File:** `sharks-way-8thwall.html`
+**File:** `shark-ar-8thwall.html`
 **Tech:** 8th Wall WebAR + A-Frame
-GPS-triggered cycle of six animated shark experiences (Maria Swimmer, Jimmy Swimmer, Sharkie Waving, Diving Shark, Stella Swimmer, Little Italy Patrol).
+GPS-triggered cycle of five animated shark experiences (Maria Swimmer, Stella Swimmer, Jimmy Swimmer, Sharkie Waving, Diving Shark) with an always-on rotation in the Little Italy zone.
 
 ### 3. Location Tour
 **File:** `location-tour.html`
@@ -87,7 +87,7 @@ City-Project/
 ├── index.html              # Landing page
 ├── marker-demo.html
 ├── sharks-way.html
-├── sharks-way-8thwall.html
+├── shark-ar-8thwall.html
 ├── location-tour.html
 ├── selfie-ar.html
 └── shark-ar-demo.html
