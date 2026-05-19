@@ -1,0 +1,157 @@
+body {
+            margin: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: transparent;
+            color: white;
+        }
+
+        #topbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 12px 14px;
+            background: linear-gradient(to bottom, rgba(0, 22, 26, 0.7) 0%, transparent 100%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 1001;
+            pointer-events: none;
+        }
+
+        #topbar a, #topbar h1, #topbar .pill {
+            pointer-events: auto;
+        }
+
+        #topbar h1 {
+            font-size: 14px;
+            font-weight: 700;
+            flex: 1;
+        }
+
+        #topbar .back {
+            color: #00A9E0;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 4px 6px;
+        }
+
+        .pill {
+            background: rgba(0, 169, 224, 0.25);
+            border: 1px solid rgba(0, 169, 224, 0.4);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            backdrop-filter: blur(8px);
+        }
+
+        #score {
+            display: none;
+        }
+
+        #timer {
+            display: none;
+            min-width: 54px;
+            text-align: center;
+        }
+
+        #reset-btn {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(40, 200, 120, 0.25);
+            border: 1px solid rgba(40, 200, 120, 0.45);
+        }
+
+        #tap-instruction {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 109, 117, 0.85);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 14px 22px;
+            border-radius: 30px;
+            font-size: 15px;
+            font-weight: 600;
+            z-index: 2000;
+            pointer-events: none;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(0, 169, 224, 0.5);
+            max-width: 80vw;
+        }
+
+        #tap-instruction.visible {
+            opacity: 1;
+        }
+
+        #toast {
+            position: fixed;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.85);
+            background: rgba(0, 22, 26, 0.85);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 18px 32px;
+            border-radius: 18px;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            z-index: 2100;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        #toast.visible {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        #toast[data-variant="goal"] {
+            background: rgba(40, 200, 120, 0.85);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        #toast[data-variant="miss"] {
+            background: rgba(0, 22, 26, 0.85);
+            font-size: 18px;
+        }
+
+        #toast[data-variant="hint"] {
+            background: rgba(0, 22, 26, 0.85);
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: 0;
+            padding: 12px 22px;
+        }
+
+        #toast[data-variant="summary"] {
+            background: rgba(0, 22, 26, 0.92);
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0;
+            line-height: 1.35;
+            padding: 14px 18px;
+            white-space: pre-line;
+            max-width: 86vw;
+        }
+
+        #tap-instruction {
+            font-size: 14px;
+            line-height: 1.4;
+        }

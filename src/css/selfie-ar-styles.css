@@ -1,0 +1,326 @@
+* {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: white;
+            overflow: hidden;
+            position: fixed;
+            inset: 0;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        #video {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+            transform: scaleX(-1);
+        }
+
+        #shark-overlay {
+            position: fixed;
+            z-index: 10;
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        #shark-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        #shark-viewer {
+            background: transparent;
+            --poster-color: transparent;
+        }
+
+        #pose-status {
+            font-size: 10px;
+            padding: 3px 6px;
+            border-radius: 4px;
+            background: rgba(255, 80, 80, 0.2);
+            border: 1px solid rgba(255, 80, 80, 0.4);
+            color: #f88;
+            text-align: center;
+        }
+
+        #pose-status.detected {
+            background: rgba(0, 255, 100, 0.15);
+            border-color: rgba(0, 255, 100, 0.4);
+            color: #0f9;
+        }
+
+        /* Top bar */
+        #topbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 12px 16px;
+            background: linear-gradient(to bottom, rgba(0, 22, 26, 0.75) 0%, transparent 100%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 9000;
+        }
+
+        #topbar a {
+            color: #00A9E0;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        #topbar h1 {
+            font-size: 14px;
+            font-weight: 700;
+            flex: 1;
+        }
+
+        @media (max-width: 480px) {
+            #nav-menu {
+                width: 85%;
+                max-width: 320px;
+            }
+        }
+
+        /* DEV panel */
+        #dev-panel {
+            position: fixed;
+            top: 60px;
+            right: 12px;
+            z-index: 9999;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            border-radius: 12px;
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #0ff;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+        }
+
+        #dev-panel select {
+            background: #111;
+            color: #0ff;
+            border: 1px solid #0ff;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-family: monospace;
+            font-size: 12px;
+            cursor: pointer;
+            outline: none;
+        }
+
+        #dev-panel label {
+            font-size: 10px;
+            opacity: 0.6;
+        }
+
+        #dev-panel input[type=range] {
+            width: 100%;
+            accent-color: #0ff;
+        }
+
+        /* Bottom controls */
+        #selfie-controls {
+            position: fixed;
+            bottom: 36px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9000;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        #selfie-snap {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: white;
+            border: 5px solid rgba(0, 169, 224, 0.9);
+            box-shadow: 0 0 0 3px rgba(0, 169, 224, 0.3), 0 8px 24px rgba(0, 0, 0, 0.5);
+            cursor: pointer;
+            transition: transform 0.12s ease;
+            flex-shrink: 0;
+        }
+
+        #selfie-snap:active {
+            transform: scale(0.88);
+        }
+
+        #selfie-hint {
+            position: fixed;
+            bottom: 130px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(0, 169, 224, 0.3);
+            border-radius: 20px;
+            padding: 8px 18px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.8);
+            z-index: 9000;
+            white-space: nowrap;
+            transition: opacity 0.5s ease;
+        }
+
+        /* Flash */
+        #selfie-flash {
+            position: fixed;
+            inset: 0;
+            background: white;
+            z-index: 99999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.05s ease;
+        }
+
+        /* Preview overlay */
+        #selfie-preview {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 99998;
+            background: rgba(0, 0, 0, 0.88);
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        #selfie-preview.active {
+            display: flex;
+        }
+
+        #selfie-preview img {
+            max-width: 92vw;
+            max-height: 68vh;
+            border-radius: 18px;
+            border: 2px solid rgba(0, 169, 224, 0.5);
+            box-shadow: 0 8px 48px rgba(0, 0, 0, 0.7);
+        }
+
+        #selfie-preview-label {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.6);
+            letter-spacing: 0.3px;
+        }
+
+        #selfie-preview-actions {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        #selfie-preview-actions button {
+            flex: 1;
+            padding: 16px 20px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        #selfie-preview-actions button:active {
+            transform: translateY(1px);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        #btn-retake {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border: 1.5px solid rgba(255, 255, 255, 0.3) !important;
+            backdrop-filter: blur(10px);
+        }
+
+        #btn-retake:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        #btn-save {
+            background: #00A9E0;
+            color: white;
+        }
+
+        #btn-save:hover {
+            background: #008FC7;
+        }
+
+        #btn-share {
+            background: rgba(0, 169, 224, 0.2);
+            color: #00A9E0;
+            border: 1.5px solid rgba(0, 169, 224, 0.5) !important;
+            backdrop-filter: blur(10px);
+        }
+
+        #btn-share:hover {
+            background: rgba(0, 169, 224, 0.3);
+        }
+
+        /* Loading */
+        #selfie-loading {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 15, 20, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 8000;
+            gap: 16px;
+            transition: opacity 0.4s ease;
+        }
+
+        #selfie-loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .spinner {
+            width: 44px;
+            height: 44px;
+            border: 3px solid rgba(0, 169, 224, 0.2);
+            border-top-color: #00A9E0;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #selfie-loading p {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        #selfie-loading h2 {
+            font-size: 16px;
+            color: #00A9E0;
+        }
