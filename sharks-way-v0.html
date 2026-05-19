@@ -434,177 +434,6 @@
             font-weight: 600;
         }
 
-        #hamburger-btn {
-            background: rgba(0, 169, 224, 0.25);
-            border: 1px solid rgba(0, 169, 224, 0.4);
-            color: white;
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            padding: 0;
-            margin-left: auto;
-            position: relative;
-            z-index: 101;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        #hamburger-btn:active {
-            transform: scale(0.95);
-            background: rgba(0, 169, 224, 0.4);
-        }
-
-        #hamburger-btn svg {
-            width: 20px;
-            height: 20px;
-            stroke: currentColor;
-            stroke-width: 2;
-            fill: none;
-        }
-
-        #topbar .top-btn {
-            background: rgba(0, 169, 224, 0.25);
-            border: 1px solid rgba(0, 169, 224, 0.4);
-            color: #fff;
-            border-radius: 20px;
-            padding: 6px 10px;
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        #topbar .top-btn:disabled {
-            opacity: 0.45;
-            cursor: default;
-        }
-
-        #topbar .top-btn.top-btn--warn {
-            border-color: rgba(255, 177, 0, 0.6);
-            background: rgba(255, 177, 0, 0.18);
-        }
-
-        #trained-badge {
-            margin-left: auto;
-            background: rgba(0, 169, 224, 0.25);
-            border: 1px solid rgba(0, 169, 224, 0.4);
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-
-        @keyframes pulse {
-
-            0%,
-            100% {
-                transform: translateX(-50%) scale(1);
-                opacity: 1;
-            }
-
-            50% {
-                transform: translateX(-50%) scale(1.05);
-                opacity: 0.9;
-            }
-        }
-
-        /* Navigation Menu */
-        #nav-menu {
-            position: fixed;
-            top: 0;
-            right: -100%;
-            width: 280px;
-            height: 100vh;
-            background: rgba(0, 22, 26, 0.95);
-            backdrop-filter: blur(20px) saturate(180%);
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
-            border-left: 1px solid rgba(0, 169, 224, 0.3);
-            z-index: 150;
-            transition: right 0.3s ease;
-            padding: 60px 20px 20px;
-            overflow-y: auto;
-        }
-
-        #nav-menu.open {
-            right: 0;
-        }
-
-        #nav-menu .close-btn {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            background: rgba(0, 169, 224, 0.25);
-            border: 1px solid rgba(0, 169, 224, 0.4);
-            color: white;
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 24px;
-            line-height: 1;
-            -webkit-tap-highlight-color: transparent;
-            padding: 0;
-        }
-
-        #nav-menu h2 {
-            color: #00A9E0;
-            font-size: 18px;
-            margin-bottom: 20px;
-            font-weight: 700;
-        }
-
-        #nav-menu .nav-link {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 14px 16px;
-            margin-bottom: 8px;
-            background: rgba(0, 169, 224, 0.1);
-            border: 1px solid rgba(0, 169, 224, 0.2);
-            border-radius: 12px;
-            color: white;
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-        #nav-menu .nav-link:hover,
-        #nav-menu .nav-link:active {
-            background: rgba(0, 169, 224, 0.25);
-            border-color: rgba(0, 169, 224, 0.4);
-            transform: translateX(-4px);
-        }
-
-        #nav-menu .nav-link svg {
-            width: 20px;
-            height: 20px;
-            stroke: #00A9E0;
-            stroke-width: 2;
-            fill: none;
-        }
-
-        #nav-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 140;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
-        }
-
-        #nav-overlay.visible {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
         @media (max-width: 480px) {
             #info-panel {
                 top: 50px;
@@ -906,108 +735,11 @@
     <div id="topbar">
         <a href="./index.html" class="back">&larr;</a>
         <h1>Sharks Way</h1>
-        <button id="hamburger-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-        </button>
+        
     </div>
 
     <!-- Navigation Menu -->
-    <div id="nav-overlay"></div>
-    <div id="nav-menu">
-        <button class="close-btn" id="close-menu">&times;</button>
-        <h2>Navigation</h2>
-        <a href="./sharks-way.html" class="nav-link">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                <circle cx="12" cy="10" r="3" />
-            </svg>
-            Sharks Way
-        </a>
-        <a href="./location-tour.html" class="nav-link">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <circle cx="12" cy="10" r="3" />
-                <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z" />
-            </svg>
-            Location Tour
-        </a>
-        <a href="./marker-demo.html" class="nav-link">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                <line x1="8" y1="21" x2="16" y2="21" />
-                <line x1="12" y1="17" x2="12" y2="21" />
-            </svg>
-            Marker
-        </a>
-        <a href="./selfie-ar.html" class="nav-link">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                <circle cx="12" cy="13" r="4" />
-            </svg>
-            Selfie with Sammy
-        </a>
-        <a href="./selfie-ar.html?character=sharkey" class="nav-link">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                <circle cx="12" cy="13" r="4" />
-            </svg>
-            Selfie with Sharkie
-        </a>
-    </div>
-
-    <!-- 3D Plushie overlay -->
-    <div id="model-overlay">
-        <div id="model-glow"></div>
-        <model-viewer id="shark-model-viewer" src="./assets/shark.glb" auto-rotate rotation-per-second="30deg"
-            camera-orbit="0deg 75deg 4m" field-of-view="30deg" min-field-of-view="20deg" max-field-of-view="45deg"
-            disable-zoom interaction-prompt="none" environment-image="neutral" shadow-intensity="0.5"
-            style="background: transparent; overflow: visible;"></model-viewer>
-    </div>
-
-    <!-- Legacy promo (disabled via ENABLE_GAME_DAY_BANNER) -->
-    <div id="basketball-promo" aria-hidden="true">
-        <div class="basketball-shell">
-            <model-viewer
-                id="basketball-model-viewer"
-                src="./assets/3D-models/basketball_animation.glb"
-                auto-rotate
-                rotation-per-second="60deg"
-                camera-orbit="0deg 75deg auto"
-                field-of-view="28deg"
-                min-field-of-view="20deg"
-                max-field-of-view="45deg"
-                disable-zoom
-                interaction-prompt="none"
-                environment-image="neutral"
-                shadow-intensity="0.2"
-            ></model-viewer>
-        </div>
-    </div>
-
-    <!-- Shark label -->
-    <div id="shark-label">
-        <span class="label-name" id="labelName">Shark Found!</span>
-    </div>
-
-    <!-- Info panel (bottom-right) -->
-    <div id="info-panel">
-        <img id="event-icon" src="./assets/SharkLogo.png" alt="Event" onerror="this.style.display='none'">
-        <h2>Welcome to Sharks Way</h2>
-        <p>Point your phone at a Sharks Way mural to bring the street to life.</p>
-        <p class="status-text" id="gps-status" style="display:none;"></p>
-    </div>
-
-    <!-- Event info slide-in -->
-    <div id="event-info">
-        <h3 id="event-title">Event Loading...</h3>
-        <div class="event-details">
-            <p id="event-date"></p>
-            <p id="event-location"></p>
-        </div>
-        <div id="sharkey-message"
+    <div id="sharkey-message"
             style="font-size: 12px; margin-top: 8px; color: rgba(255,255,255,0.8); line-height: 1.5;"></div>
         <button class="cta-button" id="learn-more">
             <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -2385,6 +2117,12 @@
 
     <!-- GPS Tracking for Checkpoints -->
     <script type="module" src="./src/utils/shared-gps-tracking.js"></script>
+
+    <!-- Navigation Component -->
+    <script type="module">
+        import { initNavigation } from './src/components/navigation.js';
+        initNavigation();
+    </script>
 </body>
 
 </html>

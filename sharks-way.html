@@ -75,68 +75,6 @@
             font-weight: 600;
         }
 
-        #hamburger-btn {
-            background: rgba(0, 169, 224, 0.25);
-            border: 1px solid rgba(0, 169, 224, 0.4);
-            color: white;
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            margin-left: auto;
-            position: relative;
-            z-index: 1002;
-        }
-
-        #nav-menu {
-            position: fixed;
-            top: 0;
-            right: -100%;
-            width: 280px;
-            height: 100vh;
-            background: rgba(0, 22, 26, 0.95);
-            backdrop-filter: blur(20px);
-            border-left: 1px solid rgba(0, 169, 224, 0.3);
-            z-index: 1050;
-            transition: right 0.3s ease;
-            padding: 60px 20px 20px;
-            overflow-y: auto;
-        }
-
-        #nav-menu.open { right: 0; }
-
-        .nav-link {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 14px 16px;
-            margin-bottom: 8px;
-            background: rgba(0, 169, 224, 0.1);
-            border-radius: 12px;
-            color: white;
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        #nav-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1040;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
-        }
-
-        #nav-overlay.visible {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
         #info-panel {
             position: fixed;
             bottom: 20px;
@@ -182,39 +120,14 @@
     <div id="topbar">
         <a href="./index.html" class="back">&larr;</a>
         <h1>Shark Detection (8W)</h1>
-        <button id="hamburger-btn">
-            <svg style="width:20px; height:20px; stroke:white; fill:none;" viewBox="0 0 24 24">
-                <line x1="3" y1="6" x2="21" y2="6" stroke-width="2"/>
-                <line x1="3" y1="12" x2="21" y2="12" stroke-width="2"/>
-                <line x1="3" y1="18" x2="21" y2="18" stroke-width="2"/>
-            </svg>
-        </button>
+        
     </div>
 
     <!-- Tap Instruction Overlay -->
     <div id="tap-instruction">Tap the ground to bring a shark to life</div>
 
     <!-- Navigation Menu -->
-    <div id="nav-overlay"></div>
-    <div id="nav-menu">
-        <button id="close-menu" style="position:absolute; top:16px; right:16px; background:none; border:none; color:white; font-size:22px; cursor:pointer; line-height:1;" aria-label="Close menu">&times;</button>
-        <h2 style="color:#00A9E0; font-size:18px; margin-bottom:20px;">Navigation</h2>
-        <a href="./index.html" class="nav-link">Home</a>
-        <a href="./location-tour.html" class="nav-link">Location Tour</a>
-        <a href="./marker-demo.html" class="nav-link">Marker (AR.js)</a>
-        <a href="./selfie-ar.html" class="nav-link">Selfie AR</a>
-        <a href="./shark-ar-8thwall.html" class="nav-link">Full AR (8th Wall)</a>
-        
-        <h2 style="color:#00A9E0; font-size:18px; margin-top:30px; margin-bottom:20px;">Settings</h2>
-        <button onclick="if(window.manualSharkSpawn) window.manualSharkSpawn();" class="nav-link" style="width:100%; text-align:left; border:none; cursor:pointer; font-family:inherit;">Force Spawn / Cycle</button>
-    </div>
-
-    <!-- Progress tracker (checkpoint tracker) -->
-    <div id="progress-tracker">
-        <div style="font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-            Checkpoints
-        </div>
-        <div class="stop-item" data-checkpoint="A" id="checkpoint-a">
+    <div class="stop-item" data-checkpoint="A" id="checkpoint-a">
             <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="10"></circle>
                 <path d="m9 12 2 2 4-4"></path>
@@ -291,6 +204,12 @@
 
     <!-- GPS Tracking for Checkpoints -->
     <script type="module" src="./src/utils/shared-gps-tracking.js"></script>
+
+    <!-- Navigation Component -->
+    <script type="module">
+        import { initNavigation } from './src/components/navigation.js';
+        initNavigation();
+    </script>
 </body>
 
 </html>
