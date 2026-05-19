@@ -15,14 +15,14 @@
     <link rel="stylesheet" href="./src/css/shared-styles.css" />
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="./src/utils/checkpoint-loader.js"></script>
-    <script src="./src/utils/shared-map-markers.js"></script>
+    <script type="module" src="./src/utils/checkpoint-loader.js"></script>
+    <script type="module" src="./src/utils/shared-map-markers.js"></script>
     
     <!-- Core AI Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1"></script>
-    <script src="./src/utils/shark-embedding-detector.js"></script>
-    <script src="./src/utils/xr8-shark-video-bridge.js"></script>
+    <script type="module" src="./src/utils/shark-embedding-detector.js"></script>
+    <script type="module" src="./src/utils/xr8-shark-video-bridge.js"></script>
 
     <!-- 1. 8th Wall Engine & Extras (2026 Distributed Engine) -->
     <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" crossorigin="anonymous" data-preload-chunks="slam" async></script>
@@ -33,13 +33,13 @@
     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
 
     <!-- Project Source -->
-    <script src="./src/utils/audio-utils.js"></script>
-    <script src="./src/utils/math-utils.js"></script>
-    <script src="./src/systems/event-system.js"></script>
-    <script src="./src/components/shark-detector.js"></script>
-    <script src="./src/components/shark-animator.js"></script>
-    <script src="./src/components/tour-ui.js"></script>
-    <script src="./src/app.js"></script>
+    <script type="module" src="./src/utils/audio-utils.js"></script>
+    <script type="module" src="./src/utils/math-utils.js"></script>
+    <script type="module" src="./src/systems/event-system.js"></script>
+    <script type="module" src="./src/components/shark-detector.js"></script>
+    <script type="module" src="./src/components/shark-animator.js"></script>
+    <script type="module" src="./src/components/tour-ui.js"></script>
+    <script type="module" src="./src/app.js"></script>
 
     <style>
         body {
@@ -169,7 +169,7 @@
     </script>
 
     <!-- GPS Tracking -->
-    <script src="./src/utils/shared-gps-tracking.js"></script>
+    <script type="module" src="./src/utils/shared-gps-tracking.js"></script>
 </body>
 
 </html>

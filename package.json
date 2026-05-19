@@ -1,0 +1,28 @@
+{
+  "name": "city-project",
+  "version": "1.0.0",
+  "description": "WebAR platform for the Sharks Way corridor between downtown San José and SAP Center, built by SJSU students and faculty as part of **Immersion 2026**.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/klevrlab/City-Project.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/klevrlab/City-Project/issues"
+  },
+  "homepage": "https://github.com/klevrlab/City-Project#readme",
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "vite": "^8.0.13"
+  }
+}

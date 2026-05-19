@@ -1,16 +1,24 @@
-# Retraining / embedding generation tools (keep locally, don't deploy)
-generate-embeddings.html
-shark-image-list.json
-shark-painting-photos-20260203-jpg/
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# Dependencies
-node_modules/
-package.json
-package-lock.json
+node_modules
+dist
+dist-ssr
+*.local
 
-# OS files
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
 .DS_Store
-.vscode/launch.json
-.gitignore
-.vscode/tasks.json
-.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
