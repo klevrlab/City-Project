@@ -94,10 +94,6 @@ export function initNavigation() {
   closeMenuBtn.addEventListener('click', closeMenu);
   navOverlay.addEventListener('click', closeMenu);
 
-  hamburgerBtn.addEventListener('touchend', (e) => { e.preventDefault(); openMenu(); });
-  closeMenuBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeMenu(); });
-  navOverlay.addEventListener('touchend', (e) => { e.preventDefault(); closeMenu(); });
-
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && navMenu.classList.contains('open')) {
       closeMenu();
