@@ -55,6 +55,8 @@ AFRAME.registerComponent('soccer-game', {
     this.challengeTimerId = null;
     this.challengeEndsAtMs = 0;
     this.pendingRoundSummary = false;
+    this.preRoundCountdownActive = false;
+    this.countdownTimeoutIds = [];
     this.aimDots = [];
     this.aimVisible = false;
     this.fieldOriginCameraPos = null;
@@ -147,27 +149,56 @@ AFRAME.registerComponent('soccer-game', {
   },
 
   startChallengeIfNeeded: function () {
-    if (this.challengeActive) return;
+    if (this.challengeActive || this.preRoundCountdownActive) return;
     this.challengeActive = true;
-    this.challengeEndsAtMs = Date.now() + this.data.challengeDurationSec * 1000;
     this.score = 0;
     this.goals = 0;
     this.attempts = 0;
     this.streak = 0;
     this.bestZone = 'None';
     this.pendingRoundSummary = false;
-    this.updateTimer();
     this.updateScore();
     const timerEl = document.getElementById('timer');
     if (timerEl) timerEl.style.display = 'inline-block';
+    this.startPreRoundCountdown();
+  },
 
-    if (this.challengeTimerId) clearInterval(this.challengeTimerId);
-    this.challengeTimerId = setInterval(() => {
+  startPreRoundCountdown: function () {
+    this.preRoundCountdownActive = true;
+    this.updateInstruction('Get ready...');
+    this.countdownTimeoutIds.forEach((id) => clearTimeout(id));
+    this.countdownTimeoutIds = [];
+    const steps = [
+      { label: '3', sound: 'countdown-3' },
+      { label: '2', sound: 'countdown-2' },
+      { label: '1', sound: 'countdown-1' },
+      { label: 'GO!', sound: 'countdown-go' }
+    ];
+    const stepMs = 520;
+
+    steps.forEach((step, idx) => {
+      const id = setTimeout(() => {
+        this.showToast(step.label, 'countdown');
+        if (window.AudioUtils) window.AudioUtils.playSound(step.sound);
+      }, idx * stepMs);
+      this.countdownTimeoutIds.push(id);
+    });
+
+    const kickoffId = setTimeout(() => {
+      this.preRoundCountdownActive = false;
+      this.hideToast();
+      this.challengeEndsAtMs = Date.now() + this.data.challengeDurationSec * 1000;
       this.updateTimer();
-      if (Date.now() >= this.challengeEndsAtMs) {
-        this.finishChallengeRound();
-      }
-    }, 200);
+      if (this.challengeTimerId) clearInterval(this.challengeTimerId);
+      this.challengeTimerId = setInterval(() => {
+        this.updateTimer();
+        if (Date.now() >= this.challengeEndsAtMs) {
+          this.finishChallengeRound();
+        }
+      }, 200);
+      this.updateInstruction('GO! Swipe up to shoot');
+    }, steps.length * stepMs);
+    this.countdownTimeoutIds.push(kickoffId);
   },
 
   updateTimer: function () {
@@ -435,6 +466,7 @@ AFRAME.registerComponent('soccer-game', {
 
   onTouchStart: function (e) {
     if (this.state !== 'placed') return;
+    if (this.preRoundCountdownActive) return;
     if (!e.touches || e.touches.length === 0) return;
     if (this.isUiTarget(e.target)) { this.touchStartX = null; return; }
     const t = e.touches[0];
@@ -468,6 +500,7 @@ AFRAME.registerComponent('soccer-game', {
 
   onTouchEnd: function (e) {
     if (this.state !== 'placed') { this.hideAim(); return; }
+    if (this.preRoundCountdownActive) return;
     if (this.touchStartX == null) return;
     if (this.isUiTarget(e.target)) { this.touchStartX = null; this.hideAim(); return; }
     const t = e.changedTouches && e.changedTouches[0];
@@ -503,8 +536,10 @@ AFRAME.registerComponent('soccer-game', {
 
   kickToward: function (direction, power, curveAmount) {
     if (this.state !== 'placed' || !this.ballEntity) return;
-    this.startChallengeIfNeeded();
-    if (!this.challengeActive) return;
+    if (!this.challengeActive || this.preRoundCountdownActive) {
+      this.startChallengeIfNeeded();
+      return;
+    }
     if (this.resetTimerId) {
       clearTimeout(this.resetTimerId);
       this.resetTimerId = null;
@@ -631,6 +666,8 @@ AFRAME.registerComponent('soccer-game', {
       clearInterval(this.challengeTimerId);
       this.challengeTimerId = null;
     }
+    this.countdownTimeoutIds.forEach((id) => clearTimeout(id));
+    this.countdownTimeoutIds = [];
     this.hideAim();
     for (let i = 0; i < this.aimDots.length; i++) {
       const d = this.aimDots[i];
@@ -654,6 +691,7 @@ AFRAME.registerComponent('soccer-game', {
     this.streak = 0;
     this.bestZone = 'None';
     this.challengeActive = false;
+    this.preRoundCountdownActive = false;
     this.pendingRoundSummary = false;
     this.fieldOriginCameraPos = null;
     this.hideToast();

@@ -151,6 +151,16 @@ body {
             max-width: 86vw;
         }
 
+        #toast[data-variant="countdown"] {
+            background: rgba(0, 22, 26, 0.92);
+            font-size: 52px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            min-width: 116px;
+            text-align: center;
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
         #tap-instruction {
             font-size: 14px;
             line-height: 1.4;
