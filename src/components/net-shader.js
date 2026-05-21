@@ -10,24 +10,16 @@ AFRAME.registerComponent('net-material', {
   init: function () {
     const d = this.data;
 
-    const uniforms = {
-      uTime:      { value: 0.0 },
-      uHitUV:     { value: new THREE.Vector2(0.5, 0.5) },
-      uHitAge:    { value: 0.0 },
-      uHitActive: { value: 0 },
-      uNetColor:  { value: new THREE.Color(0.4, 0.8, 1.0) },
-      uLineWidth: { value: 0.04 },
-      uGridCount: { value: new THREE.Vector2(12.0, 6.0) }
-    };
-
+    // No logdepthbuf includes — depthWrite:false means no depth fighting,
+    // and those chunks require <common> (isPerspectiveMatrix) which we skip
+    // to keep the shader self-contained. No fwidth() — requires
+    // GL_OES_standard_derivatives which may not be available on WebGL 1.
     const vertexShader = `
-uniform float uTime;
 uniform vec2  uHitUV;
 uniform float uHitAge;
 uniform int   uHitActive;
+uniform float uAspect;
 varying vec2  vUv;
-
-#include <logdepthbuf_pars_vertex>
 
 void main() {
   vUv = uv;
@@ -35,7 +27,7 @@ void main() {
 
   if (uHitActive == 1) {
     vec2 delta = uv - uHitUV;
-    delta.x *= ${(d.width / d.height).toFixed(4)};
+    delta.x *= uAspect;
     float dist = length(delta);
     float eased = 1.0 - pow(1.0 - uHitAge, 2.0);
 
@@ -50,7 +42,6 @@ void main() {
   }
 
   gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
-  #include <logdepthbuf_vertex>
 }`;
 
     const fragmentShader = `
@@ -60,33 +51,43 @@ uniform vec3  uNetColor;
 uniform float uHitAge;
 uniform int   uHitActive;
 uniform vec2  uHitUV;
+uniform float uAspect;
 varying vec2  vUv;
-
-#include <logdepthbuf_pars_fragment>
 
 void main() {
   vec2 cellUV   = fract(vUv * uGridCount);
   vec2 edgeDist = min(cellUV, 1.0 - cellUV);
-  vec2 lineAA   = fwidth(cellUV) * 1.5;
-  vec2 lineMask = smoothstep(vec2(uLineWidth) - lineAA,
-                              vec2(uLineWidth) + lineAA, edgeDist);
+
+  // Fixed-width soft edge — no fwidth/derivatives needed
+  float aa = 0.008;
+  vec2 lineMask = smoothstep(vec2(uLineWidth - aa), vec2(uLineWidth + aa), edgeDist);
   float onLine = 1.0 - lineMask.x * lineMask.y;
+
   if (onLine < 0.01) discard;
 
   vec3  color = uNetColor;
-  float alpha = 0.55 * onLine;
+  float alpha = 0.75 * onLine;
 
   if (uHitActive == 1) {
     vec2  dv = vUv - uHitUV;
-    dv.x *= ${(d.width / d.height).toFixed(4)};
+    dv.x *= uAspect;
     float flash = exp(-length(dv) * 4.0) * (1.0 - uHitAge);
     color = mix(color, vec3(0.85, 1.0, 1.0), flash * 0.85);
     alpha = clamp(alpha + flash * 0.45, 0.0, 1.0) * onLine;
   }
 
   gl_FragColor = vec4(color, alpha);
-  #include <logdepthbuf_fragment>
 }`;
+
+    const uniforms = {
+      uHitUV:     { value: new THREE.Vector2(0.5, 0.5) },
+      uHitAge:    { value: 0.0 },
+      uHitActive: { value: 0 },
+      uNetColor:  { value: new THREE.Color(0.4, 0.8, 1.0) },
+      uLineWidth: { value: 0.08 },
+      uGridCount: { value: new THREE.Vector2(10.0, 5.0) },
+      uAspect:    { value: d.width / d.height }
+    };
 
     const geometry = new THREE.PlaneGeometry(d.width, d.height, d.segW, d.segH);
     const material = new THREE.ShaderMaterial({
@@ -95,8 +96,7 @@ void main() {
       fragmentShader,
       transparent: true,
       side: THREE.DoubleSide,
-      depthWrite: false,
-      extensions: { derivatives: true }
+      depthWrite: false
     });
 
     this.mesh = new THREE.Mesh(geometry, material);
@@ -109,8 +109,6 @@ void main() {
   },
 
   tick: function (time) {
-    this.material.uniforms.uTime.value = time * 0.001;
-
     if (this.hitActive) {
       const age = (time - this.hitStartTime) / this.data.hitDurationMs;
       if (age >= 1.0) {
