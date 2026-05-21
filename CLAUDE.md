@@ -121,3 +121,8 @@ city-project/
 - `src/app.js` is the 8th Wall entry point; other HTML pages inline or script-tag their own logic.
 - `8w-distributed-engine/` is currently a placeholder (`.gitkeep`).
 - Docs: `ARCHITECTURE.md` (system design), `DEPLOYMENT.md` (hosting guide).
+
+## Git Workflow
+
+- **Always push to `claude/scan-repo-memory-VYvsv`** (the soccer branch). Never push to main or any other branch without explicit permission from Chris.
+- Commits should be attributed to Christopher Anthony Velez <lilvelezcav@gmail.com>.
