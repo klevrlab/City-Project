@@ -703,8 +703,8 @@ AFRAME.registerComponent('soccer-game', {
   checkPostCollision: function (ballPos) {
     const postR  = 0.045;
     // Generous hit radius prevents tunneling at high ball speeds (~0.25m/frame peak)
-    const hitR   = this.data.ballRadius + postR + 0.13;  // ~0.285m
-    const xbarR  = this.data.ballRadius + postR + 0.08;  // ~0.235m crossbar
+    const hitR   = this.data.ballRadius + postR + 0.13;  // ~0.285m posts
+    const xbarR  = this.data.ballRadius + postR + 0.02;  // ~0.175m crossbar — tighter to match visual
     const hw     = this.data.goalWidth / 2;
     const h      = this.data.goalHeight;
 
