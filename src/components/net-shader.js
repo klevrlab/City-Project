@@ -17,7 +17,7 @@ AFRAME.registerComponent('net-material', {
     const vertexShader = `
 uniform vec2  uHitUV;
 uniform float uHitAge;
-uniform int   uHitActive;
+uniform float uHitActive;
 uniform float uAspect;
 varying vec2  vUv;
 
@@ -25,11 +25,12 @@ void main() {
   vUv = uv;
   vec3 displaced = position;
 
-  if (uHitActive == 1) {
+  if (uHitActive > 0.5) {
     vec2 delta = uv - uHitUV;
     delta.x *= uAspect;
     float dist = length(delta);
-    float eased = 1.0 - pow(1.0 - uHitAge, 2.0);
+    float d1 = 1.0 - uHitAge;
+    float eased = 1.0 - d1 * d1;
 
     float bulge = exp(-dist * dist * 18.0) * 0.18 * (1.0 - eased);
 
@@ -49,7 +50,7 @@ uniform vec2  uGridCount;
 uniform float uLineWidth;
 uniform vec3  uNetColor;
 uniform float uHitAge;
-uniform int   uHitActive;
+uniform float uHitActive;
 uniform vec2  uHitUV;
 uniform float uAspect;
 varying vec2  vUv;
@@ -68,7 +69,7 @@ void main() {
   vec3  color = uNetColor;
   float alpha = 0.75 * onLine;
 
-  if (uHitActive == 1) {
+  if (uHitActive > 0.5) {
     vec2  dv = vUv - uHitUV;
     dv.x *= uAspect;
     float flash = exp(-length(dv) * 4.0) * (1.0 - uHitAge);
@@ -82,7 +83,7 @@ void main() {
     const uniforms = {
       uHitUV:     { value: new THREE.Vector2(0.5, 0.5) },
       uHitAge:    { value: 0.0 },
-      uHitActive: { value: 0 },
+      uHitActive: { value: 0.0 },
       uNetColor:  { value: new THREE.Color(0.4, 0.8, 1.0) },
       uLineWidth: { value: 0.08 },
       uGridCount: { value: new THREE.Vector2(10.0, 5.0) },
@@ -114,7 +115,7 @@ void main() {
       if (age >= 1.0) {
         this.hitActive = false;
         this.material.uniforms.uHitAge.value = 0.0;
-        this.material.uniforms.uHitActive.value = 0;
+        this.material.uniforms.uHitActive.value = 0.0;
       } else {
         this.material.uniforms.uHitAge.value = age;
       }
@@ -125,7 +126,7 @@ void main() {
     this.hitActive = true;
     this.hitStartTime = performance.now();
     this.material.uniforms.uHitUV.value.set(u, v);
-    this.material.uniforms.uHitActive.value = 1;
+    this.material.uniforms.uHitActive.value = 1.0;
     this.material.uniforms.uHitAge.value = 0.0;
   },
 
