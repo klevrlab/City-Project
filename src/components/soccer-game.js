@@ -18,7 +18,7 @@ AFRAME.registerComponent('soccer-game', {
     // Re-anchor field only if player has moved this far from initial placement origin.
     reanchorDistanceFromOrigin: { type: 'number', default: 4.0 },
     challengeDurationSec: { type: 'number', default: 30 },
-    kickDurationMs: { type: 'number', default: 900 },
+    kickDurationMs: { type: 'number', default: 1300 },
     minSwipePx: { type: 'number', default: 20 },
     resetDelayMs: { type: 'number', default: 1200 },
     // Max lateral deflection from "straight ahead" in degrees, regardless of how
@@ -443,7 +443,7 @@ AFRAME.registerComponent('soccer-game', {
   updateAim: function (dir, power) {
     if (!this.ballEntity || !this.aimDots.length) return;
     const ballPos = this.ballEntity.object3D.position;
-    const distance = this.data.goalDistance * power;
+    const distance = this.data.goalDistance * (0.5 + power);
     const arcHeight = 0.5 + power * 1.0;
     const count = this.aimDots.length;
     const powerNorm = Math.min(Math.max((power - 0.45) / 1.0, 0), 1);
@@ -552,7 +552,7 @@ AFRAME.registerComponent('soccer-game', {
       this.resetTimerId = null;
     }
 
-    const distance = this.data.goalDistance * power;
+    const distance = this.data.goalDistance * (0.5 + power);
     const start = this.ballEntity.object3D.position.clone();
     const end = start.clone().add(direction.clone().multiplyScalar(distance));
     end.y = this.data.ballRadius;
@@ -564,6 +564,13 @@ AFRAME.registerComponent('soccer-game', {
     this.kickPower = power;
     this.kickDirection = direction.clone();
     this.kickGoalDetected = false;
+    this.isBouncing    = false;
+    this.bouncesLeft   = 1;
+    this.bounceStartMs = 0;
+    this.bounceFrom    = null;
+    this.bounceVelX    = 0;
+    this.bounceVelZ    = 0;
+    this.bounceVelY    = 0;
     this.kickCurveAmount = Math.max(-0.65, Math.min(curveAmount || 0, 0.65));
     this.kickCurveRight = new THREE.Vector3(direction.z, 0, -direction.x).normalize();
 
@@ -579,10 +586,41 @@ AFRAME.registerComponent('soccer-game', {
   },
 
   tickKick: function (now) {
+    // ── Bounce physics branch ─────────────────────────────────────────────────
+    if (this.isBouncing) {
+      const bt = (now - this.bounceStartMs) / 1000;
+      const bx = this.bounceFrom.x + this.bounceVelX * bt;
+      const bz = this.bounceFrom.z + this.bounceVelZ * bt;
+      const by = Math.max(
+        this.data.ballRadius,
+        this.bounceFrom.y + this.bounceVelY * bt - 4.9 * bt * bt
+      );
+
+      this.ballEntity.object3D.position.set(bx, by, bz);
+
+      if (!this.kickGoalDetected) {
+        const relX = bx - this.goalCenter.x;
+        const relZ = bz - this.goalCenter.z;
+        const alongFwd = relX * this.goalForward.x + relZ * this.goalForward.z;
+        const lateral  = relX * this.goalRight.x   + relZ * this.goalRight.z;
+        if (alongFwd >= 0 && Math.abs(lateral) <= this.data.goalWidth / 2 && by <= this.data.goalHeight) {
+          this.kickGoalDetected = true;
+          this.lastGoalU = (lateral + this.data.goalWidth / 2) / this.data.goalWidth;
+          this.lastGoalV = by / this.data.goalHeight;
+          this.onGoal(this.classifyGoalZone(lateral, by));
+        }
+      }
+
+      if (by <= this.data.ballRadius + 0.01) { this.onKickEnd(); return; }
+      this.kickRafId = requestAnimationFrame(this.tickKick);
+      return;
+    }
+    // ── Normal kick ───────────────────────────────────────────────────────────
+
     const dur = this.data.kickDurationMs;
     const t = Math.min((now - this.kickStart) / dur, 1);
     // Ease-out horizontal motion so the ball decelerates from "air drag" —
-    // feels heavier and lands softly. Y still uses sin(π·t) for clean arc.
+    // feels heavier and lands softly.
     const eased = 1 - Math.pow(1 - t, 2.2);
 
     const x = this.kickFrom.x + (this.kickTo.x - this.kickFrom.x) * eased;
@@ -613,6 +651,17 @@ AFRAME.registerComponent('soccer-game', {
     this.ballEntity.object3D.rotation.x =  spinAngle * this.kickDirection.z;
     this.ballEntity.object3D.rotation.z = -spinAngle * this.kickDirection.x;
 
+    // Post/crossbar collision check
+    if (!this.kickGoalDetected && this.bouncesLeft > 0) {
+      const ballPos = new THREE.Vector3(x + cx, y, z + cz);
+      const hit = this.checkPostCollision(ballPos);
+      if (hit) {
+        this.startBounce(ballPos, hit, t);
+        this.kickRafId = requestAnimationFrame(this.tickKick);
+        return;
+      }
+    }
+
     if (!this.kickGoalDetected) {
       const relX = (x + cx) - this.goalCenter.x;
       const relZ = (z + cz) - this.goalCenter.z;
@@ -633,6 +682,72 @@ AFRAME.registerComponent('soccer-game', {
     } else {
       this.onKickEnd();
     }
+  },
+
+  checkPostCollision: function (ballPos) {
+    const postR = 0.045;
+    const hitR  = this.data.ballRadius + postR;
+    const hw    = this.data.goalWidth / 2;
+    const h     = this.data.goalHeight;
+
+    const leftPost  = this.goalCenter.clone().add(this.goalRight.clone().multiplyScalar(-hw));
+    const rightPost = this.goalCenter.clone().add(this.goalRight.clone().multiplyScalar( hw));
+
+    // Vertical posts — active when ball is within goal height
+    if (ballPos.y > 0 && ballPos.y < h) {
+      for (const post of [leftPost, rightPost]) {
+        const dx = ballPos.x - post.x;
+        const dz = ballPos.z - post.z;
+        const d  = Math.sqrt(dx * dx + dz * dz);
+        if (d < hitR && d > 0.001)
+          return { normalX: dx / d, normalZ: dz / d, normalY: 0 };
+      }
+    }
+
+    // Crossbar — horizontal cylinder at y=h spanning the width
+    const crossCenter = this.goalCenter.clone();
+    crossCenter.y = h;
+    const toCross = ballPos.clone().sub(crossCenter);
+    const along   = toCross.dot(this.goalRight);
+    if (Math.abs(along) <= hw) {
+      const closest = crossCenter.clone().add(this.goalRight.clone().multiplyScalar(along));
+      const perp    = ballPos.clone().sub(closest);
+      const d       = perp.length();
+      if (d < hitR && d > 0.001)
+        return { normalX: perp.x / d, normalZ: perp.z / d, normalY: perp.y / d };
+    }
+
+    return null;
+  },
+
+  startBounce: function (ballPos, hit, t) {
+    this.isBouncing    = true;
+    this.bouncesLeft  -= 1;
+    this.bounceFrom    = ballPos.clone();
+    this.bounceStartMs = performance.now();
+
+    // Analytically derive velocity from parametric equations at time t
+    const dur    = this.data.kickDurationMs / 1000;
+    const deased = 2.2 * Math.pow(1 - t, 1.2);
+    const velX   = (this.kickTo.x - this.kickFrom.x) * deased / dur;
+    const velZ   = (this.kickTo.z - this.kickFrom.z) * deased / dur;
+
+    const peakT = 0.38;
+    const dArc  = t < peakT
+      ?  Math.cos(Math.PI * 0.5 * t / peakT)         * (Math.PI * 0.5 / peakT)
+      : -Math.cos(Math.PI * 0.5 * (1 - t) / (1 - peakT)) * (Math.PI * 0.5 / (1 - peakT));
+    const velY = this.kickArc * dArc / dur;
+
+    // Reflect XZ velocity around hit surface normal, apply restitution
+    const restitution = 0.55;
+    const dot = velX * hit.normalX + velZ * hit.normalZ;
+    this.bounceVelX = (velX - 2 * dot * hit.normalX) * restitution;
+    this.bounceVelZ = (velZ - 2 * dot * hit.normalZ) * restitution;
+    this.bounceVelY = hit.normalY !== 0
+      ? Math.abs(velY) * 0.4 * restitution
+      : Math.max(velY * 0.35, 0.8);
+
+    if (navigator.vibrate) navigator.vibrate(12);
   },
 
   onGoal: function (zone) {
@@ -664,6 +779,7 @@ AFRAME.registerComponent('soccer-game', {
   },
 
   onKickEnd: function () {
+    this.isBouncing = false;
     if (!this.kickGoalDetected) {
       this.streak = 0;
       this.showToast('Miss — try again', 'miss');
@@ -719,6 +835,7 @@ AFRAME.registerComponent('soccer-game', {
     this.ballEntity = null;
     this.goalEntity = null;
     this.netEl = null;
+    this.isBouncing = false;
     this.touchStartX = null;
     this.touchStartY = null;
     this.state = 'idle';
