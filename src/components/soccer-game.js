@@ -37,6 +37,9 @@ AFRAME.registerComponent('soccer-game', {
     this.state = 'idle';
     this.ballEntity = null;
     this.goalEntity = null;
+    this.netEl = null;
+    this.lastGoalU = 0.5;
+    this.lastGoalV = 0.5;
     this.ballPlacementPos = null;
     this.goalCenter = null;
     this.goalForward = null;
@@ -388,12 +391,10 @@ AFRAME.registerComponent('soccer-game', {
     cross.setAttribute('shadow', 'cast: true');
     group.appendChild(cross);
 
-    const net = document.createElement('a-plane');
-    net.setAttribute('width', w);
-    net.setAttribute('height', h);
-    net.setAttribute('position', `0 ${h / 2} -0.35`);
-    net.setAttribute('material', 'color: #66ccff; opacity: 0.15; transparent: true; side: double; depthWrite: false');
-    group.appendChild(net);
+    const netEl = document.createElement('a-entity');
+    netEl.setAttribute('net-material', `width: ${w}; height: ${h}; segW: 20; segH: 10`);
+    group.appendChild(netEl);
+    this.netEl = netEl;
 
     this.el.appendChild(group);
     this.goalEntity = group;
@@ -594,6 +595,8 @@ AFRAME.registerComponent('soccer-game', {
       if (alongForward >= 0 && Math.abs(lateral) <= this.data.goalWidth / 2 && y <= this.data.goalHeight) {
         this.kickGoalDetected = true;
         const zone = this.classifyGoalZone(lateral, y);
+        this.lastGoalU = (lateral + this.data.goalWidth  / 2) / this.data.goalWidth;
+        this.lastGoalV =  y       / this.data.goalHeight;
         this.onGoal(zone);
       }
     }
@@ -626,6 +629,9 @@ AFRAME.registerComponent('soccer-game', {
     if (window.AudioUtils) {
       window.AudioUtils.playSound('goal');
       if (bonus > 0) window.AudioUtils.playSound('bonus');
+    }
+    if (this.netEl && this.netEl.components['net-material']) {
+      this.netEl.components['net-material'].triggerHit(this.lastGoalU, this.lastGoalV);
     }
   },
 
@@ -682,6 +688,7 @@ AFRAME.registerComponent('soccer-game', {
     }
     this.ballEntity = null;
     this.goalEntity = null;
+    this.netEl = null;
     this.touchStartX = null;
     this.touchStartY = null;
     this.state = 'idle';
