@@ -18,16 +18,16 @@ AFRAME.registerComponent('soccer-game', {
     // Re-anchor field only if player has moved this far from initial placement origin.
     reanchorDistanceFromOrigin: { type: 'number', default: 4.0 },
     challengeDurationSec: { type: 'number', default: 30 },
-    kickDurationMs: { type: 'number', default: 1100 },
-    minSwipePx: { type: 'number', default: 30 },
+    kickDurationMs: { type: 'number', default: 900 },
+    minSwipePx: { type: 'number', default: 20 },
     resetDelayMs: { type: 'number', default: 1200 },
     // Max lateral deflection from "straight ahead" in degrees, regardless of how
     // diagonal the swipe is. Keeps aiming predictable in a cone, not a full circle.
-    maxAimAngleDeg: { type: 'number', default: 22 },
+    maxAimAngleDeg: { type: 'number', default: 30 },
     // Minimum upward swipe ratio (0–1 of reference distance) required to fire.
     minForwardRatio: { type: 'number', default: 0.15 },
     // How far up the screen a "full power" swipe needs to travel, as fraction of screen height.
-    fullPowerScreenRatio: { type: 'number', default: 0.4 },
+    fullPowerScreenRatio: { type: 'number', default: 0.3 },
     // Top dead zone (px) — touches that start above this are ignored (topbar area).
     topDeadZonePx: { type: 'number', default: 60 },
     aimDotCount: { type: 'number', default: 14 }
@@ -446,12 +446,18 @@ AFRAME.registerComponent('soccer-game', {
     const distance = this.data.goalDistance * power;
     const arcHeight = 0.5 + power * 1.0;
     const count = this.aimDots.length;
+    const powerNorm = Math.min(Math.max((power - 0.45) / 1.0, 0), 1);
+    const rHex = Math.round(powerNorm * 255).toString(16).padStart(2, '0');
+    const gHex = Math.round(169 - powerNorm * 63).toString(16).padStart(2, '0');
+    const bHex = Math.round(224 * (1 - powerNorm)).toString(16).padStart(2, '0');
+    const dotColor = `#${rHex}${gHex}${bHex}`;
     for (let i = 0; i < count; i++) {
       const t = (i + 1) / (count + 1);
       const x = ballPos.x + dir.x * distance * t;
       const z = ballPos.z + dir.z * distance * t;
       const y = this.data.ballRadius + arcHeight * Math.sin(Math.PI * t);
       this.aimDots[i].object3D.position.set(x, y, z);
+      this.aimDots[i].setAttribute('material', `color: ${dotColor}; shader: flat; transparent: true; opacity: ${(0.35 + t * 0.55).toFixed(2)}`);
       this.aimDots[i].setAttribute('visible', 'true');
     }
     this.aimVisible = true;
@@ -555,6 +561,8 @@ AFRAME.registerComponent('soccer-game', {
     this.kickFrom = start.clone();
     this.kickTo = end.clone();
     this.kickArc = 0.5 + power * 1.0;
+    this.kickPower = power;
+    this.kickDirection = direction.clone();
     this.kickGoalDetected = false;
     this.kickCurveAmount = Math.max(-0.65, Math.min(curveAmount || 0, 0.65));
     this.kickCurveRight = new THREE.Vector3(direction.z, 0, -direction.x).normalize();
@@ -564,6 +572,7 @@ AFRAME.registerComponent('soccer-game', {
     this.updateInstruction('');
     this.hideAim();
     if (window.AudioUtils) window.AudioUtils.playSound('kick');
+    if (navigator.vibrate) navigator.vibrate(18);
 
     cancelAnimationFrame(this.kickRafId);
     this.kickRafId = requestAnimationFrame(this.tickKick);
@@ -582,9 +591,27 @@ AFRAME.registerComponent('soccer-game', {
     const cx = this.kickCurveRight ? this.kickCurveRight.x * curveOffset : 0;
     const cz = this.kickCurveRight ? this.kickCurveRight.z * curveOffset : 0;
     const baseY = this.data.ballRadius;
-    const y = baseY + this.kickArc * Math.sin(Math.PI * t);
+    const peakT = 0.38;
+    const arcT = t < peakT
+      ? Math.sin(Math.PI * 0.5 * t / peakT)
+      : Math.sin(Math.PI * 0.5 * (1.0 - t) / (1.0 - peakT));
+    const y = baseY + this.kickArc * arcT;
+
+    if (t < 0.08) {
+      const sq = 1.0 - t / 0.08;
+      this.ballEntity.object3D.scale.set(1.0 + sq * 0.45, 1.0 - sq * 0.28, 1.0 + sq * 0.45);
+    } else if (t < 0.18) {
+      const s = 1.0 + (1.0 - (t - 0.08) / 0.10) * 0.12;
+      this.ballEntity.object3D.scale.set(1.0, s, 1.0);
+    } else {
+      this.ballEntity.object3D.scale.set(1, 1, 1);
+    }
 
     this.ballEntity.object3D.position.set(x + cx, y, z + cz);
+
+    const spinAngle = t * Math.PI * 6 * this.kickPower;
+    this.ballEntity.object3D.rotation.x =  spinAngle * this.kickDirection.z;
+    this.ballEntity.object3D.rotation.z = -spinAngle * this.kickDirection.x;
 
     if (!this.kickGoalDetected) {
       const relX = (x + cx) - this.goalCenter.x;
@@ -630,6 +657,7 @@ AFRAME.registerComponent('soccer-game', {
       window.AudioUtils.playSound('goal');
       if (bonus > 0) window.AudioUtils.playSound('bonus');
     }
+    if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
     if (this.netEl && this.netEl.components['net-material']) {
       this.netEl.components['net-material'].triggerHit(this.lastGoalU, this.lastGoalV);
     }
@@ -646,6 +674,8 @@ AFRAME.registerComponent('soccer-game', {
       if (this.state !== 'kicking') return;
       if (this.ballEntity && this.ballPlacementPos) {
         this.ballEntity.object3D.position.copy(this.ballPlacementPos);
+        this.ballEntity.object3D.rotation.set(0, 0, 0);
+        this.ballEntity.object3D.scale.set(1, 1, 1);
       }
       this.state = 'placed';
       if (this.pendingRoundSummary) {
