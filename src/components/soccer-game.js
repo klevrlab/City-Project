@@ -392,7 +392,7 @@ AFRAME.registerComponent('soccer-game', {
     group.appendChild(cross);
 
     const netEl = document.createElement('a-entity');
-    netEl.setAttribute('net-material', `width: ${w}; height: ${h}; segW: 20; segH: 10`);
+    netEl.setAttribute('net-material', `width: ${w}; height: ${h}; segW: 30; segH: 15`);
     group.appendChild(netEl);
     this.netEl = netEl;
 
@@ -728,9 +728,10 @@ AFRAME.registerComponent('soccer-game', {
       }
     }
 
-    // Crossbar — 3D cylinder check along goalRight axis at y=h
+    // Crossbar — 3D cylinder check along goalRight axis at y=h.
+    // Center shifted +0.08m above visual bar so shots clipping the top still trigger.
     const crossCenter = this.goalCenter.clone();
-    crossCenter.y = h;
+    crossCenter.y = h + 0.08;
     const toCross = ballPos.clone().sub(crossCenter);
     const along   = toCross.dot(this.goalRight);
     if (Math.abs(along) <= hw) {
