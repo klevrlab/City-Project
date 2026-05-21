@@ -10,11 +10,13 @@ AFRAME.registerComponent('net-material', {
   init: function () {
     const d = this.data;
 
-    // No logdepthbuf includes — depthWrite:false means no depth fighting,
-    // and those chunks require <common> (isPerspectiveMatrix) which we skip
-    // to keep the shader self-contained. No fwidth() — requires
-    // GL_OES_standard_derivatives which may not be available on WebGL 1.
     const vertexShader = `
+// isPerspectiveMatrix is normally in <common>; define it here so the
+// logdepthbuf chunks compile without needing the full <common> include.
+bool isPerspectiveMatrix(mat4 m) { return m[2][3] == -1.0; }
+
+#include <logdepthbuf_pars_vertex>
+
 uniform vec2  uHitUV;
 uniform float uHitAge;
 uniform float uHitActive;
@@ -43,9 +45,12 @@ void main() {
   }
 
   gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+  #include <logdepthbuf_vertex>
 }`;
 
     const fragmentShader = `
+#include <logdepthbuf_pars_fragment>
+
 uniform vec2  uGridCount;
 uniform float uLineWidth;
 uniform vec3  uNetColor;
@@ -78,6 +83,7 @@ void main() {
   }
 
   gl_FragColor = vec4(color, alpha);
+  #include <logdepthbuf_fragment>
 }`;
 
     const uniforms = {
