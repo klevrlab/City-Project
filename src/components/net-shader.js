@@ -96,6 +96,79 @@ void main() {
       uAspect:    { value: d.width / d.height }
     };
 
+    // Back mesh vertex shader — stronger displacement (1.7×) for depth/volume feel
+    const backVertexShader = `
+bool isPerspectiveMatrix(mat4 m) { return m[2][3] == -1.0; }
+#include <logdepthbuf_pars_vertex>
+
+uniform vec2  uHitUV;
+uniform float uHitAge;
+uniform float uHitActive;
+uniform float uAspect;
+varying vec2  vUv;
+
+void main() {
+  vUv = uv;
+  vec3 displaced = position;
+
+  if (uHitActive > 0.5) {
+    vec2 delta = uv - uHitUV;
+    delta.x *= uAspect;
+    float dist = length(delta);
+    float d1 = 1.0 - uHitAge;
+    float eased = 1.0 - d1 * d1;
+
+    float bulge = exp(-dist * dist * 11.0) * 0.72 * (1.0 - eased);
+
+    float waveFront = eased * 2.2;
+    float waveEnv   = max(0.0, 1.0 - abs(dist - waveFront) / 0.30);
+    float ripple    = sin(dist * 25.0 - uHitAge * 14.0) * 0.24 * waveEnv
+                      * clamp((1.0 - eased) * 0.5 + 0.5 * (1.0 - dist), 0.0, 1.0);
+
+    displaced.z -= (bulge + ripple);
+  }
+
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+  #include <logdepthbuf_vertex>
+}`;
+
+    const backFragmentShader = `
+#include <logdepthbuf_pars_fragment>
+
+uniform vec2  uGridCount;
+uniform float uLineWidth;
+uniform vec3  uNetColor;
+uniform float uHitAge;
+uniform float uHitActive;
+uniform vec2  uHitUV;
+uniform float uAspect;
+varying vec2  vUv;
+
+void main() {
+  vec2 cellUV   = fract(vUv * uGridCount);
+  vec2 edgeDist = min(cellUV, 1.0 - cellUV);
+
+  float aa = 0.008;
+  vec2 lineMask = smoothstep(vec2(uLineWidth - aa), vec2(uLineWidth + aa), edgeDist);
+  float onLine = 1.0 - lineMask.x * lineMask.y;
+
+  if (onLine < 0.01) discard;
+
+  vec3  color = uNetColor * 0.65;
+  float alpha = 0.40 * onLine;
+
+  if (uHitActive > 0.5) {
+    vec2  dv = vUv - uHitUV;
+    dv.x *= uAspect;
+    float flash = exp(-length(dv) * 2.5) * (1.0 - uHitAge);
+    color = mix(color, vec3(0.9, 1.0, 1.0), flash * 0.7);
+    alpha = clamp(alpha + flash * 0.50, 0.0, 1.0) * onLine;
+  }
+
+  gl_FragColor = vec4(color, alpha);
+  #include <logdepthbuf_fragment>
+}`;
+
     const geometry = new THREE.PlaneGeometry(d.width, d.height, d.segW, d.segH);
     const material = new THREE.ShaderMaterial({
       uniforms,
@@ -109,6 +182,19 @@ void main() {
     this.mesh = new THREE.Mesh(geometry, material);
     this.mesh.position.set(0, d.height / 2, -0.35);
     this.el.object3D.add(this.mesh);
+
+    const backMaterial = new THREE.ShaderMaterial({
+      uniforms,
+      vertexShader: backVertexShader,
+      fragmentShader: backFragmentShader,
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+
+    this.backMesh = new THREE.Mesh(geometry, backMaterial);
+    this.backMesh.position.set(0, d.height / 2, -0.65);
+    this.el.object3D.add(this.backMesh);
 
     this.material = material;
     this.hitActive = false;
@@ -137,6 +223,11 @@ void main() {
   },
 
   remove: function () {
+    if (this.backMesh) {
+      this.el.object3D.remove(this.backMesh);
+      this.backMesh.material.dispose();
+      this.backMesh = null;
+    }
     if (this.mesh) {
       this.el.object3D.remove(this.mesh);
       this.mesh.geometry.dispose();

@@ -64,6 +64,27 @@ AFRAME.registerComponent('soccer-game', {
     this.aimVisible = false;
     this.fieldOriginCameraPos = null;
 
+    // Visual effects state
+    this.trailMeshes = null;
+    this.trailPositions = null;
+    this.trailHead = 0;
+    this.trailFill = 0;
+    this.trailFrameCount = 0;
+    this.TRAIL_N = 14;
+    this.kickRingMesh = null;
+    this.kickRingUniforms = null;
+    this.kickRingActive = false;
+    this.kickRingStartMs = 0;
+    this.burstMesh = null;
+    this.burstVelocities = null;
+    this.burstN = 55;
+    this.burstActive = false;
+    this.burstStartMs = 0;
+    this.burstOrigin = new THREE.Vector3();
+    this.leftPostEl = null;
+    this.rightPostEl = null;
+    this.crossbarEl = null;
+
     this.onGroundClick = this.onGroundClick.bind(this);
     this.onTouchStart = this.onTouchStart.bind(this);
     this.onTouchMove = this.onTouchMove.bind(this);
@@ -351,7 +372,7 @@ AFRAME.registerComponent('soccer-game', {
     if (this.ballEntity) return;
     const ent = document.createElement('a-sphere');
     ent.setAttribute('radius', this.data.ballRadius);
-    ent.setAttribute('material', 'color: #f5f5f5; metalness: 0.05; roughness: 0.55');
+    ent.setAttribute('soccer-ball-material', '');
     ent.setAttribute('shadow', 'cast: true');
     this.el.appendChild(ent);
     this.ballEntity = ent;
@@ -373,6 +394,7 @@ AFRAME.registerComponent('soccer-game', {
     left.setAttribute('position', `${-w / 2} ${h / 2} 0`);
     left.setAttribute('shadow', 'cast: true');
     group.appendChild(left);
+    this.leftPostEl = left;
 
     const right = document.createElement('a-cylinder');
     right.setAttribute('radius', postR);
@@ -381,6 +403,7 @@ AFRAME.registerComponent('soccer-game', {
     right.setAttribute('position', `${w / 2} ${h / 2} 0`);
     right.setAttribute('shadow', 'cast: true');
     group.appendChild(right);
+    this.rightPostEl = right;
 
     const cross = document.createElement('a-cylinder');
     cross.setAttribute('radius', postR);
@@ -390,6 +413,7 @@ AFRAME.registerComponent('soccer-game', {
     cross.setAttribute('position', `0 ${h} 0`);
     cross.setAttribute('shadow', 'cast: true');
     group.appendChild(cross);
+    this.crossbarEl = cross;
 
     const netEl = document.createElement('a-entity');
     netEl.setAttribute('net-material', `width: ${w}; height: ${h}; segW: 30; segH: 15`);
@@ -583,6 +607,28 @@ AFRAME.registerComponent('soccer-game', {
     if (window.AudioUtils) window.AudioUtils.playSound('kick');
     if (navigator.vibrate) navigator.vibrate(18);
 
+    // Trail — reset ring buffer each kick
+    this.ensureTrail();
+    this.trailFill = 0;
+    this.trailHead = 0;
+    this.trailFrameCount = 0;
+    if (this.trailMeshes) {
+      for (let i = 0; i < this.trailMeshes.length; i++) this.trailMeshes[i].visible = false;
+    }
+
+    // Kick ring — expanding ground circle
+    this.ensureKickRing();
+    if (this.kickRingMesh) {
+      this.kickRingMesh.position.set(start.x, 0.005, start.z);
+      this.kickRingUniforms.uAge.value = 0.0;
+      this.kickRingMesh.visible = true;
+      this.kickRingActive = true;
+      this.kickRingStartMs = performance.now();
+    }
+
+    // Pre-allocate burst (triggered in onGoal)
+    this.ensureGoalBurst();
+
     cancelAnimationFrame(this.kickRafId);
     this.kickRafId = requestAnimationFrame(this.tickKick);
   },
@@ -598,6 +644,7 @@ AFRAME.registerComponent('soccer-game', {
         this.bounceFrom.y + this.bounceVelY * bt - 4.9 * bt * bt
       );
       this.ballEntity.object3D.position.set(bx, by, bz);
+      this._updateTrail(bx, by, bz);
       if (!this.kickGoalDetected) {
         const relX = bx - this.goalCenter.x;
         const relZ = bz - this.goalCenter.z;
@@ -662,6 +709,7 @@ AFRAME.registerComponent('soccer-game', {
     }
 
     this.ballEntity.object3D.position.set(x + cx, y, z + cz);
+    this._updateTrail(x + cx, y, z + cz);
 
     const spinAngle = t * Math.PI * 6 * this.kickPower;
     this.ballEntity.object3D.rotation.x =  spinAngle * this.kickDirection.z;
@@ -773,6 +821,24 @@ AFRAME.registerComponent('soccer-game', {
       : Math.max(velY * 0.35, 0.8);
 
     if (navigator.vibrate) navigator.vibrate(12);
+
+    // Flash hit post or crossbar orange for 350ms
+    const lateralDot = (ballPos.x - this.goalCenter.x) * this.goalRight.x +
+                       (ballPos.z - this.goalCenter.z) * this.goalRight.z;
+    const flashEl = hit.normalY !== 0 ? this.crossbarEl
+      : (lateralDot < 0 ? this.leftPostEl : this.rightPostEl);
+    if (flashEl) {
+      flashEl.object3D.traverse(child => {
+        if (child.isMesh && child.material) {
+          child.material.color.setHex(0xff7700);
+          if (child.material.emissive) child.material.emissive.setHex(0x662200);
+          setTimeout(() => {
+            child.material.color.setHex(0xffffff);
+            if (child.material.emissive) child.material.emissive.setHex(0x000000);
+          }, 350);
+        }
+      });
+    }
   },
 
   onGoal: function (zone) {
@@ -801,11 +867,36 @@ AFRAME.registerComponent('soccer-game', {
     if (this.netEl && this.netEl.components['net-material']) {
       this.netEl.components['net-material'].triggerHit(this.lastGoalU, this.lastGoalV);
     }
+    // Goal celebration burst
+    if (this.burstMesh) {
+      const ox = this.netCatchFrom ? this.netCatchFrom.x : this.goalCenter.x;
+      const oy = this.netCatchFrom ? Math.max(0.5, this.netCatchFrom.y) : 1.0;
+      const oz = this.netCatchFrom ? this.netCatchFrom.z : this.goalCenter.z;
+      this.burstOrigin.set(ox, oy, oz);
+      for (let i = 0; i < this.burstN; i++) {
+        const theta = Math.random() * Math.PI * 2;
+        const upBias = 0.3 + Math.random() * 0.7;
+        const lateral = Math.sqrt(1 - upBias * upBias);
+        const speed = 2.0 + Math.random() * 4.0;
+        const v = this.burstVelocities[i];
+        v.x = lateral * Math.cos(theta) * speed;
+        v.y = upBias * speed;
+        v.z = lateral * Math.sin(theta) * speed;
+      }
+      this.burstActive = true;
+      this.burstStartMs = performance.now();
+      this.burstMesh.visible = true;
+    }
   },
 
   onKickEnd: function () {
     this.isBouncing = false;
     this.netCatchStartMs = 0;
+    if (this.trailMeshes) {
+      for (let i = 0; i < this.trailMeshes.length; i++) this.trailMeshes[i].visible = false;
+      this.trailFill = 0;
+      this.trailHead = 0;
+    }
     if (!this.kickGoalDetected) {
       this.streak = 0;
       this.showToast('Miss — try again', 'miss');
@@ -861,7 +952,17 @@ AFRAME.registerComponent('soccer-game', {
     this.ballEntity = null;
     this.goalEntity = null;
     this.netEl = null;
+    this.leftPostEl = null;
+    this.rightPostEl = null;
+    this.crossbarEl = null;
     this.isBouncing = false;
+    if (this.trailMeshes) {
+      for (let i = 0; i < this.trailMeshes.length; i++) this.trailMeshes[i].visible = false;
+      this.trailFill = 0;
+      this.trailHead = 0;
+    }
+    if (this.kickRingMesh) { this.kickRingMesh.visible = false; this.kickRingActive = false; }
+    if (this.burstMesh) { this.burstMesh.visible = false; this.burstActive = false; }
     this.touchStartX = null;
     this.touchStartY = null;
     this.state = 'idle';
@@ -879,6 +980,161 @@ AFRAME.registerComponent('soccer-game', {
     this.updateInstruction('Tap the ground to place the soccer ball');
     this.showReset(false);
     this.updateScore();
+  },
+
+  tick: function () {
+    const now = performance.now();
+    if (this.kickRingActive && this.kickRingMesh) {
+      const age = (now - this.kickRingStartMs) / 600;
+      if (age >= 1.0) {
+        this.kickRingMesh.visible = false;
+        this.kickRingActive = false;
+      } else {
+        this.kickRingUniforms.uAge.value = age;
+      }
+    }
+    if (this.burstActive && this.burstMesh) {
+      const bt = (now - this.burstStartMs) / 1000;
+      if (bt >= 1.5) {
+        this.burstMesh.visible = false;
+        this.burstActive = false;
+      } else {
+        this._updateBurst(bt);
+      }
+    }
+  },
+
+  ensureTrail: function () {
+    if (this.trailMeshes) return;
+    this.trailMeshes = [];
+    this.trailPositions = [];
+    const N = this.TRAIL_N;
+    const geo = new THREE.SphereGeometry(0.055, 5, 5);
+    for (let i = 0; i < N; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x00a9e0,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.visible = false;
+      this.el.object3D.add(mesh);
+      this.trailMeshes.push(mesh);
+      this.trailPositions.push(new THREE.Vector3());
+    }
+  },
+
+  ensureKickRing: function () {
+    if (this.kickRingMesh) return;
+    const vertexShader = `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+    const fragmentShader = `
+uniform float uAge;
+uniform vec3  uColor;
+varying vec2  vUv;
+void main() {
+  vec2 ctr = vUv - 0.5;
+  float dist = length(ctr);
+  float ringR = uAge * 0.5;
+  float ringW = 0.025 * (1.0 - uAge * 0.6);
+  float ring = 1.0 - smoothstep(0.0, ringW, abs(dist - ringR));
+  float alpha = ring * (1.0 - uAge) * 0.8;
+  if (alpha < 0.01) discard;
+  gl_FragColor = vec4(uColor, alpha);
+}`;
+    const uniforms = {
+      uAge:   { value: 0.0 },
+      uColor: { value: new THREE.Color(0x00a9e0) }
+    };
+    const geo = new THREE.PlaneGeometry(5.0, 5.0);
+    const mat = new THREE.ShaderMaterial({
+      uniforms,
+      vertexShader,
+      fragmentShader,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.005;
+    mesh.visible = false;
+    this.el.object3D.add(mesh);
+    this.kickRingMesh = mesh;
+    this.kickRingUniforms = uniforms;
+  },
+
+  ensureGoalBurst: function () {
+    if (this.burstMesh) return;
+    const N = this.burstN;
+    this.burstVelocities = [];
+    const positions = new Float32Array(N * 3);
+    const colors = new Float32Array(N * 3);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const mat = new THREE.PointsMaterial({
+      size: 0.10,
+      vertexColors: true,
+      transparent: true,
+      opacity: 1.0,
+      depthWrite: false,
+      sizeAttenuation: true
+    });
+    this.burstMesh = new THREE.Points(geo, mat);
+    this.burstMesh.visible = false;
+    this.el.object3D.add(this.burstMesh);
+    for (let i = 0; i < N; i++) {
+      this.burstVelocities.push({ x: 0, y: 1, z: 0 });
+    }
+  },
+
+  _updateTrail: function (px, py, pz) {
+    if (!this.trailMeshes) return;
+    this.trailFrameCount++;
+    if (this.trailFrameCount % 2 !== 0) return;
+    const N = this.TRAIL_N;
+    const idx = ((this.trailHead % N) + N) % N;
+    this.trailPositions[idx].set(px, py, pz);
+    if (this.trailFill < N) this.trailFill++;
+    this.trailHead++;
+    for (let i = 0; i < N; i++) {
+      if (i >= this.trailFill) { this.trailMeshes[i].visible = false; continue; }
+      const posIdx = ((this.trailHead - 1 - i) % N + N) % N;
+      const m = this.trailMeshes[i];
+      m.position.copy(this.trailPositions[posIdx]);
+      m.material.opacity = (1 - i / (N - 1)) * 0.52;
+      m.visible = true;
+    }
+  },
+
+  _updateBurst: function (bt) {
+    const geo = this.burstMesh.geometry;
+    const positions = geo.attributes.position.array;
+    const colors = geo.attributes.color.array;
+    const t = bt / 1.5;
+    // Gold (#ffd700) → cyan (#00a9e0)
+    const r = 1.0  - t * 1.0;
+    const g = 0.843 + t * (0.663 - 0.843);
+    const b = 0.0   + t * 0.878;
+    for (let i = 0; i < this.burstN; i++) {
+      const v = this.burstVelocities[i];
+      positions[i * 3 + 0] = this.burstOrigin.x + v.x * bt;
+      positions[i * 3 + 1] = Math.max(this.data.ballRadius,
+        this.burstOrigin.y + v.y * bt - 4.9 * bt * bt);
+      positions[i * 3 + 2] = this.burstOrigin.z + v.z * bt;
+      colors[i * 3 + 0] = r;
+      colors[i * 3 + 1] = g;
+      colors[i * 3 + 2] = b;
+    }
+    geo.attributes.position.needsUpdate = true;
+    geo.attributes.color.needsUpdate = true;
+    this.burstMesh.material.opacity = 1.0 - t;
   },
 
   updateInstruction: function (text) {
