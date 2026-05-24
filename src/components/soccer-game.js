@@ -748,7 +748,10 @@ AFRAME.registerComponent('soccer-game', {
     }
   },
 
-  checkPostCollision: function (ballPos) {
+  checkPostCollision: function (ballPos, t) {
+    // Skip early in the kick — ball hasn't reached the goal zone yet
+    if (t !== undefined && t < 0.12) return null;
+
     const postR  = 0.045;
     // Generous hit radius prevents tunneling at high ball speeds (~0.25m/frame peak)
     const hitR   = this.data.ballRadius + postR + 0.13;  // ~0.285m posts
@@ -868,7 +871,7 @@ AFRAME.registerComponent('soccer-game', {
       this.netEl.components['net-material'].triggerHit(this.lastGoalU, this.lastGoalV);
     }
     // Goal celebration burst
-    if (this.burstMesh) {
+    if (this.burstMesh && this.burstVelocities) {
       const ox = this.netCatchFrom ? this.netCatchFrom.x : this.goalCenter.x;
       const oy = this.netCatchFrom ? Math.max(0.5, this.netCatchFrom.y) : 1.0;
       const oz = this.netCatchFrom ? this.netCatchFrom.z : this.goalCenter.z;
@@ -982,6 +985,30 @@ AFRAME.registerComponent('soccer-game', {
     this.updateScore();
   },
 
+  remove: function () {
+    if (this.trailMeshes) {
+      const geo = this.trailMeshes[0] && this.trailMeshes[0].geometry;
+      for (let i = 0; i < this.trailMeshes.length; i++) {
+        this.el.object3D.remove(this.trailMeshes[i]);
+        this.trailMeshes[i].material.dispose();
+      }
+      if (geo) geo.dispose();
+      this.trailMeshes = null;
+    }
+    if (this.kickRingMesh) {
+      this.el.object3D.remove(this.kickRingMesh);
+      this.kickRingMesh.geometry.dispose();
+      this.kickRingMesh.material.dispose();
+      this.kickRingMesh = null;
+    }
+    if (this.burstMesh) {
+      this.el.object3D.remove(this.burstMesh);
+      this.burstMesh.geometry.dispose();
+      this.burstMesh.material.dispose();
+      this.burstMesh = null;
+    }
+  },
+
   tick: function () {
     const now = performance.now();
     if (this.kickRingActive && this.kickRingMesh) {
@@ -1028,12 +1055,16 @@ AFRAME.registerComponent('soccer-game', {
   ensureKickRing: function () {
     if (this.kickRingMesh) return;
     const vertexShader = `
+bool isPerspectiveMatrix(mat4 m) { return m[2][3] == -1.0; }
+#include <logdepthbuf_pars_vertex>
 varying vec2 vUv;
 void main() {
   vUv = uv;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  #include <logdepthbuf_vertex>
 }`;
     const fragmentShader = `
+#include <logdepthbuf_pars_fragment>
 uniform float uAge;
 uniform vec3  uColor;
 varying vec2  vUv;
@@ -1046,6 +1077,7 @@ void main() {
   float alpha = ring * (1.0 - uAge) * 0.8;
   if (alpha < 0.01) discard;
   gl_FragColor = vec4(uColor, alpha);
+  #include <logdepthbuf_fragment>
 }`;
     const uniforms = {
       uAge:   { value: 0.0 },
@@ -1087,6 +1119,7 @@ void main() {
       sizeAttenuation: true
     });
     this.burstMesh = new THREE.Points(geo, mat);
+    this.burstMesh.frustumCulled = false;
     this.burstMesh.visible = false;
     this.el.object3D.add(this.burstMesh);
     for (let i = 0; i < N; i++) {

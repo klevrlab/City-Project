@@ -170,6 +170,8 @@ void main() {
 }`;
 
     const geometry = new THREE.PlaneGeometry(d.width, d.height, d.segW, d.segH);
+    this.sharedGeometry = geometry;
+
     const material = new THREE.ShaderMaterial({
       uniforms,
       vertexShader,
@@ -230,9 +232,12 @@ void main() {
     }
     if (this.mesh) {
       this.el.object3D.remove(this.mesh);
-      this.mesh.geometry.dispose();
       this.mesh.material.dispose();
       this.mesh = null;
+    }
+    if (this.sharedGeometry) {
+      this.sharedGeometry.dispose();
+      this.sharedGeometry = null;
     }
   }
 });
