@@ -654,7 +654,7 @@ AFRAME.registerComponent('soccer-game', {
           this.kickGoalDetected = true;
           this.netCatchStartMs = 0;
           this.netCatchFrom = new THREE.Vector3(bx, by, bz);
-          this.lastGoalU = (lateral + this.data.goalWidth / 2) / this.data.goalWidth;
+          this.lastGoalU = 1.0 - (lateral + this.data.goalWidth / 2) / this.data.goalWidth;
           this.lastGoalV = by / this.data.goalHeight;
           this.onGoal(this.classifyGoalZone(lateral, by));
         }
@@ -735,7 +735,7 @@ AFRAME.registerComponent('soccer-game', {
         this.netCatchStartMs = 0;
         this.netCatchFrom = new THREE.Vector3(x + cx, y, z + cz);
         const zone = this.classifyGoalZone(lateral, y);
-        this.lastGoalU = (lateral + this.data.goalWidth  / 2) / this.data.goalWidth;
+        this.lastGoalU = 1.0 - (lateral + this.data.goalWidth  / 2) / this.data.goalWidth;
         this.lastGoalV =  y       / this.data.goalHeight;
         this.onGoal(zone);
       }

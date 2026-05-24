@@ -4,7 +4,7 @@ AFRAME.registerComponent('net-material', {
     height:        { type: 'number', default: 1.5 },
     segW:          { type: 'number', default: 20 },
     segH:          { type: 'number', default: 10 },
-    hitDurationMs: { type: 'number', default: 1400 }
+    hitDurationMs: { type: 'number', default: 900 }
   },
 
   init: function () {
