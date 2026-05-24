@@ -30,7 +30,10 @@ AFRAME.registerComponent('soccer-game', {
     fullPowerScreenRatio: { type: 'number', default: 0.3 },
     // Top dead zone (px) — touches that start above this are ignored (topbar area).
     topDeadZonePx: { type: 'number', default: 60 },
-    aimDotCount: { type: 'number', default: 14 }
+    aimDotCount: { type: 'number', default: 14 },
+    goalieSpeedMps:   { type: 'number', default: 2.5 },
+    goalieReactionMs: { type: 'number', default: 150 },
+    goalieAccuracy:   { type: 'number', default: 0.78 }
   },
 
   init: function () {
@@ -84,6 +87,13 @@ AFRAME.registerComponent('soccer-game', {
     this.leftPostEl = null;
     this.rightPostEl = null;
     this.crossbarEl = null;
+    this.goalieEl = null;
+    this.goalieWorldLateral = 0;
+    this.goalieTargetLateral = 0;
+    this.goalieBlocked = false;
+    this.goalieReacted = false;
+    this.goalieReactionTimer = null;
+    this.goalieLastLateral = 0;
 
     this.onGroundClick = this.onGroundClick.bind(this);
     this.onTouchStart = this.onTouchStart.bind(this);
@@ -420,6 +430,57 @@ AFRAME.registerComponent('soccer-game', {
     group.appendChild(netEl);
     this.netEl = netEl;
 
+    // Goalie — simple humanoid: head + torso + limbs
+    const goalieGroup = document.createElement('a-entity');
+    goalieGroup.setAttribute('position', '0 0 0');
+
+    const head = document.createElement('a-sphere');
+    head.setAttribute('radius', '0.13');
+    head.setAttribute('material', 'color: #ffcc99; shader: flat');
+    head.setAttribute('position', '0 1.72 0');
+    goalieGroup.appendChild(head);
+
+    const body = document.createElement('a-box');
+    body.setAttribute('width', '0.38'); body.setAttribute('height', '0.52'); body.setAttribute('depth', '0.22');
+    body.setAttribute('material', 'color: #e74c3c; shader: flat');
+    body.setAttribute('position', '0 1.19 0');
+    goalieGroup.appendChild(body);
+
+    const leftArm = document.createElement('a-box');
+    leftArm.setAttribute('width', '0.13'); leftArm.setAttribute('height', '0.46'); leftArm.setAttribute('depth', '0.14');
+    leftArm.setAttribute('material', 'color: #e74c3c; shader: flat');
+    leftArm.setAttribute('position', '-0.27 1.17 0'); leftArm.setAttribute('rotation', '0 0 16');
+    goalieGroup.appendChild(leftArm);
+
+    const rightArm = document.createElement('a-box');
+    rightArm.setAttribute('width', '0.13'); rightArm.setAttribute('height', '0.46'); rightArm.setAttribute('depth', '0.14');
+    rightArm.setAttribute('material', 'color: #e74c3c; shader: flat');
+    rightArm.setAttribute('position', '0.27 1.17 0'); rightArm.setAttribute('rotation', '0 0 -16');
+    goalieGroup.appendChild(rightArm);
+
+    const shorts = document.createElement('a-box');
+    shorts.setAttribute('width', '0.36'); shorts.setAttribute('height', '0.28'); shorts.setAttribute('depth', '0.20');
+    shorts.setAttribute('material', 'color: #1a1a2e; shader: flat');
+    shorts.setAttribute('position', '0 0.87 0');
+    goalieGroup.appendChild(shorts);
+
+    const leftLeg = document.createElement('a-box');
+    leftLeg.setAttribute('width', '0.14'); leftLeg.setAttribute('height', '0.44'); leftLeg.setAttribute('depth', '0.14');
+    leftLeg.setAttribute('material', 'color: #ffcc99; shader: flat');
+    leftLeg.setAttribute('position', '-0.10 0.58 0');
+    goalieGroup.appendChild(leftLeg);
+
+    const rightLeg = document.createElement('a-box');
+    rightLeg.setAttribute('width', '0.14'); rightLeg.setAttribute('height', '0.44'); rightLeg.setAttribute('depth', '0.14');
+    rightLeg.setAttribute('material', 'color: #ffcc99; shader: flat');
+    rightLeg.setAttribute('position', '0.10 0.58 0');
+    goalieGroup.appendChild(rightLeg);
+
+    group.appendChild(goalieGroup);
+    this.goalieEl = goalieGroup;
+    this.goalieWorldLateral = 0;
+    this.goalieTargetLateral = 0;
+
     this.el.appendChild(group);
     this.goalEntity = group;
   },
@@ -588,6 +649,30 @@ AFRAME.registerComponent('soccer-game', {
     this.kickPower = power;
     this.kickDirection = direction.clone();
     this.kickGoalDetected = false;
+    this.goalieBlocked = false;
+    this.goalieReacted = false;
+    if (this.goalieReactionTimer) { clearTimeout(this.goalieReactionTimer); this.goalieReactionTimer = null; }
+    // Predict ball crossing point on goal plane and schedule goalie reaction
+    if (this.goalCenter && this.goalForward && this.goalRight) {
+      const toGoal  = new THREE.Vector3().subVectors(this.kickTo, this.kickFrom);
+      const denom   = toGoal.dot(this.goalForward);
+      if (Math.abs(denom) > 0.001) {
+        const toCenter   = new THREE.Vector3().subVectors(this.goalCenter, this.kickFrom);
+        const tCross     = toCenter.dot(this.goalForward) / denom;
+        if (tCross > 0 && tCross < 1.8) {
+          const crossing  = this.kickFrom.clone().add(toGoal.clone().multiplyScalar(tCross));
+          const crossRel  = crossing.clone().sub(this.goalCenter);
+          const predicted = crossRel.dot(this.goalRight);
+          const hw        = this.data.goalWidth / 2;
+          const noise     = (Math.random() - 0.5) * 2 * (1 - this.data.goalieAccuracy) * hw;
+          const target    = Math.max(-hw * 0.9, Math.min(hw * 0.9, predicted + noise));
+          this.goalieReactionTimer = setTimeout(() => {
+            this.goalieTargetLateral = target;
+            this.goalieReacted = true;
+          }, this.data.goalieReactionMs);
+        }
+      }
+    }
     this.isBouncing    = false;
     this.bouncesLeft   = 1;
     this.bounceStartMs = 0;
@@ -658,6 +743,16 @@ AFRAME.registerComponent('soccer-game', {
           this.lastGoalV = by / this.data.goalHeight;
           this.onGoal(this.classifyGoalZone(lateral, by));
         }
+        // Goalie block check (bounce path)
+        if (!this.kickGoalDetected && !this.goalieBlocked &&
+            Math.abs(alongFwd) <= 0.45 &&
+            Math.abs(lateral - this.goalieWorldLateral) < 0.38 &&
+            by > 0.05 && by < 1.55) {
+          const vy  = this.bounceVelY - 9.8 * bt;
+          this.startGoalieBlock(new THREE.Vector3(bx, by, bz), this.bounceVelX, vy, this.bounceVelZ);
+          this.kickRafId = requestAnimationFrame(this.tickKick);
+          return;
+        }
       }
       if (by <= this.data.ballRadius + 0.01) { this.onKickEnd(); return; }
       this.kickRafId = requestAnimationFrame(this.tickKick);
@@ -720,6 +815,30 @@ AFRAME.registerComponent('soccer-game', {
       const hit = this.checkPostCollision(new THREE.Vector3(x + cx, y, z + cz), t);
       if (hit) {
         this.startBounce(new THREE.Vector3(x + cx, y, z + cz), hit, t);
+        this.kickRafId = requestAnimationFrame(this.tickKick);
+        return;
+      }
+    }
+
+    // Goalie block check (normal kick path)
+    if (!this.kickGoalDetected && !this.goalieBlocked) {
+      const gRelX = (x + cx) - this.goalCenter.x;
+      const gRelZ = (z + cz) - this.goalCenter.z;
+      const gFwd  = gRelX * this.goalForward.x + gRelZ * this.goalForward.z;
+      const gLat  = gRelX * this.goalRight.x   + gRelZ * this.goalRight.z;
+      if (Math.abs(gFwd) <= 0.45 &&
+          Math.abs(gLat - this.goalieWorldLateral) < 0.38 &&
+          y > 0.05 && y < 1.55) {
+        const dur    = this.data.kickDurationMs / 1000;
+        const deased = 2.2 * Math.pow(1 - t, 1.2);
+        const ivx    = (this.kickTo.x - this.kickFrom.x) * deased / dur;
+        const ivz    = (this.kickTo.z - this.kickFrom.z) * deased / dur;
+        const peakT  = 0.38;
+        const dArc   = t < peakT
+          ?  Math.cos(Math.PI * 0.5 * t / peakT)             * (Math.PI * 0.5 / peakT)
+          : -Math.cos(Math.PI * 0.5 * (1 - t) / (1 - peakT)) * (Math.PI * 0.5 / (1 - peakT));
+        const ivy = this.kickArc * dArc / dur;
+        this.startGoalieBlock(new THREE.Vector3(x + cx, y, z + cz), ivx, ivy, ivz);
         this.kickRafId = requestAnimationFrame(this.tickKick);
         return;
       }
@@ -826,6 +945,7 @@ AFRAME.registerComponent('soccer-game', {
     if (navigator.vibrate) navigator.vibrate(12);
 
     // Flash hit post or crossbar orange for 350ms
+
     const lateralDot = (ballPos.x - this.goalCenter.x) * this.goalRight.x +
                        (ballPos.z - this.goalCenter.z) * this.goalRight.z;
     const flashEl = hit.normalY !== 0 ? this.crossbarEl
@@ -841,6 +961,32 @@ AFRAME.registerComponent('soccer-game', {
           }, 350);
         }
       });
+    }
+  },
+
+  startGoalieBlock: function (ballPos, ivx, ivy, ivz) {
+    this.goalieBlocked  = true;
+    this.isBouncing     = true;
+    this.bouncesLeft    = 0;
+    this.bounceFrom     = ballPos.clone();
+    this.bounceStartMs  = performance.now();
+
+    // Reflect incoming velocity off the goal plane (goalForward normal, pointing toward player)
+    const restitution = 0.45;
+    const nx  = -this.goalForward.x;
+    const nz  = -this.goalForward.z;
+    const dot = ivx * nx + ivz * nz;
+    this.bounceVelX = (ivx - 2 * dot * nx) * restitution;
+    this.bounceVelZ = (ivz - 2 * dot * nz) * restitution;
+    this.bounceVelY = Math.max(ivy * 0.3, 0) + 1.2;
+
+    if (navigator.vibrate) navigator.vibrate([15, 10, 25]);
+    this.showToast('Saved!', 'miss');
+
+    // Goalie punch / stretch animation
+    if (this.goalieEl) {
+      this.goalieEl.object3D.scale.set(1.28, 1.28, 1.28);
+      setTimeout(() => { if (this.goalieEl) this.goalieEl.object3D.scale.set(1, 1, 1); }, 300);
     }
   },
 
@@ -895,6 +1041,8 @@ AFRAME.registerComponent('soccer-game', {
   onKickEnd: function () {
     this.isBouncing = false;
     this.netCatchStartMs = 0;
+    if (this.goalieReactionTimer) { clearTimeout(this.goalieReactionTimer); this.goalieReactionTimer = null; }
+    this.goalieTargetLateral = 0; // goalie returns to center after each kick
     if (this.trailMeshes) {
       for (let i = 0; i < this.trailMeshes.length; i++) this.trailMeshes[i].visible = false;
       this.trailFill = 0;
@@ -902,7 +1050,9 @@ AFRAME.registerComponent('soccer-game', {
     }
     if (!this.kickGoalDetected) {
       this.streak = 0;
-      this.showToast('Miss — try again', 'miss');
+      if (!this.goalieBlocked) {
+        this.showToast('Miss — try again', 'miss');
+      }
       this.updateScore();
     }
     this.resetTimerId = setTimeout(() => {
@@ -958,6 +1108,12 @@ AFRAME.registerComponent('soccer-game', {
     this.leftPostEl = null;
     this.rightPostEl = null;
     this.crossbarEl = null;
+    this.goalieEl = null;
+    this.goalieWorldLateral = 0;
+    this.goalieTargetLateral = 0;
+    this.goalieBlocked = false;
+    this.goalieReacted = false;
+    if (this.goalieReactionTimer) { clearTimeout(this.goalieReactionTimer); this.goalieReactionTimer = null; }
     this.isBouncing = false;
     if (this.trailMeshes) {
       for (let i = 0; i < this.trailMeshes.length; i++) this.trailMeshes[i].visible = false;
@@ -986,6 +1142,7 @@ AFRAME.registerComponent('soccer-game', {
   },
 
   remove: function () {
+    if (this.goalieReactionTimer) { clearTimeout(this.goalieReactionTimer); this.goalieReactionTimer = null; }
     if (this.trailMeshes) {
       const geo = this.trailMeshes[0] && this.trailMeshes[0].geometry;
       for (let i = 0; i < this.trailMeshes.length; i++) {
@@ -1009,7 +1166,7 @@ AFRAME.registerComponent('soccer-game', {
     }
   },
 
-  tick: function () {
+  tick: function (time, timeDelta) {
     const now = performance.now();
     if (this.kickRingActive && this.kickRingMesh) {
       const age = (now - this.kickRingStartMs) / 600;
@@ -1028,6 +1185,23 @@ AFRAME.registerComponent('soccer-game', {
       } else {
         this._updateBurst(bt);
       }
+    }
+
+    // Goalie sliding
+    if (this.goalieEl && this.state !== 'idle') {
+      const dt = Math.min((timeDelta || 16) / 1000, 0.05);
+      const diff = this.goalieTargetLateral - this.goalieWorldLateral;
+      const maxStep = this.data.goalieSpeedMps * dt;
+      const prevLateral = this.goalieWorldLateral;
+      if (Math.abs(diff) <= maxStep) {
+        this.goalieWorldLateral = this.goalieTargetLateral;
+      } else {
+        this.goalieWorldLateral += Math.sign(diff) * maxStep;
+      }
+      // Negate: goal entity local +X = -goalRight in world space
+      this.goalieEl.object3D.position.x = -this.goalieWorldLateral;
+      const vel = dt > 0 ? (this.goalieWorldLateral - prevLateral) / dt : 0;
+      this.goalieEl.object3D.rotation.z = -vel * 0.09;
     }
   },
 
