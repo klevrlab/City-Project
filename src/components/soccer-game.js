@@ -430,51 +430,12 @@ AFRAME.registerComponent('soccer-game', {
     group.appendChild(netEl);
     this.netEl = netEl;
 
-    // Goalie — simple humanoid: head + torso + limbs
+    // Goalie — Sharkie mascot model
     const goalieGroup = document.createElement('a-entity');
-    goalieGroup.setAttribute('position', '0 0 0');
-
-    const head = document.createElement('a-sphere');
-    head.setAttribute('radius', '0.13');
-    head.setAttribute('material', 'color: #ffcc99; shader: flat');
-    head.setAttribute('position', '0 1.72 0');
-    goalieGroup.appendChild(head);
-
-    const body = document.createElement('a-box');
-    body.setAttribute('width', '0.38'); body.setAttribute('height', '0.52'); body.setAttribute('depth', '0.22');
-    body.setAttribute('material', 'color: #e74c3c; shader: flat');
-    body.setAttribute('position', '0 1.19 0');
-    goalieGroup.appendChild(body);
-
-    const leftArm = document.createElement('a-box');
-    leftArm.setAttribute('width', '0.13'); leftArm.setAttribute('height', '0.46'); leftArm.setAttribute('depth', '0.14');
-    leftArm.setAttribute('material', 'color: #e74c3c; shader: flat');
-    leftArm.setAttribute('position', '-0.27 1.17 0'); leftArm.setAttribute('rotation', '0 0 16');
-    goalieGroup.appendChild(leftArm);
-
-    const rightArm = document.createElement('a-box');
-    rightArm.setAttribute('width', '0.13'); rightArm.setAttribute('height', '0.46'); rightArm.setAttribute('depth', '0.14');
-    rightArm.setAttribute('material', 'color: #e74c3c; shader: flat');
-    rightArm.setAttribute('position', '0.27 1.17 0'); rightArm.setAttribute('rotation', '0 0 -16');
-    goalieGroup.appendChild(rightArm);
-
-    const shorts = document.createElement('a-box');
-    shorts.setAttribute('width', '0.36'); shorts.setAttribute('height', '0.28'); shorts.setAttribute('depth', '0.20');
-    shorts.setAttribute('material', 'color: #1a1a2e; shader: flat');
-    shorts.setAttribute('position', '0 0.87 0');
-    goalieGroup.appendChild(shorts);
-
-    const leftLeg = document.createElement('a-box');
-    leftLeg.setAttribute('width', '0.14'); leftLeg.setAttribute('height', '0.44'); leftLeg.setAttribute('depth', '0.14');
-    leftLeg.setAttribute('material', 'color: #ffcc99; shader: flat');
-    leftLeg.setAttribute('position', '-0.10 0.58 0');
-    goalieGroup.appendChild(leftLeg);
-
-    const rightLeg = document.createElement('a-box');
-    rightLeg.setAttribute('width', '0.14'); rightLeg.setAttribute('height', '0.44'); rightLeg.setAttribute('depth', '0.14');
-    rightLeg.setAttribute('material', 'color: #ffcc99; shader: flat');
-    rightLeg.setAttribute('position', '0.10 0.58 0');
-    goalieGroup.appendChild(rightLeg);
+    goalieGroup.setAttribute('position', '0 0 0.05');
+    goalieGroup.setAttribute('gltf-model', 'url(./assets/3D-models/sharkie_final_pose.glb)');
+    goalieGroup.setAttribute('scale', '0.7 0.7 0.7');
+    goalieGroup.setAttribute('rotation', '0 180 0');
 
     group.appendChild(goalieGroup);
     this.goalieEl = goalieGroup;
