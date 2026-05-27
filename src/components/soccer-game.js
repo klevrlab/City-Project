@@ -434,8 +434,8 @@ AFRAME.registerComponent('soccer-game', {
     const goalieGroup = document.createElement('a-entity');
     goalieGroup.setAttribute('position', '0 0 0.05');
     goalieGroup.setAttribute('gltf-model', 'url(./assets/3D-models/sharkie_final_pose.glb)');
-    goalieGroup.setAttribute('scale', '0.7 0.7 0.7');
-    goalieGroup.setAttribute('rotation', '0 180 0');
+    goalieGroup.setAttribute('scale', '0.3 0.3 0.3');
+    goalieGroup.setAttribute('rotation', '0 0 0');
 
     group.appendChild(goalieGroup);
     this.goalieEl = goalieGroup;
