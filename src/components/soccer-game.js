@@ -946,8 +946,9 @@ AFRAME.registerComponent('soccer-game', {
 
     // Goalie punch / stretch animation
     if (this.goalieEl) {
-      this.goalieEl.object3D.scale.set(1.28, 1.28, 1.28);
-      setTimeout(() => { if (this.goalieEl) this.goalieEl.object3D.scale.set(1, 1, 1); }, 300);
+      const s = this.goalieEl.object3D.scale.clone();
+      this.goalieEl.object3D.scale.set(s.x * 1.28, s.y * 1.28, s.z * 1.28);
+      setTimeout(() => { if (this.goalieEl) this.goalieEl.object3D.scale.copy(s); }, 300);
     }
   },
 
