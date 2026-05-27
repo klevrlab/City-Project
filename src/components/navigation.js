@@ -22,14 +22,6 @@ export function initNavigation() {
               </svg>
               Location Tour
           </a>
-          <a href="./marker-demo.html" class="nav-link">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                  <line x1="8" y1="21" x2="16" y2="21" />
-                  <line x1="12" y1="17" x2="12" y2="21" />
-              </svg>
-              Marker
-          </a>
           <a href="./selfie-ar.html" class="nav-link">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
