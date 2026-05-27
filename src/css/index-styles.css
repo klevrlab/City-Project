@@ -67,6 +67,14 @@
         .demo-link:active {
             transform: scale(0.95);
         }
+        .demo-link-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .demo-link-secondary {
+            background: linear-gradient(135deg, #1a1a2e, #006D75);
+        }
         .requirements {
             background: rgba(0, 169, 224, 0.1);
             border-left: 4px solid #00A9E0;
