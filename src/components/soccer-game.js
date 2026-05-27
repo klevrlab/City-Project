@@ -434,7 +434,7 @@ AFRAME.registerComponent('soccer-game', {
     const goalieGroup = document.createElement('a-entity');
     goalieGroup.setAttribute('position', '0 0 0.05');
     goalieGroup.setAttribute('gltf-model', 'url(./assets/3D-models/sharkie_final_pose.glb)');
-    goalieGroup.setAttribute('scale', '0.3 0.3 0.3');
+    goalieGroup.setAttribute('scale', '0.25 0.25 0.25');
     goalieGroup.setAttribute('rotation', '0 0 0');
 
     group.appendChild(goalieGroup);
@@ -611,29 +611,6 @@ AFRAME.registerComponent('soccer-game', {
     this.kickDirection = direction.clone();
     this.kickGoalDetected = false;
     this.goalieBlocked = false;
-    this.goalieReacted = false;
-    if (this.goalieReactionTimer) { clearTimeout(this.goalieReactionTimer); this.goalieReactionTimer = null; }
-    // Predict ball crossing point on goal plane and schedule goalie reaction
-    if (this.goalCenter && this.goalForward && this.goalRight) {
-      const toGoal  = new THREE.Vector3().subVectors(this.kickTo, this.kickFrom);
-      const denom   = toGoal.dot(this.goalForward);
-      if (Math.abs(denom) > 0.001) {
-        const toCenter   = new THREE.Vector3().subVectors(this.goalCenter, this.kickFrom);
-        const tCross     = toCenter.dot(this.goalForward) / denom;
-        if (tCross > 0 && tCross < 1.8) {
-          const crossing  = this.kickFrom.clone().add(toGoal.clone().multiplyScalar(tCross));
-          const crossRel  = crossing.clone().sub(this.goalCenter);
-          const predicted = crossRel.dot(this.goalRight);
-          const hw        = this.data.goalWidth / 2;
-          const noise     = (Math.random() - 0.5) * 2 * (1 - this.data.goalieAccuracy) * hw;
-          const target    = Math.max(-hw * 0.9, Math.min(hw * 0.9, predicted + noise));
-          this.goalieReactionTimer = setTimeout(() => {
-            this.goalieTargetLateral = target;
-            this.goalieReacted = true;
-          }, this.data.goalieReactionMs);
-        }
-      }
-    }
     this.isBouncing    = false;
     this.bouncesLeft   = 1;
     this.bounceStartMs = 0;
@@ -1004,7 +981,6 @@ AFRAME.registerComponent('soccer-game', {
     this.isBouncing = false;
     this.netCatchStartMs = 0;
     if (this.goalieReactionTimer) { clearTimeout(this.goalieReactionTimer); this.goalieReactionTimer = null; }
-    this.goalieTargetLateral = 0; // goalie returns to center after each kick
     if (this.trailMeshes) {
       for (let i = 0; i < this.trailMeshes.length; i++) this.trailMeshes[i].visible = false;
       this.trailFill = 0;
@@ -1149,20 +1125,14 @@ AFRAME.registerComponent('soccer-game', {
       }
     }
 
-    // Goalie sliding
+    // Goalie oscillation — simple left/right sine patrol
     if (this.goalieEl && this.state !== 'idle') {
-      const dt = Math.min((timeDelta || 16) / 1000, 0.05);
-      const diff = this.goalieTargetLateral - this.goalieWorldLateral;
-      const maxStep = this.data.goalieSpeedMps * dt;
+      const hw = this.data.goalWidth / 2;
       const prevLateral = this.goalieWorldLateral;
-      if (Math.abs(diff) <= maxStep) {
-        this.goalieWorldLateral = this.goalieTargetLateral;
-      } else {
-        this.goalieWorldLateral += Math.sign(diff) * maxStep;
-      }
-      // Negate: goal entity local +X = -goalRight in world space
+      this.goalieWorldLateral = Math.sin(time * 0.00085) * hw * 0.78;
       this.goalieEl.object3D.position.x = -this.goalieWorldLateral;
-      const vel = dt > 0 ? (this.goalieWorldLateral - prevLateral) / dt : 0;
+      const dt = Math.max(timeDelta || 16, 1) / 1000;
+      const vel = (this.goalieWorldLateral - prevLateral) / dt;
       this.goalieEl.object3D.rotation.z = -vel * 0.09;
     }
   },
