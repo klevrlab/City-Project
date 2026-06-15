@@ -10,6 +10,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         locationTour: resolve(__dirname, 'location-tour.html'),
+        muralAr8thwall: resolve(__dirname, 'mural-ar-8thwall.html'),
         selfieAr: resolve(__dirname, 'selfie-ar.html'),
         sharkAr8thwall: resolve(__dirname, 'shark-ar-8thwall.html'),
         sharkArDemo: resolve(__dirname, 'shark-ar-demo.html'),
