@@ -21,7 +21,7 @@ AFRAME.registerComponent('mural-geo-gate', {
   init: function () {
     this.started = false;
     this.inRange = false;
-    this.system = this.el.sceneEl.systems['mindar-image-system'];
+    this.system = null; // looked up lazily — may not be ready at init time
 
     this.statusEl = document.getElementById('mural-status');
     this.startBtn = document.getElementById('mural-start');
@@ -61,16 +61,23 @@ AFRAME.registerComponent('mural-geo-gate', {
     }
   },
 
-  // In range: reveal the Start button (camera needs a user tap on iOS).
+  _getSystem: function () {
+    if (!this.system) this.system = this.el.sceneEl.systems['mindar-image-system'];
+    return this.system;
+  },
+
+  // In range (or bypassed): reveal the Start button — the camera needs a user
+  // tap to start on iOS Safari.
   _arm: function (d) {
-    this.setStatus('You\'re here! Tap Start, then point at the mural.');
+    this.setStatus('Tap Start, then point your camera at the mural.');
     if (this.startBtn) this.startBtn.classList.add('visible');
   },
 
   _disarm: function (d) {
     if (this.startBtn) this.startBtn.classList.remove('visible');
-    if (this.system && this.started) {
-      try { this.system.stop(); } catch (e) {}
+    const sys = this._getSystem();
+    if (sys && this.started) {
+      try { sys.stop(); } catch (e) {}
       this.started = false;
     }
     this.setStatus('Walk to the mural — about ' + Math.round(d) + 'm away');
@@ -79,9 +86,15 @@ AFRAME.registerComponent('mural-geo-gate', {
   _onStartClick: function () {
     if (this.startBtn) this.startBtn.classList.remove('visible');
     this.setStatus('Point your camera at the mural');
-    if (this.system && !this.started) {
+    const sys = this._getSystem();
+    if (!sys) {
+      this.setStatus('Tracker still loading — tap Start again in a moment.');
+      if (this.startBtn) this.startBtn.classList.add('visible');
+      return;
+    }
+    if (!this.started) {
       try {
-        const p = this.system.start();
+        const p = sys.start();
         if (p && p.catch) p.catch(() => this.setStatus('Camera blocked — allow camera access and retry.'));
       } catch (e) {
         this.setStatus('Camera blocked — allow camera access and retry.');
