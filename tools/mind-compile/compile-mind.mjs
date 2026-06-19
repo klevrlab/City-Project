@@ -3,15 +3,19 @@ import path from 'path';
 import Jimp from 'jimp';
 import { OfflineCompiler } from 'mind-ar/src/image-target/offline-compiler.js';
 
-// Order defines targetIndex: 0 = front, 1 = back
+// Order defines targetIndex: 0 = front, 1 = back.
+// Compile from the full-res source PNGs, downscaled to MAX_WIDTH — higher
+// resolution than the 1200px markers gives finer features for tracking.
 const INPUTS = [
-  '../../assets/Markers/japan-am-front.jpg',
-  '../../assets/Markers/japan-am-back.jpg',
+  '../../assets/Japan-Am - Front BG.png',
+  '../../assets/Japan-Am - Back BG.png',
 ];
 const OUT = '../../assets/targets/japan-am.mind';
+const MAX_WIDTH = 1600;
 
 async function loadImage(p) {
   const img = await Jimp.read(p);
+  if (img.bitmap.width > MAX_WIDTH) img.resize(MAX_WIDTH, Jimp.AUTO);
   const { width, height, data } = img.bitmap; // RGBA Buffer
   return { width, height, __rgba: new Uint8ClampedArray(data) };
 }
