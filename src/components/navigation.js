@@ -22,6 +22,14 @@ export function initNavigation() {
               </svg>
               Location Tour
           </a>
+          <a href="./mural-ar.html" class="nav-link">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="M21 15l-5-5L5 21" />
+              </svg>
+              Living Mural
+          </a>
           <a href="./selfie-ar.html" class="nav-link">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />

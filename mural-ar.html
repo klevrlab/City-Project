@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Japantown Living Mural (Open-Source AR)</title>
+
+    <!-- Open-source stack: stock A-Frame + MindAR image tracking (no cloud, no backend) -->
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+    <!-- Project source -->
+    <script type="module" src="./src/utils/math-utils.js"></script>
+    <script type="module" src="./src/utils/audio-utils.js"></script>
+    <script type="module" src="./src/components/mural-geo-gate.js"></script>
+    <script type="module" src="./src/components/mural-plane.js"></script>
+
+    <link rel="stylesheet" href="./src/css/mural-ar-styles.css" />
+</head>
+
+<body>
+    <div id="topbar">
+        <a href="./index.html" class="back" aria-label="Back to home">&larr;</a>
+        <h1>Japantown Living Mural</h1>
+    </div>
+
+    <div id="mural-status" class="visible">Finding your location…</div>
+    <button id="mural-start">Start</button>
+
+    <!--
+      MindAR scene. autoStart:false so the GPS gate controls when the camera
+      turns on. Compile the two mural photos into assets/targets/japan-am.mind
+      (targetIndex 0 = front, 1 = back).
+    -->
+    <a-scene
+        mindar-image="imageTargetSrc: ./assets/targets/japan-am.mind; autoStart: false; uiScanning: no; uiLoading: no; maxTrack: 1; filterMinCF: 0.0001; filterBeta: 0.001"
+        mural-geo-gate="lat: 37.334900; lng: -121.894400; radius: 40"
+        color-space="sRGB"
+        renderer="colorManagement: true; physicallyCorrectLights: true"
+        vr-mode-ui="enabled: false"
+        device-orientation-permission-ui="enabled: false">
+
+        <a-assets>
+            <!-- Placeholder animation — swap src for the real animated mural mp4s.
+                 muted + playsinline are required for iOS autoplay. -->
+            <video id="muralVideoFront" src="./assets/video.mp4" preload="auto" loop muted playsinline crossorigin="anonymous"></video>
+            <video id="muralVideoBack"  src="./assets/video.mp4" preload="auto" loop muted playsinline crossorigin="anonymous"></video>
+        </a-assets>
+
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+        <!-- Front relief panel (targetIndex 0). Plane width 1 = mural width;
+             height = 1349/3336 = 0.4045 to match the photo aspect. -->
+        <a-entity mindar-image-target="targetIndex: 0" mural-plane="video: #muralVideoFront">
+            <a-plane width="1" height="0.4045"
+                     material="shader: flat; src: #muralVideoFront; side: double"></a-plane>
+        </a-entity>
+
+        <!-- Back relief panel (targetIndex 1). -->
+        <a-entity mindar-image-target="targetIndex: 1" mural-plane="video: #muralVideoBack">
+            <a-plane width="1" height="0.4045"
+                     material="shader: flat; src: #muralVideoBack; side: double"></a-plane>
+        </a-entity>
+    </a-scene>
+
+    <!-- Navigation Component -->
+    <script type="module">
+        import { initNavigation } from './src/components/navigation.js';
+        initNavigation();
+    </script>
+</body>
+
+</html>
