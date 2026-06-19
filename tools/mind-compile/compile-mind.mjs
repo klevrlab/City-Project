@@ -3,12 +3,16 @@ import path from 'path';
 import Jimp from 'jimp';
 import { OfflineCompiler } from 'mind-ar/src/image-target/offline-compiler.js';
 
-// Order defines targetIndex: 0 = front, 1 = back.
-// Compile from the full-res source PNGs, downscaled to MAX_WIDTH — higher
-// resolution than the 1200px markers gives finer features for tracking.
+// Order defines targetIndex:
+//   0 = front panel (full-res)
+//   1 = back panel (full-res)
+//   2 = front panel alt (BG1 — smaller reference photo)
+//   3 = back panel alt (BG1 — smaller reference photo)
 const INPUTS = [
   '../../assets/Japan-Am - Front BG.png',
   '../../assets/Japan-Am - Back BG.png',
+  '../../assets/Japan-Am - Front BG1.png',
+  '../../assets/Japan-Am - Back BG1.png',
 ];
 const OUT = '../../assets/targets/japan-am.mind';
 const MAX_WIDTH = 1600;
