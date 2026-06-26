@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Soccer AR Prototype (8th Wall)</title>
+
+    <!-- 8th Wall Engine & Extras (2026 Distributed Engine) -->
+    <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" crossorigin="anonymous" data-preload-chunks="slam" async></script>
+    <script src="https://cdn.8thwall.com/web/aframe/8frame-1.5.0.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js" crossorigin="anonymous" async></script>
+
+    <!-- Project Source -->
+    <script type="module" src="./src/utils/audio-utils.js"></script>
+    <script type="module" src="./src/utils/math-utils.js"></script>
+    <script type="module" src="./src/components/soccer-game.js"></script>
+    <script type="module" src="./src/components/net-shader.js"></script>
+    <script type="module" src="./src/components/ball-shader.js"></script>
+    <script type="module" src="./src/app.js"></script>
+
+    <link rel="stylesheet" href="./src/css/soccer-ar-8thwall-styles.css" />
+</head>
+
+<body>
+    <div id="topbar">
+        <a href="./index.html" class="back" aria-label="Back to home">&larr;</a>
+        <h1>Soccer AR Prototype</h1>
+        <span id="timer" class="pill" data-ui-overlay>00:30</span>
+        <span id="score" class="pill" data-ui-overlay>Goals 0 / 0</span>
+    </div>
+
+    <div id="tap-instruction">Loading AR&hellip;</div>
+    <div id="toast"></div>
+
+    <button id="reset-btn" class="pill" data-ui-overlay>Reset</button>
+
+    <!-- 8th Wall A-Frame scene -->
+    <a-scene id="xrscene"
+        xrextras-almost-there
+        xrextras-runtime-error
+        xrextras-loading
+        xrweb
+        vr-mode-ui="enabled: false"
+        cursor="rayOrigin: mouse"
+        raycaster="objects: .clickable"
+        renderer="antialias: true; alpha: true; logarithmicDepthBuffer: true; colorManagement: true;">
+
+        <!-- Lighting + shadows -->
+        <a-entity light="type: ambient; intensity: 0.55;"></a-entity>
+        <a-entity light="type: directional; castShadow: true; intensity: 0.85; shadowMapHeight: 2048; shadowMapWidth: 2048; shadowCameraTop: 15; shadowCameraBottom: -15; shadowCameraRight: 15; shadowCameraLeft: -15; target: #camera" position="5 10 5"></a-entity>
+
+        <!-- Shadow Ground Plane (Clickable for placement) -->
+        <a-plane id="ground" class="clickable" position="0 0 0" rotation="-90 0 0" width="1000" height="1000" material="shader: shadow; opacity: 0.4;" shadow="receive: true"></a-plane>
+
+        <!-- Soccer field root -->
+        <a-entity id="soccer-root" position="0 0 0" soccer-game></a-entity>
+
+        <a-camera id="camera" position="0 1.6 0"></a-camera>
+    </a-scene>
+
+    <script>
+        window.addEventListener('xrloaded', () => {
+            console.log('8th Wall Engine Loaded — Soccer Prototype');
+        });
+    </script>
+
+    <!-- Navigation Component -->
+    <script type="module">
+        import { initNavigation } from './src/components/navigation.js';
+        initNavigation();
+    </script>
+</body>
+
+</html>
