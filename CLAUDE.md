@@ -15,7 +15,7 @@ WebAR platform for the Sharks Way corridor between downtown San José and SAP Ce
 ```
 city-project/
 ├── index.html                  # Landing / hub page
-├── sharks-way.html             # AR.js + TensorFlow shark detection
+├── sharks-way.html             # Redirect → shark-ar-8thwall.html (MobileNet page retired)
 ├── shark-ar-8thwall.html       # 8th Wall WebAR (GPS-triggered, 5 shark experiences)
 ├── shark-ar-demo.html          # Demo / sandbox
 ├── location-tour.html          # GPS checkpoint tour (Leaflet.js)
@@ -85,7 +85,7 @@ city-project/
 
 ## AR Experiences
 
-1. **sharks-way.html** — TF.js + MobileNet AI shark painting detection
+1. ~~**sharks-way.html** — TF.js + MobileNet AI shark painting detection~~ — **retired**; the MobileNet page now redirects to `shark-ar-8thwall.html` (the public `sharks-way.html` URL is preserved for the SJSU landing-page link).
 2. **shark-ar-8thwall.html** — 8th Wall GPS-triggered Wayfinding cycle. Per the **June 10, 2026 redline**, the cycle is **Maria + Jimmy only**, appearing alternately on detection (approach from behind → pause → swim off, no tap). Tapping the ground "drops a shark" — a single Jimmy that loops in place and stays so visitors can walk around it. Stella, Sharkie Waving, and the Diving Shark were removed from this cycle (Sharkie → selfie feature; Diving → future jump locations; Stella → retired).
 3. **location-tour.html** — Leaflet.js GPS checkpoint tour along the corridor
 4. **selfie-ar.html** — MediaPipe shoulder-mount selfie with Sammy Spartan / Sharkie
@@ -119,7 +119,7 @@ city-project/
 ## Development Notes
 
 - No test suite (`npm test` is a placeholder).
-- CSS is per-page (e.g. `src/css/sharks-way-styles.css` for `sharks-way.html`) plus `shared-styles.css`.
+- CSS is per-page (e.g. `src/css/shark-ar-8thwall-styles.css` for `shark-ar-8thwall.html`) plus `shared-styles.css`.
 - `src/app.js` is the 8th Wall entry point; other HTML pages inline or script-tag their own logic.
 - `8w-distributed-engine/` is currently a placeholder (`.gitkeep`).
 - Docs: `ARCHITECTURE.md` (system design), `DEPLOYMENT.md` (hosting guide).

@@ -36,30 +36,30 @@ npx localtunnel --port 8080
 
 ## AR Experiences
 
-### 1. Sharks Way (AR.js)
-**File:** `sharks-way.html`
-**Tech:** TensorFlow.js + MobileNet
-AI-powered shark painting detection with the always-on Little Italy shark rotation.
-
-### 2. Sharks Way (8th Wall)
-**File:** `shark-ar-8thwall.html`
+### 1. Sharks Way (8th Wall)
+**File:** `shark-ar-8thwall.html` (also served at the legacy `sharks-way.html` URL via redirect)
 **Tech:** 8th Wall WebAR + A-Frame
-GPS-triggered cycle of five animated shark experiences (Maria Swimmer, Stella Swimmer, Jimmy Swimmer, Sharkie Waving, Diving Shark) with an always-on rotation in the Little Italy zone.
+GPS-triggered Wayfinding cycle — Maria and Jimmy sharks appear alternately and swim through (no tap needed). Tapping the ground "drops" a Jimmy that loops in place so visitors can walk around it.
 
-### 3. Location Tour
+### 2. Location Tour
 **File:** `location-tour.html`
 **Tech:** Geolocation API + Leaflet.js
 GPS-based checkpoint tracking with interactive map and directional navigation along the Sharks Way corridor.
 
-### 4. Selfie AR
+### 3. Selfie AR
 **File:** `selfie-ar.html`
 **Tech:** MediaPipe Pose
 Shoulder tracking to position Sammy Spartan or Sharkie on the user's shoulder for selfie capture.
 
-### 5. Marker Demo
-**File:** `marker-demo.html`
-**Tech:** AR.js + A-Frame
-Point camera at the marker to see a 3D shark with event info.
+### 4. Japantown Living Mural
+**File:** `mural-ar.html`
+**Tech:** MindAR image tracking + GPS gate
+Open-source image-target AR over the Japanese American Internment Memorial reliefs — point the camera at a panel to play an animated overlay.
+
+### 5. Soccer AR
+**File:** `soccer-ar-8thwall.html`
+**Tech:** 8th Wall WebAR + A-Frame
+Swipe-to-kick soccer mini-game with a procedural net, post/crossbar bounce, and a Sharkie goalie.
 
 ## Requirements
 
