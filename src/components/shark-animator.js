@@ -27,6 +27,13 @@ AFRAME.registerComponent('shark-animator', {
     // Extra world-space lift so geometry stays clearly above the shadow receiver.
     this.FLOOR_CLEARANCE = 0.03;
 
+    // June 10, 2026 redline — Wayfinding Shark Mode is Maria & Jimmy only,
+    // appearing alternately each time a shark is detected: they approach as if
+    // from behind the viewer, pause in front, then swim off (no tap needed).
+    // Stella, Sharkie Waving, and the Diving Shark were removed from this cycle
+    // (Sharkie → selfie feature, Diving → select jump locations, Stella → retired).
+    // Only the 'enterCenter' motion branch is exercised now; the other branches
+    // in runAnimationPhases are kept for the upcoming jump-location experiences.
     this.experiences = [
       {
         label: 'Maria Swimmer',
@@ -37,46 +44,25 @@ AFRAME.registerComponent('shark-animator', {
         rotationOffsetY: 0
       },
       {
-        label: 'Stella Swimmer',
-        model: '#stella-swimmer',
-        motion: 'enterCenter',
-        y: 0.28,
-        scale: '0.38 0.38 0.38',
-        rotationOffsetY: 0
-      },
-      {
         label: 'Jimmy Swimmer',
         model: '#jimmy-swimmer',
-        motion: 'riseFromGround',
-        y: 1.0,
-        scale: '0.4 0.4 0.4',
-        rotationOffsetY: 0
-      },
-      {
-        label: 'Sharkie Waving',
-        model: '#sharkie-wave',
-        motion: 'wavePose',
-        y: 0.26,
-        scale: '0.55 0.55 0.55',
-        rotationOffsetY: 0
-      },
-      {
-        label: 'Diving Shark',
-        model: '#diving-shark',
-        motion: 'diveArc',
-        y: 0.65,
-        scale: '0.42 0.42 0.42',
+        motion: 'enterCenter',
+        y: 0.28,
+        scale: '0.40 0.40 0.40',
         rotationOffsetY: 0
       }
     ];
 
     this.createMarker();
 
+    // Tapping the ground "drops" a single Jimmy that loops its swim animation in
+    // place and stays put so visitors can walk around it (redline "drop a shark").
+    // Auto-detection still drives the alternating Maria/Jimmy swim-through cycle.
     const ground = document.getElementById('ground');
     if (ground) {
       ground.addEventListener('click', (e) => {
         const pt = e.detail.intersection.point;
-        this.spawnAtTarget(pt);
+        this.dropShark(pt);
       });
     }
 
@@ -179,14 +165,91 @@ AFRAME.registerComponent('shark-animator', {
     const root = document.getElementById('shark-root');
     if (root) root.setAttribute('visible', 'true');
 
+    // Once a shark is detected, surface the "drop a shark" prompt rather than
+    // hiding the overlay — tapping the ground places a Jimmy that stays put.
     const instruction = document.getElementById('tap-instruction');
-    if (instruction) instruction.classList.remove('visible');
+    if (instruction) {
+      instruction.textContent = 'Tap the ground to drop your own shark';
+      instruction.classList.add('visible');
+    }
 
     if (this.targetMarker) {
       this.targetMarker.setAttribute('position', `${this.currentTarget.x} ${this.currentTarget.y + 0.05} ${this.currentTarget.z}`);
     }
 
     this.cycleNext(this.currentTarget);
+  },
+
+  // "Drop a shark" (redline): place a single Jimmy at the tapped point that rises
+  // out of the ground and loops its swim animation in place — it never swims away,
+  // so visitors can circle it. Replaces any running swim-through cycle.
+  dropShark: function (targetPoint) {
+    if (!targetPoint) return;
+    this.stopCycle();          // clear any active swim-through + its timers
+    this.isRunning = false;    // dropped shark is standalone, not part of the cycle
+
+    const root = document.getElementById('shark-root');
+    if (root) root.setAttribute('visible', 'true');
+
+    const instruction = document.getElementById('tap-instruction');
+    if (instruction) instruction.classList.remove('visible');
+    if (this.targetMarker) this.targetMarker.setAttribute('position', '0 -1000 0');
+
+    const x = targetPoint.x;
+    const z = targetPoint.z;
+    const startY = -0.6;
+    const hoverY = 0.95;
+
+    // Face the dropped shark toward the viewer.
+    let facingYaw = 0;
+    const cam = document.getElementById('camera');
+    if (cam) {
+      const dir = new THREE.Vector3().subVectors(targetPoint, cam.object3D.position);
+      dir.y = 0;
+      if (dir.lengthSq() > 0.01) facingYaw = Math.atan2(dir.x, dir.z) * (180 / Math.PI);
+    }
+
+    const ent = document.createElement('a-entity');
+    ent.addEventListener('model-loaded', () => {
+      this.alignGltfBottomToOrigin(ent);
+      ent.setAttribute('visible', 'true');
+      ent.setAttribute('animation__rise', {
+        property: 'position',
+        from: `${x} ${startY} ${z}`,
+        to: `${x} ${hoverY} ${z}`,
+        dur: 1600,
+        easing: 'easeOutCubic'
+      });
+      // Gentle hover bob in place once risen — loops forever, never swims off.
+      this.queue(() => {
+        if (this.activeEntity !== ent) return;
+        ent.setAttribute('animation__hoverBob', {
+          property: 'position',
+          from: `${x} ${(hoverY - 0.1).toFixed(3)} ${z}`,
+          to: `${x} ${(hoverY + 0.1).toFixed(3)} ${z}`,
+          dir: 'alternate',
+          loop: true,
+          dur: 1400,
+          easing: 'easeInOutSine'
+        });
+      }, 1600);
+    }, { once: true });
+
+    ent.addEventListener('model-error', () => {
+      console.warn('Failed to load dropped Jimmy model');
+    }, { once: true });
+
+    ent.setAttribute('gltf-model', '#jimmy-swimmer');
+    ent.setAttribute('animation-mixer', 'loop: repeat; timeScale: 1.0; crossFadeDuration: 0.35;');
+    ent.setAttribute('scale', '0.40 0.40 0.40');
+    ent.setAttribute('position', `${x} ${startY} ${z}`);
+    ent.setAttribute('rotation', `0 ${facingYaw} 0`);
+    ent.setAttribute('visible', 'false');
+    ent.setAttribute('shadow', 'cast: true');
+    ent.setAttribute('data-experience', 'Dropped Jimmy');
+
+    this.el.appendChild(ent);
+    this.activeEntity = ent;
   },
 
   cycleNext: function (targetPoint) {

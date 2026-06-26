@@ -80,16 +80,18 @@ city-project/
 - **GPS checkpoint radius:** 50 meters; Haversine formula in `shared-gps-tracking.js`.
 - **Shark AI detection threshold:** cosine similarity ≥ 0.55 against pre-computed MobileNet embeddings in `data/shark-embeddings-browser.json`.
 - **Selfie AR shoulder target:** MediaPipe landmark 12 (right shoulder), offset X+50px / Y-70px.
-- **8th Wall GPS zone:** "Little Italy" always-on rotation + 5 GPS-triggered shark cycles.
+- **8th Wall Wayfinding cycle (June 10 redline):** Maria + Jimmy alternating swim-throughs on GPS detection; ground-tap "drops" a stationary looping Jimmy. (Little Italy is slated to swap its always-on shark rotation for always-on marble statues pointing toward SAP — blocked on Athena / Augustus GLB assets.)
 - **HTTPS required** for camera and GPS (use localtunnel or ngrok for mobile testing).
 
 ## AR Experiences
 
 1. **sharks-way.html** — TF.js + MobileNet AI shark painting detection
-2. **shark-ar-8thwall.html** — 8th Wall GPS-triggered 5-shark cycle (Maria, Stella, Jimmy, Sharkie Waving, Diving Shark)
+2. **shark-ar-8thwall.html** — 8th Wall GPS-triggered Wayfinding cycle. Per the **June 10, 2026 redline**, the cycle is **Maria + Jimmy only**, appearing alternately on detection (approach from behind → pause → swim off, no tap). Tapping the ground "drops a shark" — a single Jimmy that loops in place and stays so visitors can walk around it. Stella, Sharkie Waving, and the Diving Shark were removed from this cycle (Sharkie → selfie feature; Diving → future jump locations; Stella → retired).
 3. **location-tour.html** — Leaflet.js GPS checkpoint tour along the corridor
 4. **selfie-ar.html** — MediaPipe shoulder-mount selfie with Sammy Spartan / Sharkie
-5. **marker-demo.html** — AR.js Hiro/custom marker → 3D shark + event info
+5. **mural-ar.html** — Japantown Living Mural: open-source MindAR image tracking + GPS gate (4 compiled targets in `assets/targets/japan-am.mind`)
+
+> Note: the AR.js marker demo (`marker-demo.html`) was removed during the Phase II consolidation.
 
 ## 3D Models (assets/3D-models/)
 

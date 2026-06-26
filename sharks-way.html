@@ -51,8 +51,9 @@
         
     </div>
 
-    <!-- Tap Instruction Overlay -->
-    <div id="tap-instruction">Tap the ground to bring a shark to life</div>
+    <!-- Tap Instruction Overlay. Sharks auto-appear along Sharks Way (no tap
+         needed); once one is detected this updates to the "drop a shark" prompt. -->
+    <div id="tap-instruction">Sharks appear automatically along Sharks Way — point your camera around</div>
 
     <!-- Navigation Menu -->
     <div class="stop-item" data-checkpoint="A" id="checkpoint-a">
@@ -107,11 +108,9 @@
         tour-ui shark-detector="useGps: true">
 
         <a-assets>
+            <!-- June 10 redline: Wayfinding cycle is Maria + Jimmy only. -->
             <a-asset-item id="maria-swimmer" src="./assets/3D-models/SEAN_ANIMATED_WiTH_MARIA_SHARK.glb"></a-asset-item>
             <a-asset-item id="jimmy-swimmer" src="./assets/3D-models/jimmy-shark-swimmer.glb"></a-asset-item>
-            <a-asset-item id="sharkie-wave" src="./assets/3D-models/sharkieflipped.glb"></a-asset-item>
-            <a-asset-item id="diving-shark" src="./assets/3D-models/maria-shark-jump-jimmy-txtr.glb"></a-asset-item>
-            <a-asset-item id="stella-swimmer" src="./assets/3D-models/StellaFlipped.glb"></a-asset-item>
         </a-assets>
 
         <!-- Lighting for AR Shadows -->
