@@ -36,11 +36,12 @@
 
     <!--
       MindAR scene. autoStart:false so the GPS gate controls when the camera
-      turns on. Compile the two mural photos into assets/targets/japan-am.mind
-      (targetIndex 0 = front, 1 = back).
+      turns on. assets/targets/japan-am.mind holds a single compiled target
+      (the front relief) — recompile via `npm run compile-targets` in
+      tools/mind-compile/ when better on-site photos are available.
     -->
     <a-scene
-        mindar-image="imageTargetSrc: ./assets/targets/japan-am.mind; autoStart: false; uiScanning: no; uiLoading: no; maxTrack: 1; missTolerance: 30; warmupTolerance: 1; filterMinCF: 0.001; filterBeta: 0.05"
+        mindar-image="imageTargetSrc: ./assets/targets/japan-am.mind; autoStart: false; uiScanning: no; uiLoading: no; maxTrack: 1; missTolerance: 30; warmupTolerance: 2; filterMinCF: 0.001; filterBeta: 0.05"
         mural-geo-gate="lat: 37.334900; lng: -121.894400; radius: 40; bypass: true"
         color-space="sRGB"
         renderer="colorManagement: true; physicallyCorrectLights: true"
@@ -48,39 +49,20 @@
         device-orientation-permission-ui="enabled: false">
 
         <a-assets>
-            <!-- Placeholder animation — swap src for the real animated mural mp4s.
+            <!-- Placeholder animation — swap src for the real animated mural mp4.
                  muted + playsinline are required for iOS autoplay. -->
-            <video id="muralVideoFront"  src="./assets/video.mp4" preload="auto" loop muted playsinline crossorigin="anonymous"></video>
-            <video id="muralVideoBack"   src="./assets/video.mp4" preload="auto" loop muted playsinline crossorigin="anonymous"></video>
-            <video id="muralVideoFront1" src="./assets/video.mp4" preload="auto" loop muted playsinline crossorigin="anonymous"></video>
-            <video id="muralVideoBack1"  src="./assets/video.mp4" preload="auto" loop muted playsinline crossorigin="anonymous"></video>
+            <video id="muralVideoFront" src="./assets/video.mp4" preload="auto" loop muted playsinline crossorigin="anonymous"></video>
         </a-assets>
 
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-        <!-- Front relief panel (targetIndex 0). Plane width 1 = mural width;
-             height = 1349/3336 = 0.4045 to match the photo aspect. -->
+        <!-- Single target: the front relief panel (targetIndex 0). Multiple
+             similar-looking bronze panels cross-matched and caused phantom
+             locks, so the experience tracks only this one. Plane width 1 =
+             mural width; height = 1349/3336 = 0.4045 to match the photo. -->
         <a-entity mindar-image-target="targetIndex: 0" mural-plane="video: #muralVideoFront">
             <a-plane width="1" height="0.4045"
                      material="shader: flat; src: #muralVideoFront; side: double"></a-plane>
-        </a-entity>
-
-        <!-- Back relief panel (targetIndex 1). -->
-        <a-entity mindar-image-target="targetIndex: 1" mural-plane="video: #muralVideoBack">
-            <a-plane width="1" height="0.4045"
-                     material="shader: flat; src: #muralVideoBack; side: double"></a-plane>
-        </a-entity>
-
-        <!-- Front panel alt photo (targetIndex 2, BG1 — 566×227, aspect 0.4011). -->
-        <a-entity mindar-image-target="targetIndex: 2" mural-plane="video: #muralVideoFront1">
-            <a-plane width="1" height="0.4011"
-                     material="shader: flat; src: #muralVideoFront1; side: double"></a-plane>
-        </a-entity>
-
-        <!-- Back panel alt photo (targetIndex 3, BG1 — 579×237, aspect 0.4093). -->
-        <a-entity mindar-image-target="targetIndex: 3" mural-plane="video: #muralVideoBack1">
-            <a-plane width="1" height="0.4093"
-                     material="shader: flat; src: #muralVideoBack1; side: double"></a-plane>
         </a-entity>
     </a-scene>
 

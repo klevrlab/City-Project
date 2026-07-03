@@ -3,16 +3,13 @@ import path from 'path';
 import Jimp from 'jimp';
 import { OfflineCompiler } from 'mind-ar/src/image-target/offline-compiler.js';
 
-// Order defines targetIndex:
-//   0 = front panel (full-res)
-//   1 = back panel (full-res)
-//   2 = front panel alt (BG1 — smaller reference photo)
-//   3 = back panel alt (BG1 — smaller reference photo)
+// Order defines targetIndex. Single target: multiple similar-looking bronze
+// panels cross-matched and multiplied false positives, so the experience now
+// tracks only the front relief (targetIndex 0).
+// On-site phone photos of the actual panel (straight-on, full frame, no
+// glare) will beat the source artwork — swap them in here when available.
 const INPUTS = [
   '../../assets/Japan-Am - Front BG.png',
-  '../../assets/Japan-Am - Back BG.png',
-  '../../assets/Japan-Am - Front BG1.png',
-  '../../assets/Japan-Am - Back BG1.png',
 ];
 const OUT = '../../assets/targets/japan-am.mind';
 const MAX_WIDTH = 1600;

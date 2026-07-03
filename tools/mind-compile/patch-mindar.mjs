@@ -33,25 +33,28 @@ const PATCHES = [
   },
   {
     // Minimum geometrically-consistent matches to accept a detection.
-    // 4 is the mathematical floor for a homography. (default 6)
+    // NOTE: 4 is degenerate — any 4 matches fit a homography exactly, which
+    // made detection fire on empty scenes (phantom panels). 5 is the loosest
+    // non-degenerate value. (default 6)
     file: 'image-target/matching/matching.js',
     from: 'const MIN_NUM_INLIERS = 6;',
-    to: 'const MIN_NUM_INLIERS = 4;'
+    to: 'const MIN_NUM_INLIERS = 5;'
   },
   {
     // RANSAC reprojection tolerance when counting inliers — higher accepts
     // sloppier geometry (curved/glossy bronze relief, oblique angles). (default 3)
     file: 'image-target/matching/matching.js',
     from: 'const INLIER_THRESHOLD = 3;',
-    to: 'const INLIER_THRESHOLD = 6;'
+    to: 'const INLIER_THRESHOLD = 5;'
   },
   // ── Frame-to-frame tracking (runs on the main thread) ──────────────────
   {
     // Normalized cross-correlation cutoff for tracked template points. Lower
-    // keeps the lock through glare, hands, and motion blur. (default 0.8)
+    // keeps the lock through glare, hands, and motion blur — but too low
+    // (0.55) let phantom locks "track" random surfaces forever. (default 0.8)
     file: 'image-target/tracker/tracker.js',
     from: 'const AR2_SIM_THRESH = 0.8;',
-    to: 'const AR2_SIM_THRESH = 0.55;'
+    to: 'const AR2_SIM_THRESH = 0.62;'
   },
   // ── Pose refinement acceptance (controller web worker) ─────────────────
   {
@@ -59,7 +62,7 @@ const PATCHES = [
     // and the target drops. Higher rides out wobbly frames. (default 5.0)
     file: 'image-target/estimation/refine-estimate.js',
     from: 'const TRACKING_THRESH = 5.0; // default',
-    to: 'const TRACKING_THRESH = 10.0; // default'
+    to: 'const TRACKING_THRESH = 8.0; // default'
   }
 ];
 
