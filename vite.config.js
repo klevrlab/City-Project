@@ -1,10 +1,36 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import { cpSync, existsSync, readdirSync } from 'fs';
+
+// Vite only bundles files it can trace from module imports / known HTML
+// attributes. Everything the AR pages fetch at runtime — GLB models,
+// compiled .mind targets, the vendored MindAR build, JSON data — is invisible
+// to it, so without this copy step the deployed site 404s on all of them.
+function copyStaticAssets() {
+  return {
+    name: 'copy-static-assets',
+    closeBundle() {
+      const outDir = resolve(__dirname, 'dist');
+      for (const dir of ['assets', 'data']) {
+        const src = resolve(__dirname, dir);
+        if (existsSync(src)) cpSync(src, resolve(outDir, dir), { recursive: true });
+      }
+      // Root-level runtime files (mascot GLBs for the selfie pages, marker patterns).
+      for (const f of readdirSync(__dirname)) {
+        if (f.endsWith('.glb') || f.endsWith('.patt')) {
+          cpSync(resolve(__dirname, f), resolve(outDir, f));
+        }
+      }
+      console.log('✓ copied static assets (assets/, data/, root GLB/patt) into dist/');
+    }
+  };
+}
 
 export default defineConfig({
   // Base public path when served in development or production.
   // We use relative paths './' because GitHub pages often serves from a subdirectory (e.g. username.github.io/repo-name)
-  base: './', 
+  base: './',
+  plugins: [copyStaticAssets()],
   build: {
     rollupOptions: {
       input: {

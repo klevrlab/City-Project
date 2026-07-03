@@ -89,7 +89,7 @@ city-project/
 2. **shark-ar-8thwall.html** — 8th Wall GPS-triggered Wayfinding cycle. Per the **June 10, 2026 redline**, the cycle is **Maria + Jimmy only**, appearing alternately on detection (approach from behind → pause → swim off, no tap). Tapping the ground "drops a shark" — a single Jimmy that loops in place and stays so visitors can walk around it. Stella, Sharkie Waving, and the Diving Shark were removed from this cycle (Sharkie → selfie feature; Diving → future jump locations; Stella → retired).
 3. **location-tour.html** — Leaflet.js GPS checkpoint tour along the corridor
 4. **selfie-ar.html** — MediaPipe shoulder-mount selfie with Sammy Spartan / Sharkie
-5. **mural-ar.html** — Japantown Living Mural: open-source MindAR image tracking + GPS gate (4 compiled targets in `assets/targets/japan-am.mind`)
+5. **mural-ar.html** — Japantown Living Mural: open-source MindAR image tracking + GPS gate (4 compiled targets in `assets/targets/japan-am.mind`). Loads a **custom loose-threshold MindAR build** (`assets/vendor/mindar-image-aframe.custom.js`, rebuilt via `npm run build-tracker` in `tools/mind-compile/`) — detection/tracking confidence gates are deliberately permissive ("always shows something" > "always the right panel"), and `mural-plane.js` holds the last pose for 2.5s after tracking drops.
 
 > Note: the AR.js marker demo (`marker-demo.html`) was removed during the Phase II consolidation.
 
@@ -119,6 +119,7 @@ city-project/
 ## Development Notes
 
 - No test suite (`npm test` is a placeholder).
+- `vite.config.js` has a `copyStaticAssets` plugin that copies `assets/`, `data/`, and root GLB/patt files into `dist/` — vite can't trace runtime fetches (GLBs, `.mind`, JSON), so without it the deployed site 404s on all of them.
 - CSS is per-page (e.g. `src/css/shark-ar-8thwall-styles.css` for `shark-ar-8thwall.html`) plus `shared-styles.css`.
 - `src/app.js` is the 8th Wall entry point; other HTML pages inline or script-tag their own logic.
 - `8w-distributed-engine/` is currently a placeholder (`.gitkeep`).

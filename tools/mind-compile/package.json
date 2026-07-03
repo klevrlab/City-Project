@@ -1,9 +1,11 @@
 {
   "name": "mind-compile",
   "version": "1.0.0",
-  "description": "",
+  "description": "MindAR tooling: offline .mind target compiler + patched loose-threshold tracker bundle",
   "main": "index.js",
   "scripts": {
+    "compile-targets": "node compile-mind.mjs",
+    "build-tracker": "node patch-mindar.mjs && vite build --config vite.mindar.config.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -12,5 +14,8 @@
   "dependencies": {
     "jimp": "^0.22.12",
     "mind-ar": "^1.2.5"
+  },
+  "devDependencies": {
+    "vite": "^8.0.13"
   }
 }

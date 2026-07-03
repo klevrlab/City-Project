@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# generated patched-source overlay for the custom MindAR tracker build
+tools/mind-compile/.mindar-patched
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
