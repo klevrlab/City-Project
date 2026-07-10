@@ -59,7 +59,7 @@ so the plane never dropped when the camera looked away:
 | `HAMMING_THRESHOLD` | 0.7 | 0.75 | accepts slightly more ambiguous feature matches |
 | `MIN_NUM_INLIERS` | 6 | 6 (stock) | was 5; reverted — phantom detections scale with target count |
 | `INLIER_THRESHOLD` | 3 | 4 | slightly looser RANSAC geometry tolerance |
-| `AR2_SIM_THRESH` | 0.8 | 0.68 | 0.62 never dropped, 0.75 dropped mid-viewing; middle ground |
+| `AR2_SIM_THRESH` | 0.8 | 0.6 | loose on purpose — stale locks are ended by mural-plane's deferred drop |
 | `TRACKING_THRESH` | 5.0 | 7.0 | 8.0 rode out too much, 6.0 was twitchy on-panel |
 
 To restore stock behaviour, point `mural-ar.html` back at the CDN

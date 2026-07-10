@@ -45,13 +45,13 @@ const PATCHES = [
   // ── Frame-to-frame tracking (runs on the main thread) ──────────────────
   {
     // Normalized cross-correlation cutoff for tracked template points.
-    // 0.62 let phantom locks "track" random surfaces forever; 0.75 dropped
-    // the lock half the time while genuinely on-panel. 0.68 splits the
-    // difference — forgiving enough for bronze glare/blur, and the deferred
-    // drop in mural-plane.js still ends stale locks. (default 0.8)
+    // Deliberately loose (0.75 dropped the lock half the time while genuinely
+    // on-panel) — stale/phantom locks are acceptable here because the
+    // deferred drop in mural-plane.js now guarantees they terminate.
+    // (default 0.8)
     file: 'image-target/tracker/tracker.js',
     from: 'const AR2_SIM_THRESH = 0.8;',
-    to: 'const AR2_SIM_THRESH = 0.68;'
+    to: 'const AR2_SIM_THRESH = 0.6;'
   },
   // ── Pose refinement acceptance (controller web worker) ─────────────────
   {

@@ -12,7 +12,7 @@
  *
  * Attach to a `mindar-image-target` anchor entity:
  *   <a-entity mindar-image-target="targetIndex: 0"
- *             mural-plane="video: #muralVideoFront; holdMs: 2500">
+ *             mural-plane="video: #muralVideoFront; holdMs: 1250">
  *     <a-plane ...></a-plane>
  *   </a-entity>
  */
@@ -26,7 +26,7 @@ let activeAnchor = null;
 AFRAME.registerComponent('mural-plane', {
   schema: {
     video: { type: 'selector' },
-    holdMs: { type: 'number', default: 2500 }   // 0 disables the hold
+    holdMs: { type: 'number', default: 1250 }   // 0 disables the hold
   },
 
   init: function () {
