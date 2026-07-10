@@ -70,7 +70,14 @@ AFRAME.registerComponent('mural-plane', {
   _onLost: function () {
     this.lostAt = null;
     const v = this.data.video;
-    if (v && !v.paused) v.pause();
+    if (!v || v.paused) return;
+    // Several anchors can share one video (multiple lighting variants of the
+    // same panel) — only pause when no other anchor is still showing it.
+    const others = this.el.sceneEl.querySelectorAll('[mural-plane]');
+    for (const el of others) {
+      if (el !== this.el && el.object3D && el.object3D.visible) return;
+    }
+    v.pause();
   },
 
   remove: function () {

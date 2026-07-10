@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "heic-convert": "^2.1.0",
     "jimp": "^0.22.12",
     "mind-ar": "^1.2.5"
   },

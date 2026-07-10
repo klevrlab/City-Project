@@ -3,13 +3,18 @@ import path from 'path';
 import Jimp from 'jimp';
 import { OfflineCompiler } from 'mind-ar/src/image-target/offline-compiler.js';
 
-// Order defines targetIndex. Single target: multiple similar-looking bronze
-// panels cross-matched and multiplied false positives, so the experience now
-// tracks only the front relief (targetIndex 0).
-// On-site phone photos of the actual panel (straight-on, full frame, no
-// glare) will beat the source artwork — swap them in here when available.
+// Order defines targetIndex. One physical target (the front relief), compiled
+// from three on-site photos under different lighting — real camera photos
+// beat the source artwork, and since every target maps to the same overlay
+// video in mural-ar.html, cross-matching between the variants is harmless.
+// Picked from assets/JapanAM Training Photos (sharp, full-frame, near-frontal):
+//   0 = Front 8  (bright, even midday light)
+//   1 = Front 20 (even, slightly warm)
+//   2 = Front 5  (darker dusk conditions)
 const INPUTS = [
-  '../../assets/Japan-Am - Front BG.png',
+  '../../assets/Markers/japan-am-front-bright.jpg',
+  '../../assets/Markers/japan-am-front-even.jpg',
+  '../../assets/Markers/japan-am-front-dark.jpg',
 ];
 const OUT = '../../assets/targets/japan-am.mind';
 const MAX_WIDTH = 1600;
