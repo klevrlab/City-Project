@@ -45,22 +45,22 @@ const PATCHES = [
   // ── Frame-to-frame tracking (runs on the main thread) ──────────────────
   {
     // Normalized cross-correlation cutoff for tracked template points.
-    // 0.62 held the lock through glare/blur but ALSO let phantom locks
-    // "track" random surfaces forever — the plane never dropped when the
-    // camera looked away. Near-stock keeps the drop crisp; real-photo
-    // targets correlate well enough not to need the slack. (default 0.8)
+    // 0.62 let phantom locks "track" random surfaces forever; 0.75 dropped
+    // the lock half the time while genuinely on-panel. 0.68 splits the
+    // difference — forgiving enough for bronze glare/blur, and the deferred
+    // drop in mural-plane.js still ends stale locks. (default 0.8)
     file: 'image-target/tracker/tracker.js',
     from: 'const AR2_SIM_THRESH = 0.8;',
-    to: 'const AR2_SIM_THRESH = 0.75;'
+    to: 'const AR2_SIM_THRESH = 0.68;'
   },
   // ── Pose refinement acceptance (controller web worker) ─────────────────
   {
     // Mean reprojection error allowed before a tracking update is rejected
     // and the target drops. Higher rides out wobbly frames; 8.0 rode out
-    // far too much. (default 5.0)
+    // far too much, 6.0 was twitchy on-panel. (default 5.0)
     file: 'image-target/estimation/refine-estimate.js',
     from: 'const TRACKING_THRESH = 5.0; // default',
-    to: 'const TRACKING_THRESH = 6.0; // default'
+    to: 'const TRACKING_THRESH = 7.0; // default'
   }
 ];
 

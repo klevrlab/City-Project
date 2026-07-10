@@ -59,8 +59,8 @@ so the plane never dropped when the camera looked away:
 | `HAMMING_THRESHOLD` | 0.7 | 0.75 | accepts slightly more ambiguous feature matches |
 | `MIN_NUM_INLIERS` | 6 | 6 (stock) | was 5; reverted — phantom detections scale with target count |
 | `INLIER_THRESHOLD` | 3 | 4 | slightly looser RANSAC geometry tolerance |
-| `AR2_SIM_THRESH` | 0.8 | 0.75 | was 0.62; near-stock so the lock drops when off-panel |
-| `TRACKING_THRESH` | 5.0 | 6.0 | was 8.0; rejects sloppy pose updates sooner |
+| `AR2_SIM_THRESH` | 0.8 | 0.68 | 0.62 never dropped, 0.75 dropped mid-viewing; middle ground |
+| `TRACKING_THRESH` | 5.0 | 7.0 | 8.0 rode out too much, 6.0 was twitchy on-panel |
 
 To restore stock behaviour, point `mural-ar.html` back at the CDN
 `mindar-image-aframe.prod.js` — the custom file is a pure superset drop-in.
