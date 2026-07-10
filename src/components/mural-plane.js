@@ -94,10 +94,13 @@ AFRAME.registerComponent('mural-plane', {
     const v = this.data.video;
     if (!v || v.paused) return;
     // Several anchors can share one video (multiple lighting variants of the
-    // same panel) — only pause when no other anchor is still showing it.
+    // same panel) — only pause when no other anchor of the SAME video is
+    // still showing it. Anchors for the other side have their own video.
     const others = this.el.sceneEl.querySelectorAll('[mural-plane]');
     for (const el of others) {
-      if (el !== this.el && el.object3D && el.object3D.visible) return;
+      if (el === this.el || !el.object3D || !el.object3D.visible) continue;
+      const c = el.components['mural-plane'];
+      if (c && c.data.video === v) return;
     }
     v.pause();
   },

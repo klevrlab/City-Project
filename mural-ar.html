@@ -36,8 +36,9 @@
 
     <!--
       MindAR scene. autoStart:false so the GPS gate controls when the camera
-      turns on. assets/targets/japan-am.mind holds a single compiled target
-      (the front relief) — recompile via `npm run compile-targets` in
+      turns on. assets/targets/japan-am.mind holds six compiled targets:
+      front relief (indices 0-2) and back relief (indices 3-5), three lighting
+      variants each — recompile via `npm run compile-targets` in
       tools/mind-compile/ when better on-site photos are available.
     -->
     <a-scene
@@ -49,18 +50,20 @@
         device-orientation-permission-ui="enabled: false">
 
         <a-assets>
-            <!-- Placeholder animation — swap src for the real animated mural mp4.
-                 muted + playsinline are required for iOS autoplay. -->
+            <!-- Placeholder animations — swap src for the real animated mural mp4s
+                 (one per side). muted + playsinline are required for iOS autoplay. -->
             <video id="muralVideoFront" src="./assets/video.mp4" preload="auto" loop muted playsinline crossorigin="anonymous"></video>
+            <video id="muralVideoBack" src="./assets/video.mp4" preload="auto" loop muted playsinline crossorigin="anonymous"></video>
         </a-assets>
 
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-        <!-- One physical target (the front relief) compiled from three on-site
-             photos under different lighting. All three anchors play the SAME
-             video, and mural-plane enforces a single active anchor: whichever
-             variant locks first renders the plane, the others keep tracking
-             silently with their planes hidden. Plane heights match each source
+        <!-- Two physical targets (front + back reliefs), each compiled from
+             three on-site photos under different lighting (indices 0-2 front,
+             3-5 back). mural-plane enforces a single active anchor across ALL
+             variants: whichever one locks first renders its plane, the others
+             keep tracking silently with their planes hidden — so you only ever
+             see one plane, front or back. Plane heights match each source
              photo's aspect ratio (h/w at 1600px wide). -->
         <a-entity mindar-image-target="targetIndex: 0" mural-plane="video: #muralVideoFront">
             <a-plane width="1" height="0.4038"
@@ -73,6 +76,18 @@
         <a-entity mindar-image-target="targetIndex: 2" mural-plane="video: #muralVideoFront">
             <a-plane width="1" height="0.4000"
                      material="shader: flat; src: #muralVideoFront; side: double"></a-plane>
+        </a-entity>
+        <a-entity mindar-image-target="targetIndex: 3" mural-plane="video: #muralVideoBack">
+            <a-plane width="1" height="0.4250"
+                     material="shader: flat; src: #muralVideoBack; side: double"></a-plane>
+        </a-entity>
+        <a-entity mindar-image-target="targetIndex: 4" mural-plane="video: #muralVideoBack">
+            <a-plane width="1" height="0.3856"
+                     material="shader: flat; src: #muralVideoBack; side: double"></a-plane>
+        </a-entity>
+        <a-entity mindar-image-target="targetIndex: 5" mural-plane="video: #muralVideoBack">
+            <a-plane width="1" height="0.3981"
+                     material="shader: flat; src: #muralVideoBack; side: double"></a-plane>
         </a-entity>
     </a-scene>
 
