@@ -48,15 +48,19 @@ source ever drifts) and then a vite lib build.
 
 Output: `assets/vendor/mindar-image-aframe.custom.js`
 
-Thresholds patched (see `patch-mindar.mjs` for the full why):
+Thresholds patched (see `patch-mindar.mjs` for the full why). These were
+originally much looser ("always shows something"), but with targets compiled
+from real on-site photos the tracker no longer needs the slack — and the
+loose tracking gates let phantom locks "track" random surfaces indefinitely,
+so the plane never dropped when the camera looked away:
 
 | Constant | Default | Ours | Effect |
 |---|---|---|---|
-| `HAMMING_THRESHOLD` | 0.7 | 0.8 | accepts more ambiguous feature matches |
-| `MIN_NUM_INLIERS` | 6 | 5 | fewest matches to declare detection (4 is degenerate — phantom locks) |
-| `INLIER_THRESHOLD` | 3 | 5 | looser RANSAC geometry tolerance |
-| `AR2_SIM_THRESH` | 0.8 | 0.62 | holds tracking lock through glare/blur |
-| `TRACKING_THRESH` | 5.0 | 8.0 | accepts sloppier pose updates before dropping |
+| `HAMMING_THRESHOLD` | 0.7 | 0.75 | accepts slightly more ambiguous feature matches |
+| `MIN_NUM_INLIERS` | 6 | 6 (stock) | was 5; reverted — phantom detections scale with target count |
+| `INLIER_THRESHOLD` | 3 | 4 | slightly looser RANSAC geometry tolerance |
+| `AR2_SIM_THRESH` | 0.8 | 0.75 | was 0.62; near-stock so the lock drops when off-panel |
+| `TRACKING_THRESH` | 5.0 | 6.0 | was 8.0; rejects sloppy pose updates sooner |
 
 To restore stock behaviour, point `mural-ar.html` back at the CDN
 `mindar-image-aframe.prod.js` — the custom file is a pure superset drop-in.

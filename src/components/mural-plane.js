@@ -4,11 +4,11 @@
  * dropouts (glare, hands, motion blur) don't blank the showcase.
  *
  * The hold works by wrapping the mindar-image-target component's
- * updateWorldMatrix: while inside the grace window, null (lost) updates are
- * swallowed, so the anchor keeps its last pose and stays visible. Real
- * targetLost only fires — and the video only pauses — once the grace window
- * expires. Re-acquiring within the window resumes seamlessly with no
- * found/lost churn.
+ * updateWorldMatrix: MindAR sends the null (lost) update exactly once, so it
+ * is swallowed to keep the last pose, and tick() delivers the deferred drop
+ * when the grace window expires — targetLost fires and the video pauses only
+ * then. Re-acquiring within the window resumes seamlessly with no found/lost
+ * churn.
  *
  * Attach to a `mindar-image-target` anchor entity:
  *   <a-entity mindar-image-target="targetIndex: 0"
@@ -49,11 +49,14 @@ AFRAME.registerComponent('mural-plane', {
     if (!anchor || typeof anchor.updateWorldMatrix !== 'function') return false;
 
     const orig = anchor.updateWorldMatrix.bind(anchor);
+    this._origUpdate = orig;
     anchor.updateWorldMatrix = (worldMatrix) => {
       if (worldMatrix === null && this.data.holdMs > 0 && this.el.object3D.visible) {
-        const now = performance.now();
-        if (this.lostAt === null) this.lostAt = now;
-        if (now - this.lostAt < this.data.holdMs) return; // freeze last pose
+        // MindAR sends the null "lost" update ONCE (controller.js flips
+        // showing=false and stops updating). Swallow it to freeze the last
+        // pose — tick() delivers the deferred drop when the window expires.
+        if (this.lostAt === null) this.lostAt = performance.now();
+        return;
       }
       if (worldMatrix !== null) this.lostAt = null;
       orig(worldMatrix);
@@ -64,6 +67,14 @@ AFRAME.registerComponent('mural-plane', {
 
   tick: function () {
     if (!this._wrapped) this._wrapAnchor();
+
+    // Deferred drop: the swallowed null never repeats, so the hold must
+    // expire from here or the plane sticks forever once tracking is gone.
+    if (this.lostAt !== null && this.el.object3D.visible &&
+        performance.now() - this.lostAt >= this.data.holdMs) {
+      this.lostAt = null;
+      this._origUpdate(null); // emits targetLost, hides the anchor
+    }
 
     // Claim/enforce the single-plane slot. Visibility of the anchor entity is
     // driven by MindAR; we only toggle the child plane so secondary variants

@@ -1,10 +1,12 @@
 /**
- * Copies mind-ar's published source into .mindar-patched/ and loosens its
- * hardcoded confidence thresholds so the Japan-Am mural locks on far more
- * easily. The project brief favours "always shows something" over "always
- * tracks the exact right panel", so every gate below trades precision for
- * pickup. Run before `vite build --config vite.mindar.config.mjs` (the
- * build-tracker npm script chains both).
+ * Copies mind-ar's published source into .mindar-patched/ and adjusts its
+ * hardcoded confidence thresholds for the Japan-Am mural. Detection stays
+ * slightly permissive for fast pickup, but tracking is kept near stock:
+ * the targets are now compiled from real on-site photos (which match the
+ * live camera view well), and the original very-loose tracking gates let
+ * phantom locks "track" random surfaces indefinitely — the plane never
+ * dropped when you looked away. Run before `vite build --config
+ * vite.mindar.config.mjs` (the build-tracker npm script chains both).
  *
  * Patching a copy on disk (instead of a vite transform plugin) guarantees the
  * inlined web worker — where detection actually runs — gets the patched code
@@ -29,40 +31,36 @@ const PATCHES = [
     // ambiguous feature matches as candidates. (default 0.7)
     file: 'image-target/matching/matching.js',
     from: 'const HAMMING_THRESHOLD = 0.7;',
-    to: 'const HAMMING_THRESHOLD = 0.8;'
-  },
-  {
-    // Minimum geometrically-consistent matches to accept a detection.
-    // NOTE: 4 is degenerate — any 4 matches fit a homography exactly, which
-    // made detection fire on empty scenes (phantom panels). 5 is the loosest
-    // non-degenerate value. (default 6)
-    file: 'image-target/matching/matching.js',
-    from: 'const MIN_NUM_INLIERS = 6;',
-    to: 'const MIN_NUM_INLIERS = 5;'
+    to: 'const HAMMING_THRESHOLD = 0.75;'
   },
   {
     // RANSAC reprojection tolerance when counting inliers — higher accepts
-    // sloppier geometry (curved/glossy bronze relief, oblique angles). (default 3)
+    // sloppier geometry (curved/glossy bronze relief, oblique angles).
+    // (default 3; was 5, walked back with real-photo targets + 6 variants —
+    // phantom detections scale with target count) (default 3)
     file: 'image-target/matching/matching.js',
     from: 'const INLIER_THRESHOLD = 3;',
-    to: 'const INLIER_THRESHOLD = 5;'
+    to: 'const INLIER_THRESHOLD = 4;'
   },
   // ── Frame-to-frame tracking (runs on the main thread) ──────────────────
   {
-    // Normalized cross-correlation cutoff for tracked template points. Lower
-    // keeps the lock through glare, hands, and motion blur — but too low
-    // (0.55) let phantom locks "track" random surfaces forever. (default 0.8)
+    // Normalized cross-correlation cutoff for tracked template points.
+    // 0.62 held the lock through glare/blur but ALSO let phantom locks
+    // "track" random surfaces forever — the plane never dropped when the
+    // camera looked away. Near-stock keeps the drop crisp; real-photo
+    // targets correlate well enough not to need the slack. (default 0.8)
     file: 'image-target/tracker/tracker.js',
     from: 'const AR2_SIM_THRESH = 0.8;',
-    to: 'const AR2_SIM_THRESH = 0.62;'
+    to: 'const AR2_SIM_THRESH = 0.75;'
   },
   // ── Pose refinement acceptance (controller web worker) ─────────────────
   {
     // Mean reprojection error allowed before a tracking update is rejected
-    // and the target drops. Higher rides out wobbly frames. (default 5.0)
+    // and the target drops. Higher rides out wobbly frames; 8.0 rode out
+    // far too much. (default 5.0)
     file: 'image-target/estimation/refine-estimate.js',
     from: 'const TRACKING_THRESH = 5.0; // default',
-    to: 'const TRACKING_THRESH = 8.0; // default'
+    to: 'const TRACKING_THRESH = 6.0; // default'
   }
 ];
 
