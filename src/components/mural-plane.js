@@ -16,6 +16,13 @@
  *     <a-plane ...></a-plane>
  *   </a-entity>
  */
+
+// All anchors are lighting variants of the same physical panel, so when the
+// tracker cross-matches several at once only ONE plane should render. The
+// first anchor to become visible claims this slot; it releases the claim when
+// it truly loses tracking (after the hold), letting another variant take over.
+let activeAnchor = null;
+
 AFRAME.registerComponent('mural-plane', {
   schema: {
     video: { type: 'selector' },
@@ -57,6 +64,20 @@ AFRAME.registerComponent('mural-plane', {
 
   tick: function () {
     if (!this._wrapped) this._wrapAnchor();
+
+    // Claim/enforce the single-plane slot. Visibility of the anchor entity is
+    // driven by MindAR; we only toggle the child plane so secondary variants
+    // keep tracking silently without drawing a second plane.
+    const visible = this.el.object3D.visible;
+    if (visible && (activeAnchor === null || !activeAnchor.el.object3D.visible)) {
+      activeAnchor = this;
+    }
+    this._setPlaneVisible(visible && activeAnchor === this);
+  },
+
+  _setPlaneVisible: function (v) {
+    const plane = this.el.querySelector('a-plane');
+    if (plane && plane.object3D) plane.object3D.visible = v;
   },
 
   _onFound: function () {
@@ -69,6 +90,7 @@ AFRAME.registerComponent('mural-plane', {
 
   _onLost: function () {
     this.lostAt = null;
+    if (activeAnchor === this) activeAnchor = null;
     const v = this.data.video;
     if (!v || v.paused) return;
     // Several anchors can share one video (multiple lighting variants of the

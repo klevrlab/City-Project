@@ -58,9 +58,10 @@
 
         <!-- One physical target (the front relief) compiled from three on-site
              photos under different lighting. All three anchors play the SAME
-             video, so whichever variant locks first shows the mural — cross-
-             matching between them is harmless by design. Plane heights match
-             each source photo's aspect ratio (h/w at 1600px wide). -->
+             video, and mural-plane enforces a single active anchor: whichever
+             variant locks first renders the plane, the others keep tracking
+             silently with their planes hidden. Plane heights match each source
+             photo's aspect ratio (h/w at 1600px wide). -->
         <a-entity mindar-image-target="targetIndex: 0" mural-plane="video: #muralVideoFront">
             <a-plane width="1" height="0.4038"
                      material="shader: flat; src: #muralVideoFront; side: double"></a-plane>
