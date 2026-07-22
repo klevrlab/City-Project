@@ -3,9 +3,10 @@
  *
  * - Little Italy: always-on Athena statues (left/right) at the 8 street pins.
  *   Odd pins use Augustus_of_Prima_Porta.glb (CC-BY Sketchfab / Arqueomodel3D).
- * - Leaning Tower: 8 m placeholder near western corner (until tower GLB).
+ * - Leaning Tower: Leaning_Tower_of_Pisa.glb scaled to 8 m near western corner.
  * - Jump zones: underpass / river / grand finale fire a one-shot dive with
- *   maria-shark-jump-jimmy-txtr.glb (splash TBD — Rhonda).
+ *   maria-shark-jump-jimmy-txtr.glb (splash TBD — Rhonda). Finale also plants
+ *   circle-swim + dancing mascot placeholders.
  *
  * Statues are planted in world space relative to the camera when the user
  * enters each geofence (SLAM keeps them anchored). Absolute GPS→ENU without a
@@ -250,7 +251,7 @@ AFRAME.registerComponent('location-experiences', {
     this.statueRoot = null;
   },
 
-  // ---- Leaning Tower placeholder -------------------------------------------
+  // ---- Leaning Tower (real GLB, scaled to 8 m) -----------------------------
 
   plantTowerInFront: function () {
     this.clearTower();
@@ -262,45 +263,32 @@ AFRAME.registerComponent('location-experiences', {
     forward.y = 0;
     if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
     forward.normalize();
-    const pos = cam.object3D.position.clone().add(forward.multiplyScalar(10));
+    const pos = cam.object3D.position.clone().add(forward.multiplyScalar(12));
     pos.y = 0;
 
     const h = this.towerPin.heightM;
     const tower = document.createElement('a-entity');
-    tower.setAttribute('id', 'leaning-tower-placeholder');
+    tower.setAttribute('id', 'leaning-tower');
     tower.setAttribute('position', `${pos.x} 0 ${pos.z}`);
-    // ~4° lean like Pisa
-    tower.setAttribute('rotation', '0 0 4');
+    tower.setAttribute('gltf-model', '#leaning-tower-model');
+    tower.setAttribute('shadow', 'cast: true');
 
-    const shaft = document.createElement('a-cylinder');
-    shaft.setAttribute('radius', 1.1);
-    shaft.setAttribute('height', h);
-    shaft.setAttribute('position', `0 ${h / 2} 0`);
-    shaft.setAttribute('material', 'color: #cfc6b8; roughness: 0.9; metalness: 0.05');
-    shaft.setAttribute('shadow', 'cast: true');
-    tower.appendChild(shaft);
-
-    const bands = [0.2, 0.4, 0.6, 0.8].map((t) => {
-      const ring = document.createElement('a-torus');
-      ring.setAttribute('radius', 1.15);
-      ring.setAttribute('radius-tubular', 0.06);
-      ring.setAttribute('rotation', '90 0 0');
-      ring.setAttribute('position', `0 ${h * t} 0`);
-      ring.setAttribute('material', 'color: #b7aea0; roughness: 0.85');
-      return ring;
-    });
-    bands.forEach((b) => tower.appendChild(b));
-
-    const label = document.createElement('a-text');
-    label.setAttribute('value', 'Leaning Tower\n(placeholder 8m)');
-    label.setAttribute('align', 'center');
-    label.setAttribute('width', 8);
-    label.setAttribute('color', '#111');
-    label.setAttribute('position', `0 ${h + 0.6} 0`);
-    tower.appendChild(label);
+    tower.addEventListener('model-loaded', () => {
+      const obj = tower.object3D;
+      // Normalize to exactly 8 m tall and sit on the ground plane.
+      const box = new THREE.Box3().setFromObject(obj);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const s = h / Math.max(size.y, 0.001);
+      obj.scale.set(s, s, s);
+      obj.updateMatrixWorld(true);
+      const box2 = new THREE.Box3().setFromObject(obj);
+      obj.position.y -= box2.min.y;
+    }, { once: true });
 
     this.el.appendChild(tower);
     this.towerEl = tower;
+    this.setHint('Leaning Tower of Pisa — 8 m · walk around it');
   },
 
   clearTower: function () {
@@ -311,6 +299,57 @@ AFRAME.registerComponent('location-experiences', {
   },
 
   // ---- Jump sequences (placeholder splash) ---------------------------------
+
+  spawnSplashPlaceholder: function (x, z) {
+    const group = document.createElement('a-entity');
+    group.setAttribute('position', `${x} 0.02 ${z}`);
+
+    const disc = document.createElement('a-cylinder');
+    disc.setAttribute('radius', 0.05);
+    disc.setAttribute('height', 0.04);
+    disc.setAttribute('material', 'color: #7ec8e3; opacity: 0.65; transparent: true');
+    group.appendChild(disc);
+
+    const ring = document.createElement('a-torus');
+    ring.setAttribute('radius', 0.08);
+    ring.setAttribute('radius-tubular', 0.02);
+    ring.setAttribute('rotation', '90 0 0');
+    ring.setAttribute('material', 'color: #b8e8f8; opacity: 0.7; transparent: true');
+    group.appendChild(ring);
+
+    const label = document.createElement('a-text');
+    label.setAttribute('value', 'splash TBD');
+    label.setAttribute('align', 'center');
+    label.setAttribute('width', 4);
+    label.setAttribute('color', '#0a3a4a');
+    label.setAttribute('position', '0 0.35 0');
+    group.appendChild(label);
+
+    this.el.appendChild(group);
+    disc.setAttribute('animation__grow', {
+      property: 'scale',
+      from: '1 1 1',
+      to: '28 1 28',
+      dur: 1000,
+      easing: 'easeOutQuad'
+    });
+    ring.setAttribute('animation__grow', {
+      property: 'scale',
+      from: '1 1 1',
+      to: '22 1 22',
+      dur: 1100,
+      easing: 'easeOutQuad'
+    });
+    group.setAttribute('animation__fade', {
+      property: 'scale',
+      to: '0.01 0.01 0.01',
+      dur: 400,
+      delay: 900
+    });
+    setTimeout(() => {
+      if (group.parentNode) group.parentNode.removeChild(group);
+    }, 1400);
+  },
 
   playJump: function (jumpId) {
     const pin = this.jumpPins.find((p) => p.id === jumpId) || this.jumpPins[0];
@@ -366,7 +405,7 @@ AFRAME.registerComponent('location-experiences', {
       easing: 'easeInOutSine'
     });
 
-    // Jump arc peak
+    // Jump arc peak + splash placeholder
     setTimeout(() => {
       if (!ent.parentNode) return;
       ent.setAttribute('animation__jump', {
@@ -375,26 +414,7 @@ AFRAME.registerComponent('location-experiences', {
         dur: 700,
         easing: 'easeOutQuad'
       });
-      // Placeholder splash disc
-      const splash = document.createElement('a-cylinder');
-      splash.setAttribute('radius', 0.01);
-      splash.setAttribute('height', 0.05);
-      splash.setAttribute('position', `${mid.x} 0.05 ${mid.z}`);
-      splash.setAttribute('material', 'color: #7ec8e3; opacity: 0.55; transparent: true');
-      this.el.appendChild(splash);
-      splash.setAttribute('animation__grow', {
-        property: 'scale',
-        from: '1 1 1',
-        to: '40 1 40',
-        dur: 900,
-        easing: 'easeOutQuad'
-      });
-      splash.setAttribute('animation__fade', {
-        property: 'material.opacity',
-        to: 0,
-        dur: 900
-      });
-      setTimeout(() => { if (splash.parentNode) splash.parentNode.removeChild(splash); }, 1000);
+      this.spawnSplashPlaceholder(mid.x, mid.z);
     }, 1800);
 
     // Come down + continue
@@ -408,15 +428,75 @@ AFRAME.registerComponent('location-experiences', {
       });
     }, 2500);
 
-    // Finale: also drop placeholder dancing mascots at SW corner relative layout.
+    // Finale: circle sharks + dancing mascots (placeholders until art lands).
     if (pin.id === 'finale') {
-      setTimeout(() => this.plantFinaleDancers(cam), 1200);
+      setTimeout(() => {
+        this.plantFinaleCircle(cam);
+        this.plantFinaleDancers(cam);
+      }, 800);
     }
 
     setTimeout(() => {
       if (ent.parentNode) ent.parentNode.removeChild(ent);
       this.jumpBusy = false;
     }, 4800);
+  },
+
+  // Spec asks for a 60 m circle — AR scale uses ~10 m radius so it stays in view.
+  plantFinaleCircle: function (cam) {
+    const forward = new THREE.Vector3();
+    cam.object3D.getWorldDirection(forward);
+    forward.y = 0;
+    if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
+    forward.normalize();
+    const center = cam.object3D.position.clone().add(forward.clone().multiplyScalar(10));
+    center.y = 0;
+
+    const pivot = document.createElement('a-entity');
+    pivot.setAttribute('id', 'finale-circle');
+    pivot.setAttribute('position', `${center.x} 0.5 ${center.z}`);
+    pivot.setAttribute('animation__orbit', {
+      property: 'rotation',
+      to: '0 360 0',
+      loop: true,
+      dur: 32000,
+      easing: 'linear'
+    });
+
+    const radius = 10; // AR stand-in for the 60 m corridor circle
+    const sharks = [
+      { model: '#circle-maria', angleDeg: 0, scale: '0.32 0.32 0.32' },
+      { model: '#circle-stella', angleDeg: 180, scale: '0.30 0.30 0.30' }
+    ];
+
+    sharks.forEach((s) => {
+      const rad = s.angleDeg * Math.PI / 180;
+      const x = Math.cos(rad) * radius;
+      const z = Math.sin(rad) * radius;
+      const ent = document.createElement('a-entity');
+      ent.setAttribute('gltf-model', s.model);
+      ent.setAttribute('scale', s.scale);
+      ent.setAttribute('position', `${x} 0 ${z}`);
+      // Face tangent to the circle (travel direction).
+      const tangentYaw = (s.angleDeg + 90);
+      ent.setAttribute('rotation', `0 ${tangentYaw} 0`);
+      ent.setAttribute('animation-mixer', 'loop: repeat; timeScale: 1.0');
+      ent.setAttribute('shadow', 'cast: true');
+      pivot.appendChild(ent);
+    });
+
+    const label = document.createElement('a-text');
+    label.setAttribute('value', '60m circle\n(AR-scaled)');
+    label.setAttribute('align', 'center');
+    label.setAttribute('width', 6);
+    label.setAttribute('color', '#ffffff');
+    label.setAttribute('position', '0 2.2 0');
+    pivot.appendChild(label);
+
+    this.el.appendChild(pivot);
+    setTimeout(() => {
+      if (pivot.parentNode) pivot.parentNode.removeChild(pivot);
+    }, 16000);
   },
 
   plantFinaleDancers: function (cam) {
@@ -429,8 +509,8 @@ AFRAME.registerComponent('location-experiences', {
     const base = cam.object3D.position.clone().add(forward.clone().multiplyScalar(4));
 
     const dancers = [
-      { model: '#photo-sharkie', offset: -0.8 },
-      { model: '#photo-sammy', offset: 0.8 }
+      { model: '#photo-sharkie', offset: -0.8, label: 'Sharkie\n(dance TBD)' },
+      { model: '#photo-sammy', offset: 0.8, label: 'Sammy\n(dance TBD)' }
     ];
 
     dancers.forEach((d) => {
@@ -446,6 +526,13 @@ AFRAME.registerComponent('location-experiences', {
         dur: 4000,
         easing: 'linear'
       });
+      const label = document.createElement('a-text');
+      label.setAttribute('value', d.label);
+      label.setAttribute('align', 'center');
+      label.setAttribute('width', 2.5);
+      label.setAttribute('color', '#fff');
+      label.setAttribute('position', '0 2.1 0');
+      ent.appendChild(label);
       this.el.appendChild(ent);
       setTimeout(() => {
         if (ent.parentNode) ent.parentNode.removeChild(ent);

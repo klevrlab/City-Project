@@ -5,7 +5,9 @@ AFRAME.registerComponent('shark-animator', {
   schema: {
     triggerDelayMs: { type: 'number', default: 1200 },
     minPingCount: { type: 'number', default: 1 },
-    scale: { type: 'vec3', default: { x: 0.4, y: 0.4, z: 0.4 } }
+    scale: { type: 'vec3', default: { x: 0.4, y: 0.4, z: 0.4 } },
+    // Soft stand-in for "always swim West toward SAP" until compass lock exists.
+    preferWestSwim: { type: 'boolean', default: true }
   },
 
   init: function () {
@@ -443,7 +445,10 @@ AFRAME.registerComponent('shark-animator', {
       return;
     }
 
-    // Default motion (Maria, Stella): enter center, hover, swim through.
+    // Default motion (Maria / Jimmy): enter center, hover, swim through.
+    // Optional west-toward-SAP bias: if preferWestSwim is on, swim-out leans
+    // toward camera-left/right so the exit reads more "corridor west" than
+    // straight past the viewer (true compass lock still TBD).
     const swimInDur = 2500;
     const centerDwellDur = 4500;
     const swimOutDur = 2500;
@@ -451,7 +456,20 @@ AFRAME.registerComponent('shark-animator', {
     const startPos = new THREE.Vector3().copy(camPos).sub(dirToTarget.clone().multiplyScalar(3.4));
     startPos.y = y;
     const centerPos = new THREE.Vector3(targetPoint.x, y, targetPoint.z);
-    const endPos = new THREE.Vector3().copy(targetPoint).add(dirToTarget.clone().multiplyScalar(10.5));
+    let outDir = dirToTarget.clone();
+    if (this.data.preferWestSwim) {
+      // Bias ~35° toward the camera's local −X (often corridor-ish on Sharks Way).
+      const camRight = new THREE.Vector3();
+      cam.object3D.getWorldDirection(new THREE.Vector3());
+      camRight.set(1, 0, 0).applyQuaternion(cam.object3D.quaternion);
+      camRight.y = 0;
+      if (camRight.lengthSq() > 0.01) {
+        camRight.normalize();
+        // Prefer the side that points more "away down the corridor" from the viewer.
+        outDir.add(camRight.multiplyScalar(-0.7)).normalize();
+      }
+    }
+    const endPos = new THREE.Vector3().copy(targetPoint).add(outDir.multiplyScalar(10.5));
     endPos.y = y;
 
     ent.setAttribute('position', `${startPos.x} ${startPos.y} ${startPos.z}`);

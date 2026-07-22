@@ -1,0 +1,11 @@
+Model Information:
+* title:	Leaning Tower of Pisa
+* source:	https://sketchfab.com/3d-models/leaning-tower-of-pisa-435244ffd9ab4f0fa10d571e7cff00c4
+* author:	Anjith (https://sketchfab.com/anjithkrish89)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Leaning Tower of Pisa" (https://sketchfab.com/3d-models/leaning-tower-of-pisa-435244ffd9ab4f0fa10d571e7cff00c4) by Anjith (https://sketchfab.com/anjithkrish89) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
