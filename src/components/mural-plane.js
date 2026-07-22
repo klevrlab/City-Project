@@ -15,6 +15,8 @@
  *             mural-plane="video: #muralVideoFront; holdMs: 1250">
  *     <a-plane ...></a-plane>
  *   </a-entity>
+ *
+ * `video` is optional — omit it when the plane uses a static image texture.
  */
 
 // All anchors are lighting variants of the same physical panel, so when the
@@ -94,7 +96,11 @@ AFRAME.registerComponent('mural-plane', {
   _onFound: function () {
     this.lostAt = null;
     const v = this.data.video;
-    if (v) { const p = v.play(); if (p && p.catch) p.catch(() => {}); }
+    // Static image overlays have no play(); only start real <video> elements.
+    if (v && typeof v.play === 'function') {
+      const p = v.play();
+      if (p && p.catch) p.catch(() => {});
+    }
     const status = document.getElementById('mural-status');
     if (status) status.classList.remove('visible');
   },
@@ -103,7 +109,7 @@ AFRAME.registerComponent('mural-plane', {
     this.lostAt = null;
     if (activeAnchor === this) activeAnchor = null;
     const v = this.data.video;
-    if (!v || v.paused) return;
+    if (!v || typeof v.pause !== 'function' || v.paused) return;
     // Several anchors can share one video (multiple lighting variants of the
     // same panel) — only pause when no other anchor of the SAME video is
     // still showing it. Anchors for the other side have their own video.

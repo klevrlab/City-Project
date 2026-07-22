@@ -102,25 +102,25 @@ AFRAME.registerComponent('shark-detector', {
         const enteredLittleItaly = inLittleItaly && !this.state.inLittleItaly;
         const leftLittleItaly = !inLittleItaly && this.state.inLittleItaly;
         this.state.inLittleItaly = inLittleItaly;
-        this.state.alwaysOn = inLittleItaly;
+        // June 10 redline: Little Italy uses always-on marble statues (handled by
+        // location-experiences) — no wayfinding shark cycle in this corridor.
+        this.state.alwaysOn = false;
 
         if (leftLittleItaly) {
-          console.log("Left Little Italy zone — always-on rotation disabled");
+          console.log("Left Little Italy zone");
           this.el.sceneEl.emit('sharkAlwaysOnExit');
         }
 
         const cooldown = performance.now() - this.state.dismissedAt > 3000;
 
         if (enteredLittleItaly) {
-          console.log("Entered Little Italy zone — always-on rotation enabled");
+          console.log("Entered Little Italy — statues take over (no shark cycle)");
           this.state.sharkVisible = false;
-          this.onSharkFound({
-            trigger: 'little-italy',
-            alwaysOn: true,
-            pingCount: this.state.gpsPingCount,
+          this.el.sceneEl.emit('dismissSharkUi');
+          this.el.sceneEl.emit('littleItalyEnter', {
             position: { lat: pos.coords.latitude, lng: pos.coords.longitude }
           });
-        } else if (this.state.gpsActive && cooldown && !this.state.sharkVisible) {
+        } else if (!inLittleItaly && this.state.gpsActive && cooldown && !this.state.sharkVisible) {
           this.onSharkFound({
             trigger: 'gps',
             alwaysOn: false,

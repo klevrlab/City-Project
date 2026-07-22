@@ -39,13 +39,19 @@
     <script type="module" src="./src/components/shark-detector.js"></script>
     <script type="module" src="./src/components/shark-animator.js"></script>
     <script type="module" src="./src/components/tour-ui.js"></script>
+    <script type="module" src="./src/components/soccer-game.js"></script>
+    <script type="module" src="./src/components/net-shader.js"></script>
+    <script type="module" src="./src/components/ball-shader.js"></script>
+    <script type="module" src="./src/components/sharks-way-modes.js"></script>
+    <script type="module" src="./src/components/location-experiences.js"></script>
     <script type="module" src="./src/app.js"></script>
 
     <link rel="stylesheet" href="./src/css/shark-ar-8thwall-styles.css" />
 </head>
 
 <body>
-    <!-- Top bar: back to dashboard + hamburger experience-switcher (injected by initNavigation). -->
+    <!-- Top bar: back to dashboard + hamburger experience-switcher (injected by initNavigation).
+         Photo Mode / Goalie Mode live under "Sharks Way Modes" in that menu (June 10 redline). -->
     <div id="topbar">
         <a href="./index.html" class="back" aria-label="Back to home">&larr;</a>
         <h1>Sharks Way — Shark AR</h1>
@@ -69,13 +75,22 @@
         cursor="rayOrigin: mouse"
         raycaster="objects: .clickable"
         renderer="antialias: true; alpha: true; logarithmicDepthBuffer: true; colorManagement: true;"
-        tour-ui shark-detector="useGps: true">
+        tour-ui shark-detector="useGps: true" location-experiences>
 
         <a-assets>
             <!-- June 10 redline: Wayfinding cycle is Maria + Jimmy only. Stella,
                  Sharkie, and the Diving Shark were removed from this experience. -->
             <a-asset-item id="maria-swimmer" src="./assets/3D-models/SEAN_ANIMATED_WiTH_MARIA_SHARK.glb"></a-asset-item>
             <a-asset-item id="jimmy-swimmer" src="./assets/3D-models/jimmy-shark-swimmer.glb"></a-asset-item>
+            <!-- Photo Mode mascots (place on ground; Flip Camera opens selfie-ar). -->
+            <a-asset-item id="photo-sharkie" src="./assets/3D-models/sharkie_final_pose.glb"></a-asset-item>
+            <a-asset-item id="photo-sammy" src="./assets/3D-models/sammy_final_pose.glb"></a-asset-item>
+            <!-- Little Italy marble statues (June 10). Even=Athena L/R, odd=Augustus. -->
+            <a-asset-item id="athena-point-left" src="./assets/3D-models/Athena_Statue-point-left.glb"></a-asset-item>
+            <a-asset-item id="athena-point-right" src="./assets/3D-models/Athena_Statue-point-right.glb"></a-asset-item>
+            <a-asset-item id="augustus-statue" src="./assets/3D-models/Augustus_of_Prima_Porta.glb"></a-asset-item>
+            <!-- Jump-location diving shark (splash TBD). -->
+            <a-asset-item id="diving-shark" src="./assets/3D-models/maria-shark-jump-jimmy-txtr.glb"></a-asset-item>
         </a-assets>
 
         <!-- Lighting for AR Shadows -->
@@ -85,9 +100,15 @@
         <!-- Shadow Ground Plane (Clickable for spawning) -->
         <a-plane id="ground" class="clickable" position="0 0 0" rotation="-90 0 0" width="1000" height="1000" material="shader: shadow; opacity: 0.4;" shadow="receive: true"></a-plane>
 
-        <!-- Shark Content -->
+        <!-- Shark Content (Wayfinding) -->
         <a-entity id="shark-root" position="0 0 0" visible="false" shark-animator>
         </a-entity>
+
+        <!-- Photo Mode mascot root -->
+        <a-entity id="photo-root" position="0 0 0" visible="false"></a-entity>
+
+        <!-- Goalie Mode (hockey puck; input gated by SharksWayMode) -->
+        <a-entity id="soccer-root" position="0 0 0" soccer-game="usePuck: true"></a-entity>
 
         <a-camera id="camera" position="0 1.6 0"></a-camera>
     </a-scene>

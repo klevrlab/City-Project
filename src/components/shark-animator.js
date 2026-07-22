@@ -58,9 +58,11 @@ AFRAME.registerComponent('shark-animator', {
     // Tapping the ground "drops" a single Jimmy that loops its swim animation in
     // place and stays put so visitors can walk around it (redline "drop a shark").
     // Auto-detection still drives the alternating Maria/Jimmy swim-through cycle.
+    // Photo / Goalie modes own the ground tap — skip drop while those are active.
     const ground = document.getElementById('ground');
     if (ground) {
       ground.addEventListener('click', (e) => {
+        if (window.SharksWayMode && !window.SharksWayMode.isWayfinding()) return;
         const pt = e.detail.intersection.point;
         this.dropShark(pt);
       });
@@ -72,12 +74,16 @@ AFRAME.registerComponent('shark-animator', {
     });
 
     window.manualSharkSpawn = () => {
+      if (window.SharksWayMode && !window.SharksWayMode.isWayfinding()) return;
       const pt = this.getForwardTarget(4);
       this.spawnAtTarget(pt);
       this.closeNavIfOpen();
     };
 
     this.el.sceneEl.addEventListener('sharkFound', (e) => {
+      // Wayfinding-only: Photo / Goalie modes suppress auto swim-throughs.
+      if (window.SharksWayMode && !window.SharksWayMode.isWayfinding()) return;
+
       const detail = (e && e.detail) || {};
       const now = performance.now();
       const pingCount = Number(detail.pingCount || 0);

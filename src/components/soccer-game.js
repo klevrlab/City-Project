@@ -6,6 +6,10 @@
 AFRAME.registerComponent('soccer-game', {
   schema: {
     ballRadius: { type: 'number', default: 0.11 },
+    // June 10 Goalie Mode: hard-coded hockey puck instead of a soccer ball.
+    usePuck: { type: 'boolean', default: false },
+    puckRadius: { type: 'number', default: 0.12 },
+    puckHeight: { type: 'number', default: 0.035 },
     goalWidth: { type: 'number', default: 3.0 },
     goalHeight: { type: 'number', default: 1.5 },
     goalDistance: { type: 'number', default: 6.0 },
@@ -110,7 +114,12 @@ AFRAME.registerComponent('soccer-game', {
     document.addEventListener('touchend', this.onTouchEnd, { passive: true });
     document.addEventListener('touchcancel', this.onTouchCancel, { passive: true });
 
-    const showHint = () => this.updateInstruction('Tap the ground to place the soccer ball');
+    const showHint = () => {
+      if (window.SharksWayMode && !window.SharksWayMode.isGoalie()) return;
+      this.updateInstruction(this.data.usePuck
+        ? 'Tap the ground to place the goal & hockey puck'
+        : 'Tap the ground to place the soccer ball');
+    };
     if (this.el.sceneEl && this.el.sceneEl.hasLoaded) {
       showHint();
     }
@@ -150,6 +159,8 @@ AFRAME.registerComponent('soccer-game', {
   },
 
   onGroundClick: function (e) {
+    // On the combined Sharks Way page, only Goalie Mode owns ground placement.
+    if (window.SharksWayMode && !window.SharksWayMode.isGoalie()) return;
     if (this.state === 'kicking') return;
     // Keep field stable during normal play; only re-anchor after large player movement.
     if (this.state === 'placed' && !this.hasMovedFarFromOrigin()) return;
@@ -308,6 +319,10 @@ AFRAME.registerComponent('soccer-game', {
     return out;
   },
 
+  projectileRadius: function () {
+    return this.data.usePuck ? Math.max(this.data.puckHeight / 2, 0.02) : this.data.ballRadius;
+  },
+
   placeField: function (ballPos) {
     const constrainedBallPos = this.clampPointToCameraDistance(
       ballPos.clone ? ballPos.clone() : new THREE.Vector3(ballPos.x, ballPos.y, ballPos.z),
@@ -335,7 +350,7 @@ AFRAME.registerComponent('soccer-game', {
     goalPos.y = 0;
     this.goalCenter = goalPos.clone();
     this.ballPlacementPos = constrainedBallPos.clone();
-    this.ballPlacementPos.y = this.data.ballRadius;
+    this.ballPlacementPos.y = this.projectileRadius();
 
     this.ensureBall();
     this.ensureGoal();
@@ -357,7 +372,9 @@ AFRAME.registerComponent('soccer-game', {
 
     this.state = 'placed';
     this.startChallengeIfNeeded();
-    this.updateInstruction('Swipe up to shoot — drag higher for more power · tap the ball for a straight kick');
+    this.updateInstruction(this.data.usePuck
+      ? 'Swipe up to shoot the puck — Sharkie defends the goal'
+      : 'Swipe up to shoot — drag higher for more power · tap the ball for a straight kick');
     this.showReset(true);
     this.updateScore();
   },
@@ -380,8 +397,38 @@ AFRAME.registerComponent('soccer-game', {
 
   ensureBall: function () {
     if (this.ballEntity) return;
+
+    if (this.data.usePuck) {
+      // Hard-coded hockey puck: flat black cylinder + white center stripe.
+      const puck = document.createElement('a-entity');
+      puck.setAttribute('shadow', 'cast: true');
+
+      const body = document.createElement('a-cylinder');
+      body.setAttribute('radius', this.data.puckRadius);
+      body.setAttribute('height', this.data.puckHeight);
+      body.setAttribute('material', 'color: #111111; roughness: 0.55; metalness: 0.15');
+      puck.appendChild(body);
+
+      const stripe = document.createElement('a-cylinder');
+      stripe.setAttribute('radius', this.data.puckRadius * 0.42);
+      stripe.setAttribute('height', this.data.puckHeight + 0.002);
+      stripe.setAttribute('material', 'color: #f2f2f2; roughness: 0.4; metalness: 0.05');
+      puck.appendChild(stripe);
+
+      const rim = document.createElement('a-torus');
+      rim.setAttribute('radius', this.data.puckRadius * 0.92);
+      rim.setAttribute('radius-tubular', 0.008);
+      rim.setAttribute('rotation', '90 0 0');
+      rim.setAttribute('material', 'color: #2a2a2a; roughness: 0.5');
+      puck.appendChild(rim);
+
+      this.el.appendChild(puck);
+      this.ballEntity = puck;
+      return;
+    }
+
     const ent = document.createElement('a-sphere');
-    ent.setAttribute('radius', this.data.ballRadius);
+    ent.setAttribute('radius', this.projectileRadius());
     ent.setAttribute('soccer-ball-material', '');
     ent.setAttribute('shadow', 'cast: true');
     this.el.appendChild(ent);
@@ -501,7 +548,7 @@ AFRAME.registerComponent('soccer-game', {
       const t = (i + 1) / (count + 1);
       const x = ballPos.x + dir.x * distance * t;
       const z = ballPos.z + dir.z * distance * t;
-      const y = this.data.ballRadius + arcHeight * Math.sin(Math.PI * t);
+      const y = this.projectileRadius() + arcHeight * Math.sin(Math.PI * t);
       this.aimDots[i].object3D.position.set(x, y, z);
       this.aimDots[i].setAttribute('material', `color: ${dotColor}; shader: flat; transparent: true; opacity: ${(0.35 + t * 0.55).toFixed(2)}`);
       this.aimDots[i].setAttribute('visible', 'true');
@@ -518,6 +565,7 @@ AFRAME.registerComponent('soccer-game', {
   },
 
   onTouchStart: function (e) {
+    if (window.SharksWayMode && !window.SharksWayMode.isGoalie()) return;
     if (this.state !== 'placed') return;
     if (this.preRoundCountdownActive) return;
     if (!e.touches || e.touches.length === 0) return;
@@ -601,7 +649,7 @@ AFRAME.registerComponent('soccer-game', {
     const distance = this.data.goalDistance * (0.5 + power);
     const start = this.ballEntity.object3D.position.clone();
     const end = start.clone().add(direction.clone().multiplyScalar(distance));
-    end.y = this.data.ballRadius;
+    end.y = this.projectileRadius();
 
     this.kickStart = performance.now();
     this.kickFrom = start.clone();
@@ -663,7 +711,7 @@ AFRAME.registerComponent('soccer-game', {
       const bx = this.bounceFrom.x + this.bounceVelX * bt;
       const bz = this.bounceFrom.z + this.bounceVelZ * bt;
       const by = Math.max(
-        this.data.ballRadius,
+        this.projectileRadius(),
         this.bounceFrom.y + this.bounceVelY * bt - 4.9 * bt * bt
       );
       this.ballEntity.object3D.position.set(bx, by, bz);
@@ -692,7 +740,7 @@ AFRAME.registerComponent('soccer-game', {
           return;
         }
       }
-      if (by <= this.data.ballRadius + 0.01) { this.onKickEnd(); return; }
+      if (by <= this.projectileRadius() + 0.01) { this.onKickEnd(); return; }
       this.kickRafId = requestAnimationFrame(this.tickKick);
       return;
     }
@@ -705,8 +753,8 @@ AFRAME.registerComponent('soccer-game', {
         const ease = 1 - (1 - nT) * (1 - nT);
         const bx = this.netCatchFrom.x + this.goalForward.x * 0.28 * ease;
         const bz = this.netCatchFrom.z + this.goalForward.z * 0.28 * ease;
-        const by = Math.max(this.data.ballRadius,
-          this.netCatchFrom.y - (this.netCatchFrom.y - this.data.ballRadius) * ease * 0.45);
+        const by = Math.max(this.projectileRadius(),
+          this.netCatchFrom.y - (this.netCatchFrom.y - this.projectileRadius()) * ease * 0.45);
         this.ballEntity.object3D.position.set(bx, by, bz);
       }
       const mainT = Math.min((now - this.kickStart) / this.data.kickDurationMs, 1);
@@ -724,7 +772,7 @@ AFRAME.registerComponent('soccer-game', {
     const curveOffset = this.kickCurveAmount * Math.sin(Math.PI * t) * this.data.goalDistance * 0.22;
     const cx = this.kickCurveRight ? this.kickCurveRight.x * curveOffset : 0;
     const cz = this.kickCurveRight ? this.kickCurveRight.z * curveOffset : 0;
-    const baseY = this.data.ballRadius;
+    const baseY = this.projectileRadius();
     const peakT = 0.38;
     const arcT = t < peakT
       ? Math.sin(Math.PI * 0.5 * t / peakT)
@@ -811,8 +859,8 @@ AFRAME.registerComponent('soccer-game', {
 
     const postR  = 0.045;
     // Generous hit radius prevents tunneling at high ball speeds (~0.25m/frame peak)
-    const hitR   = this.data.ballRadius + postR + 0.13;  // ~0.285m posts
-    const xbarR  = this.data.ballRadius + postR + 0.02;  // ~0.175m crossbar — tighter to match visual
+    const hitR   = this.projectileRadius() + postR + 0.13;  // ~0.285m posts
+    const xbarR  = this.projectileRadius() + postR + 0.02;  // ~0.175m crossbar — tighter to match visual
     const hw     = this.data.goalWidth / 2;
     const h      = this.data.goalHeight;
 
@@ -1074,7 +1122,11 @@ AFRAME.registerComponent('soccer-game', {
     this.fieldOriginCameraPos = null;
     this.hideToast();
     this.updateTimer();
-    this.updateInstruction('Tap the ground to place the soccer ball');
+    if (!window.SharksWayMode || window.SharksWayMode.isGoalie()) {
+      this.updateInstruction(this.data.usePuck
+        ? 'Tap the ground to place the goal & hockey puck'
+        : 'Tap the ground to place the soccer ball');
+    }
     this.showReset(false);
     this.updateScore();
   },
@@ -1264,7 +1316,7 @@ void main() {
     for (let i = 0; i < this.burstN; i++) {
       const v = this.burstVelocities[i];
       positions[i * 3 + 0] = this.burstOrigin.x + v.x * bt;
-      positions[i * 3 + 1] = Math.max(this.data.ballRadius,
+      positions[i * 3 + 1] = Math.max(this.projectileRadius(),
         this.burstOrigin.y + v.y * bt - 4.9 * bt * bt);
       positions[i * 3 + 2] = this.burstOrigin.z + v.z * bt;
       colors[i * 3 + 0] = r;
