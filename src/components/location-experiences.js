@@ -16,7 +16,7 @@
 AFRAME.registerComponent('location-experiences', {
   schema: {
     statueRadiusM: { type: 'number', default: 55 },
-    towerRadiusM: { type: 'number', default: 35 },
+    towerRadiusM: { type: 'number', default: 60 },
     jumpRadiusM: { type: 'number', default: 40 },
     jumpCooldownMs: { type: 'number', default: 28000 }
   },
@@ -30,6 +30,8 @@ AFRAME.registerComponent('location-experiences', {
     this.lastJumpAt = {};
     this.userLat = null;
     this.userLng = null;
+    this.gpsStarted = false;
+    this.statusEl = null;
 
     // June 10 redline pins — North side points Right/West; South points Left/West.
     this.statuePins = [
@@ -74,24 +76,91 @@ AFRAME.registerComponent('location-experiences', {
     this.liWest = { lat: 37.334778, lng: -121.899222 };
     this.liEast = { lat: 37.335444, lng: -121.896778 };
 
+    // ?demoLocations=1 forces statues + tower in front of camera (no GPS needed).
+    const params = new URLSearchParams(window.location.search);
+    this.demoLocations = params.get('demoLocations') === '1' || params.get('demo') === 'locations';
+
     if (this.el.sceneEl.hasLoaded) this.start();
     else this.el.sceneEl.addEventListener('loaded', () => this.start(), { once: true });
   },
 
   start: function () {
-    window.addEventListener('realityready', () => this.startGps(), { once: true });
-    // Dev helper — plant Little Italy layout in front of the camera without GPS.
-    window.forceLittleItalyStatues = () => this.plantStatuesAroundCamera();
-    window.forceLeaningTower = () => this.plantTowerInFront();
+    this.ensureStatusUi();
+
+    // Dev helpers — plant without GPS.
+    window.forceLittleItalyStatues = () => {
+      this.plantStatuesAroundCamera();
+      this.setStatus('Forced: Little Italy statues');
+    };
+    window.forceLeaningTower = () => {
+      this.plantTowerInFront();
+      this.setStatus('Forced: Leaning Tower');
+    };
     window.forceJumpDemo = (id) => this.playJump(id || 'underpass');
+
+    // GPS does not need XR — start immediately, and also on realityready as backup.
+    this.startGps();
+    window.addEventListener('realityready', () => {
+      this.startGps();
+      if (this.demoLocations) this.runDemoPlant();
+      // Retry plants once AR camera is live (first GPS ping may have been early).
+      if (this.inLittleItaly && !this.statueRoot) this.plantStatuesAroundCamera();
+      if (this.userLat != null) this.onGps(this.userLat, this.userLng);
+    }, { once: true });
+
+    // Fallback if realityready never fires (seen on some iOS/WebView paths).
+    setTimeout(() => {
+      this.startGps();
+      if (this.demoLocations) this.runDemoPlant();
+      if (this.inLittleItaly && !this.statueRoot) this.plantStatuesAroundCamera();
+    }, 4000);
+
+    if (this.demoLocations) {
+      // Plant shortly after load so the camera entity exists.
+      setTimeout(() => this.runDemoPlant(), 1500);
+    }
+  },
+
+  runDemoPlant: function () {
+    this.plantStatuesAroundCamera();
+    this.plantTowerInFront();
+    this.setHint('Demo locations — statues + tower planted');
+    this.setStatus('Demo mode (?demoLocations=1)');
+  },
+
+  ensureStatusUi: function () {
+    if (document.getElementById('location-status')) {
+      this.statusEl = document.getElementById('location-status');
+      return;
+    }
+    const el = document.createElement('div');
+    el.id = 'location-status';
+    el.setAttribute('aria-live', 'polite');
+    el.textContent = 'Location: waiting for GPS…';
+    document.body.appendChild(el);
+    this.statusEl = el;
+  },
+
+  setStatus: function (text) {
+    if (!this.statusEl) this.ensureStatusUi();
+    if (this.statusEl) this.statusEl.textContent = text;
   },
 
   startGps: function () {
-    if (!('geolocation' in navigator) || this.watchId != null) return;
+    if (!('geolocation' in navigator)) {
+      this.setStatus('Location: GPS unavailable');
+      return;
+    }
+    if (this.watchId != null) return;
+    this.gpsStarted = true;
+    this.setStatus('Location: acquiring GPS…');
     this.watchId = navigator.geolocation.watchPosition(
-      (pos) => this.onGps(pos.coords.latitude, pos.coords.longitude),
-      (err) => console.warn('[location-experiences] GPS', err),
-      { enableHighAccuracy: true, maximumAge: 1500, timeout: 15000 }
+      (pos) => this.onGps(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
+      (err) => {
+        console.warn('[location-experiences] GPS', err);
+        this.setStatus(`Location: blocked (${err && err.message ? err.message : 'error'})`);
+      },
+      { enableHighAccuracy: true, maximumAge: 1500, timeout: 20000 }
     );
   },
 
@@ -110,7 +179,8 @@ AFRAME.registerComponent('location-experiences', {
   },
 
   isInLittleItaly: function (lat, lng) {
-    const pad = 0.0006;
+    // ~110 m pad so phone GPS jitter near the corridor still counts.
+    const pad = 0.001;
     const minLat = Math.min(this.liWest.lat, this.liEast.lat) - pad;
     const maxLat = Math.max(this.liWest.lat, this.liEast.lat) + pad;
     const minLng = Math.min(this.liWest.lng, this.liEast.lng) - pad;
@@ -118,31 +188,43 @@ AFRAME.registerComponent('location-experiences', {
     return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
   },
 
-  onGps: function (lat, lng) {
+  onGps: function (lat, lng, accuracy) {
     this.userLat = lat;
     this.userLng = lng;
 
+    const acc = typeof accuracy === 'number' ? ` ±${Math.round(accuracy)}m` : '';
+    const towerDist = this.haversineM(lat, lng, this.towerPin.lat, this.towerPin.lng);
     const inLI = this.isInLittleItaly(lat, lng);
-    if (inLI && !this.inLittleItaly) {
+
+    if (inLI) {
+      const wasIn = this.inLittleItaly;
       this.inLittleItaly = true;
-      console.log('[location-experiences] Entered Little Italy — planting marble statues');
-      this.plantStatuesAroundCamera();
-      this.setHint('Little Italy — marble statues pointing toward SAP');
-      this.el.sceneEl.emit('littleItalyEnter');
-    } else if (!inLI && this.inLittleItaly) {
+      // Always (re)plant if missing — first enter used to race the AR camera and never retry.
+      if (!this.statueRoot) {
+        console.log('[location-experiences] Planting Little Italy statues');
+        this.plantStatuesAroundCamera();
+        if (this.statueRoot) {
+          this.setHint('Little Italy — marble statues pointing toward SAP');
+          if (!wasIn) this.el.sceneEl.emit('littleItalyEnter');
+        }
+      }
+      this.setStatus(`Little Italy · tower ${Math.round(towerDist)}m${acc}`);
+    } else if (this.inLittleItaly) {
       this.inLittleItaly = false;
       this.clearStatues();
       this.el.sceneEl.emit('littleItalyExit');
+      this.setStatus(`Outside Little Italy · tower ${Math.round(towerDist)}m${acc}`);
+    } else {
+      this.setStatus(`GPS ok · tower ${Math.round(towerDist)}m${acc}`);
     }
 
-    // Tower (western corner) — independent of Little Italy enter/exit.
-    const towerDist = this.haversineM(lat, lng, this.towerPin.lat, this.towerPin.lng);
+    // Tower — wider catch radius; retry if plant failed earlier.
     if (towerDist <= this.data.towerRadiusM) {
       if (!this.towerEl) {
         this.plantTowerInFront();
-        this.setHint('Leaning Tower placeholder (8 m) — walk around it');
+        if (this.towerEl) this.setHint('Leaning Tower of Pisa — 8 m · walk around it');
       }
-    } else if (this.towerEl && towerDist > this.data.towerRadiusM + 15) {
+    } else if (this.towerEl && towerDist > this.data.towerRadiusM + 20) {
       this.clearTower();
     }
 
@@ -172,9 +254,13 @@ AFRAME.registerComponent('location-experiences', {
   // ---- Little Italy statues -------------------------------------------------
 
   plantStatuesAroundCamera: function () {
-    this.clearStatues();
     const cam = document.getElementById('camera');
-    if (!cam) return;
+    if (!cam || !cam.object3D) {
+      console.warn('[location-experiences] No camera yet — will retry on next GPS');
+      return false;
+    }
+
+    this.clearStatues();
 
     const root = document.createElement('a-entity');
     root.setAttribute('id', 'little-italy-statues');
@@ -211,6 +297,7 @@ AFRAME.registerComponent('location-experiences', {
         .add(right.clone().multiplyScalar(-lateral));
       this.spawnStatue(root, pin, pos, /*yawTowardStreet*/ 0);
     });
+    return true;
   },
 
   spawnStatue: function (root, pin, worldPos, yawOffset) {
@@ -254,9 +341,13 @@ AFRAME.registerComponent('location-experiences', {
   // ---- Leaning Tower (real GLB, scaled to 8 m) -----------------------------
 
   plantTowerInFront: function () {
-    this.clearTower();
     const cam = document.getElementById('camera');
-    if (!cam) return;
+    if (!cam || !cam.object3D) {
+      console.warn('[location-experiences] No camera for tower — will retry');
+      return false;
+    }
+
+    this.clearTower();
 
     const forward = new THREE.Vector3();
     cam.object3D.getWorldDirection(forward);
@@ -286,9 +377,15 @@ AFRAME.registerComponent('location-experiences', {
       obj.position.y -= box2.min.y;
     }, { once: true });
 
+    tower.addEventListener('model-error', () => {
+      console.warn('[location-experiences] Failed to load Leaning_Tower_of_Pisa.glb');
+      this.setStatus('Tower model failed to load');
+    }, { once: true });
+
     this.el.appendChild(tower);
     this.towerEl = tower;
     this.setHint('Leaning Tower of Pisa — 8 m · walk around it');
+    return true;
   },
 
   clearTower: function () {
@@ -548,3 +645,18 @@ AFRAME.registerComponent('location-experiences', {
     this.clearTower();
   }
 });
+
+// Ensure the component attaches even if the a-scene attribute was parsed before
+// this module finished registering (ES module defer race).
+function ensureLocationExperiencesAttached() {
+  const scene = document.querySelector('a-scene');
+  if (!scene || !window.AFRAME) return;
+  if (!scene.components || !scene.components['location-experiences']) {
+    scene.setAttribute('location-experiences', '');
+  }
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => setTimeout(ensureLocationExperiencesAttached, 0));
+} else {
+  setTimeout(ensureLocationExperiencesAttached, 0);
+}

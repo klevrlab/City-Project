@@ -73,3 +73,20 @@ body {
         #tap-instruction.visible {
             opacity: 1;
         }
+
+        #location-status {
+            position: fixed;
+            left: 12px;
+            bottom: 18px;
+            z-index: 1100;
+            max-width: calc(100vw - 24px);
+            background: rgba(0, 22, 26, 0.72);
+            border: 1px solid rgba(0, 169, 224, 0.35);
+            color: rgba(255, 255, 255, 0.92);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 6px 10px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            pointer-events: none;
+        }

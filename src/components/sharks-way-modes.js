@@ -2,8 +2,10 @@
  * June 10 redline — Sharks Way mode switcher.
  * Wayfinding (default) | Photo Mode | Goalie Mode
  *
- * Photo Mode: back-camera AR, tap ground to place Sharkie/Sammy; flip opens selfie.
- * Goalie Mode: activates the soccer-game prototype (Sharkie in goal) on this page.
+ * Photo Mode (real, in-page):
+ *  - Place: back-camera XR, tap ground to place Sharkie/Sammy, Snap captures AR frame
+ *  - Selfie: Flip Camera → front cam + MediaPipe shoulder mount (no page navigate)
+ * Goalie Mode: soccer-game with hard-coded puck (Sharkie in goal).
  */
 import '../css/sharks-way-modes.css';
 
@@ -23,11 +25,28 @@ const CHAR_MODEL = {
   [CHAR.SAMMY]: '#photo-sammy'
 };
 
+const CHAR_SELFIE_SRC = {
+  [CHAR.SHARKIE]: './assets/3D-models/sharkie_final_pose.glb',
+  [CHAR.SAMMY]: './assets/3D-models/sammy_final_pose.glb'
+};
+
 const state = {
   mode: MODE.WAYFINDING,
   photoCharacter: CHAR.SHARKIE,
   photoEntity: null,
-  soccerArmed: false
+  photoSubmode: 'place', // 'place' | 'selfie'
+  soccerArmed: false,
+  selfie: {
+    stream: null,
+    pose: null,
+    camera: null,
+    lastPos: null,
+    size: 250,
+    yNudge: -70,
+    xNudge: 50,
+    scriptsReady: false,
+    scriptsLoading: null
+  }
 };
 
 function closeNav() {
@@ -42,6 +61,15 @@ function setInstruction(text, visible = true) {
   if (!el) return;
   el.textContent = text;
   el.classList.toggle('visible', visible);
+}
+
+function flashToast(text, ms = 2200) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(flashToast._t);
+  flashToast._t = setTimeout(() => el.classList.remove('show'), ms);
 }
 
 function setWayfindingUi(on) {
@@ -86,26 +114,46 @@ function placePhotoMascot(point) {
   root.appendChild(ent);
   state.photoEntity = ent;
 
-  setInstruction('Tap again to move · use Flip Camera for selfie', true);
+  setInstruction('Tap again to move · Snap to save · Flip for selfie', true);
   setTimeout(() => {
     const el = document.getElementById('tap-instruction');
     if (el) el.classList.remove('visible');
   }, 2800);
 }
 
-function setPhotoUi(on) {
-  const bar = document.getElementById('photo-mode-bar');
-  if (bar) bar.classList.toggle('visible', on);
-  const root = document.getElementById('photo-root');
-  if (root) root.setAttribute('visible', on ? 'true' : 'false');
-  if (!on) clearPhotoMascot();
-  syncPhotoCharacterButtons();
-}
-
 function syncPhotoCharacterButtons() {
   document.querySelectorAll('[data-photo-char]').forEach((btn) => {
     btn.classList.toggle('active', btn.getAttribute('data-photo-char') === state.photoCharacter);
   });
+}
+
+function syncPhotoSubmodeUi() {
+  const flip = document.getElementById('photo-flip-btn');
+  if (flip) {
+    flip.textContent = state.photoSubmode === 'selfie' ? 'Back Camera' : 'Flip Camera';
+  }
+  const layer = document.getElementById('sw-selfie-layer');
+  if (layer) layer.classList.toggle('visible', state.photoSubmode === 'selfie');
+
+  const root = document.getElementById('photo-root');
+  if (root) {
+    root.setAttribute('visible',
+      state.mode === MODE.PHOTO && state.photoSubmode === 'place' ? 'true' : 'false');
+  }
+}
+
+function setPhotoUi(on) {
+  const bar = document.getElementById('photo-mode-bar');
+  if (bar) bar.classList.toggle('visible', on);
+  if (!on) {
+    if (state.photoSubmode === 'selfie') stopSelfieMode();
+    state.photoSubmode = 'place';
+    clearPhotoMascot();
+  }
+  const root = document.getElementById('photo-root');
+  if (root) root.setAttribute('visible', on && state.photoSubmode === 'place' ? 'true' : 'false');
+  syncPhotoCharacterButtons();
+  syncPhotoSubmodeUi();
 }
 
 function disarmSoccer() {
@@ -127,7 +175,6 @@ function disarmSoccer() {
 function armSoccer() {
   const soccerRoot = document.getElementById('soccer-root');
   if (!soccerRoot) return;
-  // Component is declared on the entity in HTML; just reset into idle placement.
   if (!soccerRoot.components || !soccerRoot.components['soccer-game']) {
     soccerRoot.setAttribute('soccer-game', '');
   } else if (typeof soccerRoot.components['soccer-game'].resetField === 'function') {
@@ -144,12 +191,327 @@ function setGoalieUi(on) {
   else disarmSoccer();
 }
 
+function pauseXr() {
+  try {
+    if (window.XR8 && typeof window.XR8.pause === 'function') window.XR8.pause();
+  } catch (e) { /* ignore */ }
+  const scene = document.getElementById('xrscene');
+  if (scene) scene.classList.add('sw-xr-paused');
+}
+
+function resumeXr() {
+  const scene = document.getElementById('xrscene');
+  if (scene) scene.classList.remove('sw-xr-paused');
+  try {
+    if (window.XR8 && typeof window.XR8.resume === 'function') window.XR8.resume();
+  } catch (e) { /* ignore */ }
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) {
+      resolve();
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`Failed to load ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+async function ensureSelfieScripts() {
+  if (state.selfie.scriptsReady) return;
+  if (state.selfie.scriptsLoading) return state.selfie.scriptsLoading;
+
+  state.selfie.scriptsLoading = (async () => {
+    // model-viewer as module
+    if (!customElements.get('model-viewer')) {
+      await import('https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js');
+    }
+    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js');
+    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js');
+    state.selfie.scriptsReady = true;
+  })();
+
+  try {
+    await state.selfie.scriptsLoading;
+  } finally {
+    state.selfie.scriptsLoading = null;
+  }
+}
+
+function applySelfieCharacter() {
+  const viewer = document.getElementById('sw-selfie-viewer');
+  if (!viewer) return;
+  viewer.setAttribute('src', CHAR_SELFIE_SRC[state.photoCharacter] || CHAR_SELFIE_SRC[CHAR.SHARKIE]);
+}
+
+function onSelfiePoseResults(results) {
+  const overlay = document.getElementById('sw-selfie-overlay');
+  const viewer = document.getElementById('sw-selfie-viewer');
+  if (!overlay || !viewer) return;
+
+  if (!results.poseLandmarks) {
+    overlay.classList.remove('visible');
+    state.selfie.lastPos = null;
+    return;
+  }
+
+  const lm = results.poseLandmarks;
+  // Landmark 12 = right shoulder (project convention); also blend left for stability.
+  const left = lm[11];
+  const right = lm[12];
+  if (!left || !right) return;
+
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  const half = state.selfie.size / 2;
+
+  // Mirrored selfie preview → flip X
+  const lx = (1 - left.x) * W;
+  const ly = left.y * H;
+  const rx = (1 - right.x) * W;
+  const ry = right.y * H;
+
+  let px = rx + state.selfie.xNudge;
+  let py = ry + state.selfie.yNudge;
+  // Soft blend toward mid-shoulder so the mascot sits more naturally
+  px = px * 0.65 + ((lx + rx) / 2) * 0.35;
+  py = py * 0.65 + ((ly + ry) / 2) * 0.35;
+
+  overlay.style.left = `${px - half}px`;
+  overlay.style.top = `${py - half}px`;
+  overlay.classList.add('visible');
+  viewer.style.width = `${state.selfie.size}px`;
+  viewer.style.height = `${state.selfie.size}px`;
+  state.selfie.lastPos = { px, py };
+}
+
+async function startSelfieMode() {
+  setInstruction('Selfie Mode — line up shoulders, then Snap', true);
+  flashToast('Starting front camera…');
+
+  try {
+    await ensureSelfieScripts();
+  } catch (e) {
+    console.warn('Selfie scripts failed', e);
+    flashToast('Could not load selfie libraries');
+    return;
+  }
+
+  pauseXr();
+  state.photoSubmode = 'selfie';
+  syncPhotoSubmodeUi();
+  applySelfieCharacter();
+
+  const video = document.getElementById('sw-selfie-video');
+  if (!video) return;
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    state.selfie.stream = stream;
+    video.srcObject = stream;
+    await video.play();
+  } catch (e) {
+    console.warn('Front camera error', e);
+    flashToast('Front camera blocked — check permissions');
+    stopSelfieMode();
+    return;
+  }
+
+  if (typeof Pose === 'undefined' || typeof Camera === 'undefined') {
+    flashToast('Pose tracker unavailable');
+    return;
+  }
+
+  const pose = new Pose({
+    locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
+  });
+  pose.setOptions({
+    modelComplexity: 0,
+    smoothLandmarks: true,
+    enableSegmentation: false,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5
+  });
+  pose.onResults(onSelfiePoseResults);
+  state.selfie.pose = pose;
+
+  const camera = new Camera(video, {
+    onFrame: async () => {
+      if (state.photoSubmode !== 'selfie' || !state.selfie.pose) return;
+      try { await state.selfie.pose.send({ image: video }); } catch (e) { /* frame drop */ }
+    },
+    width: 1280,
+    height: 720
+  });
+  state.selfie.camera = camera;
+  await camera.start();
+  setInstruction('Selfie Mode — Snap to capture · Flip returns to place', true);
+}
+
+function stopSelfieMode() {
+  try {
+    if (state.selfie.camera && typeof state.selfie.camera.stop === 'function') {
+      state.selfie.camera.stop();
+    }
+  } catch (e) { /* ignore */ }
+  state.selfie.camera = null;
+  state.selfie.pose = null;
+  state.selfie.lastPos = null;
+
+  if (state.selfie.stream) {
+    state.selfie.stream.getTracks().forEach((t) => t.stop());
+    state.selfie.stream = null;
+  }
+  const video = document.getElementById('sw-selfie-video');
+  if (video) video.srcObject = null;
+
+  const overlay = document.getElementById('sw-selfie-overlay');
+  if (overlay) overlay.classList.remove('visible');
+
+  state.photoSubmode = 'place';
+  syncPhotoSubmodeUi();
+  resumeXr();
+}
+
+async function togglePhotoCamera() {
+  if (state.mode !== MODE.PHOTO) return;
+  if (state.photoSubmode === 'place') {
+    await startSelfieMode();
+  } else {
+    stopSelfieMode();
+    setInstruction('Photo Mode — tap the ground to place your mascot', true);
+  }
+}
+
+function showPreview(dataUrl) {
+  const preview = document.getElementById('sw-photo-preview');
+  const img = document.getElementById('sw-photo-preview-img');
+  if (!preview || !img) return;
+  img.src = dataUrl;
+  preview.classList.add('visible');
+}
+
+function hidePreview() {
+  const preview = document.getElementById('sw-photo-preview');
+  if (preview) preview.classList.remove('visible');
+}
+
+function capturePlaceMode() {
+  const scene = document.querySelector('a-scene');
+  const canvas = scene && (scene.canvas || scene.querySelector('canvas'));
+  if (!canvas) {
+    flashToast('AR canvas not ready');
+    return;
+  }
+  try {
+    showPreview(canvas.toDataURL('image/png'));
+  } catch (e) {
+    console.warn('Place capture failed', e);
+    flashToast('Capture failed (try again)');
+  }
+}
+
+function captureSelfieMode() {
+  const video = document.getElementById('sw-selfie-video');
+  const viewer = document.getElementById('sw-selfie-viewer');
+  if (!video || !video.videoWidth) {
+    flashToast('Camera not ready');
+    return;
+  }
+
+  const out = document.createElement('canvas');
+  out.width = video.videoWidth;
+  out.height = video.videoHeight;
+  const ctx = out.getContext('2d');
+  const scaleX = video.videoWidth / window.innerWidth;
+  const scaleY = video.videoHeight / window.innerHeight;
+
+  ctx.save();
+  ctx.translate(out.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, out.width, out.height);
+  ctx.restore();
+
+  if (state.selfie.lastPos && viewer && viewer.shadowRoot) {
+    const mvCanvas = viewer.shadowRoot.querySelector('canvas');
+    if (mvCanvas) {
+      const size = state.selfie.size;
+      ctx.save();
+      ctx.translate(out.width, 0);
+      ctx.scale(-1, 1);
+      const x = (out.width / scaleX - state.selfie.lastPos.px - size / 2) * scaleX;
+      const y = (state.selfie.lastPos.py - size / 2) * scaleY;
+      const w = size * scaleX;
+      const h = size * scaleY;
+      ctx.translate(x + w, y);
+      ctx.scale(-1, 1);
+      ctx.drawImage(mvCanvas, 0, 0, w, h);
+      ctx.restore();
+    }
+  }
+
+  showPreview(out.toDataURL('image/png'));
+}
+
+function snapPhoto() {
+  if (state.mode !== MODE.PHOTO) return;
+  const flash = document.getElementById('sw-photo-flash');
+  if (flash) {
+    flash.classList.add('on');
+    setTimeout(() => flash.classList.remove('on'), 180);
+  }
+  if (state.photoSubmode === 'selfie') captureSelfieMode();
+  else capturePlaceMode();
+}
+
+function savePreview() {
+  const img = document.getElementById('sw-photo-preview-img');
+  if (!img || !img.src) return;
+  const a = document.createElement('a');
+  a.href = img.src;
+  a.download = `sharks-way-photo-${Date.now()}.png`;
+  a.click();
+  hidePreview();
+  flashToast('Saved');
+}
+
+async function sharePreview() {
+  const img = document.getElementById('sw-photo-preview-img');
+  if (!img || !img.src) return;
+  try {
+    if (navigator.share) {
+      const blob = await (await fetch(img.src)).blob();
+      await navigator.share({
+        files: [new File([blob], 'sharks-way-photo.png', { type: 'image/png' })],
+        title: 'Sharks Way Photo'
+      });
+    } else {
+      flashToast('Share not supported — use Save');
+    }
+  } catch (e) {
+    /* user cancelled */
+  }
+}
+
 export function getSharksWayMode() {
   return state.mode;
 }
 
 export function setSharksWayMode(mode) {
-  if (!Object.values(MODE).includes(mode) || mode === state.mode) {
+  if (!Object.values(MODE).includes(mode)) {
+    highlightModeButtons(state.mode);
+    closeNav();
+    return;
+  }
+  if (mode === state.mode) {
     highlightModeButtons(state.mode);
     closeNav();
     return;
@@ -158,12 +520,10 @@ export function setSharksWayMode(mode) {
   const prev = state.mode;
   state.mode = mode;
 
-  // Tear down previous mode.
   if (prev === MODE.PHOTO) setPhotoUi(false);
   if (prev === MODE.GOALIE) setGoalieUi(false);
   if (prev === MODE.WAYFINDING) setWayfindingUi(false);
 
-  // Bring up new mode.
   if (mode === MODE.WAYFINDING) {
     setWayfindingUi(true);
     setInstruction('Sharks appear automatically along Sharks Way — point your camera around', true);
@@ -191,7 +551,7 @@ function highlightModeButtons(mode) {
 }
 
 function onGroundClick(e) {
-  if (state.mode !== MODE.PHOTO) return;
+  if (state.mode !== MODE.PHOTO || state.photoSubmode !== 'place') return;
   const pt = e.detail && e.detail.intersection && e.detail.intersection.point;
   if (!pt) return;
   placePhotoMascot(pt);
@@ -205,11 +565,51 @@ function injectModeUi() {
   photoBar.innerHTML = `
     <button type="button" data-photo-char="sharkie" class="sw-chip active">Sharkie</button>
     <button type="button" data-photo-char="sammy" class="sw-chip">Sammy</button>
-    <a id="photo-flip-btn" class="sw-chip sw-chip-link" href="./selfie-ar.html?character=sharkey">Flip Camera</a>
+    <button type="button" id="photo-flip-btn" class="sw-chip">Flip Camera</button>
+    <button type="button" id="photo-snap-btn" class="sw-chip sw-chip-snap" aria-label="Take photo">Snap</button>
   `;
   document.body.appendChild(photoBar);
 
-  // Goalie / soccer overlays (hidden until Goalie Mode)
+  // In-page selfie layer (front camera + shoulder mascot)
+  const selfie = document.createElement('div');
+  selfie.id = 'sw-selfie-layer';
+  selfie.innerHTML = `
+    <video id="sw-selfie-video" autoplay playsinline muted></video>
+    <div id="sw-selfie-overlay">
+      <model-viewer id="sw-selfie-viewer"
+        src="./assets/3D-models/sharkie_final_pose.glb"
+        camera-orbit="0deg 75deg 150%"
+        field-of-view="60deg"
+        disable-zoom
+        interaction-prompt="none"
+        environment-image="neutral"
+        shadow-intensity="0"
+        style="width:250px;height:250px;background:transparent;--poster-color:transparent;">
+      </model-viewer>
+    </div>
+    <div id="sw-selfie-hint">Step back so your shoulders are visible</div>
+  `;
+  document.body.appendChild(selfie);
+
+  const flash = document.createElement('div');
+  flash.id = 'sw-photo-flash';
+  document.body.appendChild(flash);
+
+  const preview = document.createElement('div');
+  preview.id = 'sw-photo-preview';
+  preview.innerHTML = `
+    <div class="sw-preview-card">
+      <div class="sw-preview-label">Your Sharks Way Photo</div>
+      <img id="sw-photo-preview-img" alt="Captured photo">
+      <div class="sw-preview-actions">
+        <button type="button" id="sw-photo-retake">Retake</button>
+        <button type="button" id="sw-photo-save">Save</button>
+        <button type="button" id="sw-photo-share">Share</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(preview);
+
   if (!document.getElementById('timer')) {
     const topbar = document.getElementById('topbar');
     if (topbar) {
@@ -267,24 +667,30 @@ function wirePhotoBar() {
     btn.addEventListener('click', () => {
       state.photoCharacter = btn.getAttribute('data-photo-char');
       syncPhotoCharacterButtons();
-      const flip = document.getElementById('photo-flip-btn');
-      if (flip) {
-        flip.href = state.photoCharacter === CHAR.SAMMY
-          ? './selfie-ar.html'
-          : './selfie-ar.html?character=sharkey';
-      }
       if (state.photoEntity) {
-        const model = CHAR_MODEL[state.photoCharacter];
-        state.photoEntity.setAttribute('gltf-model', model);
+        state.photoEntity.setAttribute('gltf-model', CHAR_MODEL[state.photoCharacter]);
       }
+      if (state.photoSubmode === 'selfie') applySelfieCharacter();
     });
   });
+
+  const flip = document.getElementById('photo-flip-btn');
+  if (flip) flip.addEventListener('click', () => { togglePhotoCamera(); });
+
+  const snap = document.getElementById('photo-snap-btn');
+  if (snap) snap.addEventListener('click', () => snapPhoto());
+
+  const retake = document.getElementById('sw-photo-retake');
+  const save = document.getElementById('sw-photo-save');
+  const share = document.getElementById('sw-photo-share');
+  if (retake) retake.addEventListener('click', hidePreview);
+  if (save) save.addEventListener('click', savePreview);
+  if (share) share.addEventListener('click', () => { sharePreview(); });
 }
 
 export function initSharksWayModes() {
   injectModeUi();
   injectNavModeSection();
-  // Navigation injects #nav-menu asynchronously relative to this module — retry briefly.
   if (!document.getElementById('sw-mode-section')) {
     let tries = 0;
     const id = setInterval(() => {
@@ -298,18 +704,17 @@ export function initSharksWayModes() {
   const ground = document.getElementById('ground');
   if (ground) ground.addEventListener('click', onGroundClick);
 
-  // Expose for shark-animator / console
   window.SharksWayMode = {
     get: getSharksWayMode,
     set: setSharksWayMode,
     MODE,
     isWayfinding: () => state.mode === MODE.WAYFINDING,
     isPhoto: () => state.mode === MODE.PHOTO,
-    isGoalie: () => state.mode === MODE.GOALIE
+    isGoalie: () => state.mode === MODE.GOALIE,
+    photoSubmode: () => state.photoSubmode
   };
 }
 
-// Auto-init when this module is loaded on the Sharks Way page.
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initSharksWayModes);
 } else {
