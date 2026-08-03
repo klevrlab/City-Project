@@ -109,7 +109,9 @@ function placePhotoMascot(point) {
   ent.setAttribute('gltf-model', model);
   ent.setAttribute('position', `${point.x} ${point.y + 0.02} ${point.z}`);
   ent.setAttribute('rotation', `0 ${facingYaw} 0`);
-  ent.setAttribute('scale', '0.45 0.45 0.45');
+  // Sharkie is 1.95 m in its GLB and Sammy 2.96 m, and both float above their
+  // origin — normalize to a common person height so photos frame consistently.
+  ent.setAttribute('model-normalize', 'height: 1.9');
   ent.setAttribute('shadow', 'cast: true');
   root.appendChild(ent);
   state.photoEntity = ent;

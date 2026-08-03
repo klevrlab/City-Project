@@ -116,6 +116,54 @@ city-project/
 - Minis & Trophy at Arena Green West — Mar 26 & 28, 2026 (past)
 - International Football Watch Together — Jun–Jul 2026, San Pedro Square Market
 
+## Model Sizing
+
+The GLBs share no unit convention — measured raw heights: Athena **206 m**, Augustus **1.0 m**,
+Leaning Tower **47.5 m**, Sharkie **1.95 m** (floating 1.01 m above its origin), Sammy **2.96 m**
+(floating 0.42 m). Hand-tuned `scale="1.1 1.1 1.1"` values therefore meant something different per
+asset and broke on every re-export.
+
+`src/components/model-normalize.js` sizes a model in metres on load and drops it on the ground:
+`model-normalize="height: 2.5"` or `maxDim: 3` for long, low shapes (sharks). It scales the *mesh*,
+so entity transforms and saved placement overrides stack on top instead of being clobbered.
+
+Current targets (ceiling ≈ one storey):
+
+| Content | Size | Why |
+|---|---|---|
+| Little Italy statues (Athena + Augustus) | 2.5 m tall | street statue, above human, under a storey |
+| Sharkie / Sammy (Photo Mode + finale dancers) | 1.9 m tall | person-scale for photos |
+| Finale circle sharks, jump diving shark | 3.0 m longest axis | height is the wrong axis to pin on a shark |
+| Leaning Tower | 8 m tall | deliberate exception — the June 10 redline spec's 8 m |
+
+Wayfinding swim-through sharks (`shark-animator.js`, ~0.4 scale) are intentionally left as tuned.
+
+## Placement Debug Mode
+
+`shark-ar-8thwall.html?debug=1` loads `src/components/debug-placement.js` — an on-device HUD for
+testing placements without walking the corridor. (Add `&demoLocations=1` to plant Little Italy +
+tower with no GPS.)
+
+- **STATUS** — XR/GPS/FPS, geofence distances with a "fire" button per jump pin, and every
+  `<a-asset-item>` with its load state *and* HTTP status. A 404 GLB shows up here first.
+- **MODELS** — spawn any GLB from the manifest 3 m ahead (or all of them in a grid). Each spawn
+  logs its bounding-box size, which is how you tell "didn't load" from "loaded at 200 m tall".
+- **OBJECTS** — every placed entity: key, loaded/ERROR, size, distance, visibility. Tap to select,
+  or arm tap-to-select and tap the model in the camera view.
+- **MOVE** — nudge/rotate/scale in camera-relative axes, drag along the ground, then SAVE.
+
+Saves are keyed by `data-placement-key` (`little-italy/pin-3`, `leaning-tower`,
+`finale/dancer-sammy`, …) and stored by `src/utils/placement-overrides.js`:
+
+1. `data/placement-overrides.json` — committed baseline (optional; 404 is fine)
+2. `localStorage['sharksway.placement']` — this device's tuning, wins over the baseline
+
+EXPORT downloads the merged JSON; commit it as `data/placement-overrides.json` to make a tweak
+everyone's. Saved transforms are **local to the plant anchor** (a root entity dropped at the
+camera's ground position and yawed to camera-forward), not world coordinates — content is planted
+relative to the camera when a geofence fires, so absolute world positions would be meaningless on
+the next visit. `window.SharksWayDebug` exposes the same operations to the console.
+
 ## Development Notes
 
 - No test suite (`npm test` is a placeholder).

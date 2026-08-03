@@ -42,11 +42,17 @@
     <script type="module" src="./src/components/soccer-game.js"></script>
     <script type="module" src="./src/components/net-shader.js"></script>
     <script type="module" src="./src/components/ball-shader.js"></script>
+    <script type="module" src="./src/components/model-normalize.js"></script>
     <script type="module" src="./src/components/sharks-way-modes.js"></script>
+    <!-- Placement overrides must register before anything plants content. -->
+    <script type="module" src="./src/utils/placement-overrides.js"></script>
     <script type="module" src="./src/components/location-experiences.js"></script>
+    <!-- Debug placement HUD — inert unless ?debug=1 is in the URL. -->
+    <script type="module" src="./src/components/debug-placement.js"></script>
     <script type="module" src="./src/app.js"></script>
 
     <link rel="stylesheet" href="./src/css/shark-ar-8thwall-styles.css" />
+    <link rel="stylesheet" href="./src/css/debug-placement.css" />
 </head>
 
 <body>

@@ -13,6 +13,17 @@
  * compass lock is unreliable in browser XR, so entry-time local layout is the
  * intentional placeholder strategy.
  */
+/**
+ * Real-world sizes, in metres, for everything this component plants. Models are
+ * normalized to these on load (see model-normalize.js) — none of the source
+ * GLBs share a unit convention, so per-asset scale factors were guesswork.
+ * Ceiling is roughly one storey (~3 m); the Leaning Tower is the deliberate
+ * exception, spec'd at 8 m in the June 10 redline.
+ */
+const STATUE_HEIGHT_M = 2.5;   // marble statues — taller than a person, well under a storey
+const MASCOT_HEIGHT_M = 1.9;   // Sharkie / Sammy — person-scale for photos
+const SHARK_MAX_DIM_M = 3.0;   // sharks are long and low, so pin the longest axis
+
 AFRAME.registerComponent('location-experiences', {
   schema: {
     statueRadiusM: { type: 'number', default: 55 },
@@ -253,6 +264,35 @@ AFRAME.registerComponent('location-experiences', {
 
   // ---- Little Italy statues -------------------------------------------------
 
+  /**
+   * Anchor root at the camera's ground position, yawed so that local −Z is the
+   * camera's forward. Children then live in a stable "metres ahead / metres
+   * right" frame, which is what debug mode saves as a placement override.
+   */
+  makeAnchorRoot: function (id, cam) {
+    const camObj = cam.object3D;
+    const forward = new THREE.Vector3();
+    camObj.getWorldDirection(forward);
+    forward.y = 0;
+    if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
+    forward.normalize();
+
+    const origin = camObj.getWorldPosition(new THREE.Vector3());
+    const root = document.createElement('a-entity');
+    root.setAttribute('id', id);
+    root.setAttribute('position', `${origin.x} 0 ${origin.z}`);
+    root.setAttribute('rotation', `0 ${THREE.MathUtils.radToDeg(Math.atan2(-forward.x, -forward.z))} 0`);
+    return root;
+  },
+
+  place: function (el, key, defaults) {
+    if (window.PlacementOverrides) return window.PlacementOverrides.apply(el, key, defaults);
+    if (defaults.position) el.setAttribute('position', defaults.position);
+    if (defaults.rotation) el.setAttribute('rotation', defaults.rotation);
+    if (defaults.scale) el.setAttribute('scale', defaults.scale);
+    return el;
+  },
+
   plantStatuesAroundCamera: function () {
     const cam = document.getElementById('camera');
     if (!cam || !cam.object3D) {
@@ -262,71 +302,51 @@ AFRAME.registerComponent('location-experiences', {
 
     this.clearStatues();
 
-    const root = document.createElement('a-entity');
-    root.setAttribute('id', 'little-italy-statues');
+    const root = this.makeAnchorRoot('little-italy-statues', cam);
     this.el.appendChild(root);
     this.statueRoot = root;
 
-    // Two rows parallel to "street" (camera forward = toward SAP / west-ish).
+    // Two rows parallel to "street" (local −Z = toward SAP / west-ish).
     // North side = +X local, South side = −X local; spaced along Z.
-    const camObj = cam.object3D;
-    const forward = new THREE.Vector3();
-    camObj.getWorldDirection(forward);
-    forward.y = 0;
-    if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
-    forward.normalize();
-    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-    const origin = camObj.position.clone().add(forward.clone().multiplyScalar(6));
-
     const northPins = this.statuePins.filter((p) => p.side === 'north');
     const southPins = this.statuePins.filter((p) => p.side === 'south');
     const spacing = 4.5;
     const lateral = 3.2;
+    const aheadM = 6;
 
     northPins.forEach((pin, i) => {
       const along = (i - (northPins.length - 1) / 2) * spacing;
-      const pos = origin.clone()
-        .add(forward.clone().multiplyScalar(along))
-        .add(right.clone().multiplyScalar(lateral));
-      this.spawnStatue(root, pin, pos, /*yawTowardStreet*/ 180);
+      this.spawnStatue(root, pin, { x: lateral, y: 0, z: -(aheadM + along) }, /*faceStreet*/ -90);
     });
     southPins.forEach((pin, i) => {
       const along = (i - (southPins.length - 1) / 2) * spacing;
-      const pos = origin.clone()
-        .add(forward.clone().multiplyScalar(along))
-        .add(right.clone().multiplyScalar(-lateral));
-      this.spawnStatue(root, pin, pos, /*yawTowardStreet*/ 0);
+      this.spawnStatue(root, pin, { x: -lateral, y: 0, z: -(aheadM + along) }, /*faceStreet*/ 90);
     });
     return true;
   },
 
-  spawnStatue: function (root, pin, worldPos, yawOffset) {
+  spawnStatue: function (root, pin, localPos, yaw) {
     const ent = document.createElement('a-entity');
-    ent.setAttribute('position', `${worldPos.x} ${worldPos.y} ${worldPos.z}`);
     ent.setAttribute('shadow', 'cast: true');
     ent.setAttribute('data-statue-pin', String(pin.id));
-
-    // Face across the street (pointing roughly west / toward SAP per redline).
-    const cam = document.getElementById('camera');
-    let yaw = yawOffset;
-    if (cam) {
-      const dir = new THREE.Vector3().subVectors(cam.object3D.position, worldPos);
-      dir.y = 0;
-      if (dir.lengthSq() > 0.01) yaw = Math.atan2(dir.x, dir.z) * (180 / Math.PI);
-    }
-    ent.setAttribute('rotation', `0 ${yaw} 0`);
 
     if (pin.odd) {
       // Spec: odd pins = Augustus of Prima Porta.
       ent.setAttribute('gltf-model', '#augustus-statue');
-      ent.setAttribute('scale', '1.0 1.0 1.0');
     } else {
-      const model = pin.side === 'north'
-        ? '#athena-point-right'
-        : '#athena-point-left';
-      ent.setAttribute('gltf-model', model);
-      ent.setAttribute('scale', '1.1 1.1 1.1');
+      ent.setAttribute('gltf-model', pin.side === 'north' ? '#athena-point-right' : '#athena-point-left');
     }
+
+    // Raw GLBs are 1 m (Augustus) and 206 m (Athena) tall — normalize both to a
+    // consistent street-statue height rather than per-asset scale guesses.
+    ent.setAttribute('model-normalize', `height: ${STATUE_HEIGHT_M}`);
+
+    // Face across the street (pointing roughly west / toward SAP per redline).
+    this.place(ent, `little-italy/pin-${pin.id}`, {
+      position: localPos,
+      rotation: { x: 0, y: yaw, z: 0 },
+      scale: '1 1 1'
+    });
 
     root.appendChild(ent);
   },
@@ -349,41 +369,29 @@ AFRAME.registerComponent('location-experiences', {
 
     this.clearTower();
 
-    const forward = new THREE.Vector3();
-    cam.object3D.getWorldDirection(forward);
-    forward.y = 0;
-    if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
-    forward.normalize();
-    const pos = cam.object3D.position.clone().add(forward.multiplyScalar(12));
-    pos.y = 0;
-
+    const root = this.makeAnchorRoot('leaning-tower-anchor', cam);
     const h = this.towerPin.heightM;
     const tower = document.createElement('a-entity');
     tower.setAttribute('id', 'leaning-tower');
-    tower.setAttribute('position', `${pos.x} 0 ${pos.z}`);
     tower.setAttribute('gltf-model', '#leaning-tower-model');
     tower.setAttribute('shadow', 'cast: true');
 
-    tower.addEventListener('model-loaded', () => {
-      const obj = tower.object3D;
-      // Normalize to exactly 8 m tall and sit on the ground plane.
-      const box = new THREE.Box3().setFromObject(obj);
-      const size = new THREE.Vector3();
-      box.getSize(size);
-      const s = h / Math.max(size.y, 0.001);
-      obj.scale.set(s, s, s);
-      obj.updateMatrixWorld(true);
-      const box2 = new THREE.Box3().setFromObject(obj);
-      obj.position.y -= box2.min.y;
-    }, { once: true });
+    // Raw GLB is 47.5 m tall; the redline calls for an 8 m landmark replica.
+    tower.setAttribute('model-normalize', `height: ${h}`);
+    this.place(tower, 'leaning-tower', {
+      position: { x: 0, y: 0, z: -12 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: '1 1 1'
+    });
 
     tower.addEventListener('model-error', () => {
       console.warn('[location-experiences] Failed to load Leaning_Tower_of_Pisa.glb');
       this.setStatus('Tower model failed to load');
     }, { once: true });
 
-    this.el.appendChild(tower);
-    this.towerEl = tower;
+    root.appendChild(tower);
+    this.el.appendChild(root);
+    this.towerEl = root;
     this.setHint('Leaning Tower of Pisa — 8 m · walk around it');
     return true;
   },
@@ -484,7 +492,7 @@ AFRAME.registerComponent('location-experiences', {
 
     const ent = document.createElement('a-entity');
     ent.setAttribute('gltf-model', '#diving-shark');
-    ent.setAttribute('scale', '0.38 0.38 0.38');
+    ent.setAttribute('model-normalize', `maxDim: ${SHARK_MAX_DIM_M}; ground: false`);
     ent.setAttribute('position', `${start.x} ${start.y} ${start.z}`);
     ent.setAttribute('animation-mixer', 'loop: repeat; timeScale: 1.1');
     ent.setAttribute('shadow', 'cast: true');
@@ -541,17 +549,12 @@ AFRAME.registerComponent('location-experiences', {
 
   // Spec asks for a 60 m circle — AR scale uses ~10 m radius so it stays in view.
   plantFinaleCircle: function (cam) {
-    const forward = new THREE.Vector3();
-    cam.object3D.getWorldDirection(forward);
-    forward.y = 0;
-    if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
-    forward.normalize();
-    const center = cam.object3D.position.clone().add(forward.clone().multiplyScalar(10));
-    center.y = 0;
+    const anchor = this.makeAnchorRoot('finale-circle-anchor', cam);
 
     const pivot = document.createElement('a-entity');
     pivot.setAttribute('id', 'finale-circle');
-    pivot.setAttribute('position', `${center.x} 0.5 ${center.z}`);
+    // Rotation is driven by the orbit animation, so only position is overridable.
+    this.place(pivot, 'finale/circle-center', { position: { x: 0, y: 0.5, z: -10 } });
     pivot.setAttribute('animation__orbit', {
       property: 'rotation',
       to: '0 360 0',
@@ -562,23 +565,23 @@ AFRAME.registerComponent('location-experiences', {
 
     const radius = 10; // AR stand-in for the 60 m corridor circle
     const sharks = [
-      { model: '#circle-maria', angleDeg: 0, scale: '0.32 0.32 0.32' },
-      { model: '#circle-stella', angleDeg: 180, scale: '0.30 0.30 0.30' }
+      { id: 'maria', model: '#circle-maria', angleDeg: 0 },
+      { id: 'stella', model: '#circle-stella', angleDeg: 180 }
     ];
 
     sharks.forEach((s) => {
       const rad = s.angleDeg * Math.PI / 180;
-      const x = Math.cos(rad) * radius;
-      const z = Math.sin(rad) * radius;
       const ent = document.createElement('a-entity');
       ent.setAttribute('gltf-model', s.model);
-      ent.setAttribute('scale', s.scale);
-      ent.setAttribute('position', `${x} 0 ${z}`);
-      // Face tangent to the circle (travel direction).
-      const tangentYaw = (s.angleDeg + 90);
-      ent.setAttribute('rotation', `0 ${tangentYaw} 0`);
+      ent.setAttribute('model-normalize', `maxDim: ${SHARK_MAX_DIM_M}; ground: false`);
       ent.setAttribute('animation-mixer', 'loop: repeat; timeScale: 1.0');
       ent.setAttribute('shadow', 'cast: true');
+      // Face tangent to the circle (travel direction).
+      this.place(ent, `finale/circle-${s.id}`, {
+        position: { x: Math.cos(rad) * radius, y: 0, z: Math.sin(rad) * radius },
+        rotation: { x: 0, y: s.angleDeg + 90, z: 0 },
+        scale: '1 1 1'
+      });
       pivot.appendChild(ent);
     });
 
@@ -590,32 +593,31 @@ AFRAME.registerComponent('location-experiences', {
     label.setAttribute('position', '0 2.2 0');
     pivot.appendChild(label);
 
-    this.el.appendChild(pivot);
+    anchor.appendChild(pivot);
+    this.el.appendChild(anchor);
     setTimeout(() => {
-      if (pivot.parentNode) pivot.parentNode.removeChild(pivot);
+      if (anchor.parentNode) anchor.parentNode.removeChild(anchor);
     }, 16000);
   },
 
   plantFinaleDancers: function (cam) {
-    const forward = new THREE.Vector3();
-    cam.object3D.getWorldDirection(forward);
-    forward.y = 0;
-    if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
-    forward.normalize();
-    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-    const base = cam.object3D.position.clone().add(forward.clone().multiplyScalar(4));
+    const anchor = this.makeAnchorRoot('finale-dancers-anchor', cam);
 
     const dancers = [
-      { model: '#photo-sharkie', offset: -0.8, label: 'Sharkie\n(dance TBD)' },
-      { model: '#photo-sammy', offset: 0.8, label: 'Sammy\n(dance TBD)' }
+      { id: 'sharkie', model: '#photo-sharkie', offset: -0.8, label: 'Sharkie\n(dance TBD)' },
+      { id: 'sammy', model: '#photo-sammy', offset: 0.8, label: 'Sammy\n(dance TBD)' }
     ];
 
     dancers.forEach((d) => {
-      const pos = base.clone().add(right.clone().multiplyScalar(d.offset));
       const ent = document.createElement('a-entity');
       ent.setAttribute('gltf-model', d.model);
-      ent.setAttribute('scale', '0.35 0.35 0.35');
-      ent.setAttribute('position', `${pos.x} 0.02 ${pos.z}`);
+      // Both mascot GLBs float above their origin and differ in height — normalize.
+      ent.setAttribute('model-normalize', `height: ${MASCOT_HEIGHT_M}`);
+      // Rotation is the spin animation; position/scale are overridable.
+      this.place(ent, `finale/dancer-${d.id}`, {
+        position: { x: d.offset, y: 0.02, z: -4 },
+        scale: '1 1 1'
+      });
       ent.setAttribute('animation__spin', {
         property: 'rotation',
         to: '0 360 0',
@@ -630,11 +632,13 @@ AFRAME.registerComponent('location-experiences', {
       label.setAttribute('color', '#fff');
       label.setAttribute('position', '0 2.1 0');
       ent.appendChild(label);
-      this.el.appendChild(ent);
-      setTimeout(() => {
-        if (ent.parentNode) ent.parentNode.removeChild(ent);
-      }, 12000);
+      anchor.appendChild(ent);
     });
+
+    this.el.appendChild(anchor);
+    setTimeout(() => {
+      if (anchor.parentNode) anchor.parentNode.removeChild(anchor);
+    }, 12000);
   },
 
   remove: function () {
