@@ -74,7 +74,9 @@ AFRAME.registerComponent('debug-placement', {
     this.lastFpsAt = performance.now();
     this.assetRows = new Map();
     this.spawned = [];
-    this.normalizeSpawns = false;
+    // Default to normalized: a raw Athena spawn is 206 m and fills the sky,
+    // which reads as "the tool is broken" rather than "this GLB has no units".
+    this.normalizeSpawns = true;
     this.log = [];
 
     // Collectors first — the first render() reads their state.
@@ -277,6 +279,7 @@ AFRAME.registerComponent('debug-placement', {
       const state = el.dataset.dbgState || (mesh ? 'loaded' : 'pending');
       const dims = el.dataset.dbgDims || (mesh ? measure(el) : '—');
       const visible = el.object3D ? el.object3D.visible && isAncestryVisible(el) : false;
+      const height = el.object3D ? boxOf(el).y : 0;
       return {
         el,
         key,
@@ -285,6 +288,10 @@ AFRAME.registerComponent('debug-placement', {
         dims,
         dist,
         visible,
+        height,
+        // Anything over a storey is either unnormalized or a bad override.
+        oversized: height > 4 && key !== 'leaning-tower',
+        normalized: !!el.components && !!el.components['model-normalize'],
         world,
         summary: `${key} · ${state} · ${dims} · ${dist.toFixed(1)}m · ${visible ? 'visible' : 'HIDDEN'}`
       };
@@ -310,7 +317,28 @@ AFRAME.registerComponent('debug-placement', {
     const xr = window.XR8 ? (window.XR8.isPaused && window.XR8.isPaused() ? 'paused' : 'running') : 'not loaded';
     const objs = this.collectObjects();
     const failed = objs.filter((o) => o.state === 'ERROR').length;
+    const huge = objs.filter((o) => o.oversized);
     const mode = window.SharksWayMode && window.SharksWayMode.get ? window.SharksWayMode.get() : 'n/a';
+
+    // Self-check: the usual reasons a statue is still 200 m tall.
+    const checks = [];
+    const hasNormalize = !!(window.AFRAME && AFRAME.components['model-normalize']);
+    checks.push(check('model-normalize registered', hasNormalize,
+      hasNormalize ? 'ok' : 'MISSING — script not loaded; hard-reload to clear cache'));
+    const overridesWithScale = (window.PlacementOverrides ? window.PlacementOverrides.dirtyKeys() : [])
+      .filter((k) => {
+        const r = window.PlacementOverrides.get(k);
+        return r && r.scale && Math.abs(r.scale.x - 1) > 0.01;
+      });
+    checks.push(check('saved scale overrides', overridesWithScale.length === 0,
+      overridesWithScale.length ? `${overridesWithScale.length} key(s) rescale on top: ${overridesWithScale.join(', ')}` : 'none'));
+    checks.push(check('oversized objects', huge.length === 0,
+      huge.length ? huge.map((o) => `${o.key} ${o.height.toFixed(0)}m`).join(', ') : 'none over 4 m'));
+
+    function check(label, ok, detail) {
+      return `<div class="dbg-row"><span class="${ok ? 'dbg-good' : 'dbg-bad'}">${ok ? '✓' : '✗'}</span>
+        <span class="dbg-name">${label}</span><span>${detail}</span></div>`;
+    }
 
     const assets = Array.from(this.assetRows.values()).map((r) => `
       <tr class="${r.state === 'ERROR' ? 'dbg-bad' : r.state === 'loaded' ? 'dbg-good' : ''}">
@@ -333,6 +361,8 @@ AFRAME.registerComponent('debug-placement', {
         <div><b>GPS</b><span>${this.gps.state}${this.gps.acc ? ' ±' + Math.round(this.gps.acc) + 'm' : ''}</span></div>
         <div><b>Coords</b><span>${this.gps.lat != null ? this.gps.lat.toFixed(6) + ', ' + this.gps.lng.toFixed(6) : '—'}</span></div>
       </div>
+      <h4>Sizing self-check</h4>
+      <div class="dbg-list">${checks.join('')}</div>
       <h4>Geofences</h4>
       <div class="dbg-list">${geo}</div>
       <h4>Assets (&lt;a-asset-item&gt;)</h4>
@@ -388,10 +418,11 @@ AFRAME.registerComponent('debug-placement', {
         <button class="dbg-mini" id="dbg-clear-spawned">clear spawned (${this.spawned.length})</button>
         <button class="dbg-mini" id="dbg-force-statues">force statues</button>
         <button class="dbg-mini" id="dbg-force-tower">force tower</button>
-        <button class="dbg-mini ${this.normalizeSpawns ? 'dbg-on' : ''}" id="dbg-norm">normalize to 2.5m: ${this.normalizeSpawns ? 'ON' : 'off'}</button>
+        <button class="dbg-mini ${this.normalizeSpawns ? 'dbg-on' : ''}" id="dbg-norm">size: ${this.normalizeSpawns ? 'normalized 2.5m' : 'RAW GLB'}</button>
       </div>
-      <div class="dbg-dim">Spawns land 3 m in front of the camera at 1:1 scale and report their
-      bounding-box size — if a model looks missing, check the size and distance here first.</div>
+      <div class="dbg-dim">Spawns land 3 m ahead and report their measured size. Switch to RAW GLB
+      to see a model's true authored size — Athena is 206 m that way, which is the whole reason
+      model-normalize exists.</div>
       <div class="dbg-list">${items}</div>
     `;
 
@@ -423,9 +454,9 @@ AFRAME.registerComponent('debug-placement', {
     }
     const rows = objs.map((o, i) => `
       <div class="dbg-row dbg-obj ${o.el === this.selected ? 'dbg-sel' : ''}" data-idx="${i}">
-        <span class="dbg-name">${o.key}</span>
+        <span class="dbg-name">${o.oversized ? '⚠ ' : ''}${o.key}</span>
         <span class="${o.state === 'ERROR' ? 'dbg-bad' : 'dbg-good'}">${o.state}</span>
-        <span>${o.dims}</span>
+        <span class="${o.oversized ? 'dbg-bad' : ''}">${o.dims}</span>
         <span>${o.dist.toFixed(1)}m</span>
         <span>${o.visible ? '👁' : '🚫'}</span>
       </div>`).join('');
@@ -555,7 +586,6 @@ AFRAME.registerComponent('debug-placement', {
     ent.setAttribute('data-debug-spawn', name);
     ent.setAttribute('gltf-model', url);
     ent.setAttribute('animation-mixer', 'loop: repeat');
-    // Raw by default — seeing the GLB's true size is the point of this panel.
     if (this.normalizeSpawns) ent.setAttribute('model-normalize', 'height: 2.5');
     window.PlacementOverrides.apply(ent, key, {
       position: { x: pos.x, y: pos.y, z: pos.z },
@@ -856,6 +886,12 @@ AFRAME.registerComponent('debug-placement', {
 });
 
 // ---- helpers ----------------------------------------------------------------
+
+function boxOf(el) {
+  const s = new THREE.Vector3();
+  new THREE.Box3().setFromObject(el.object3D).getSize(s);
+  return isFinite(s.y) ? s : new THREE.Vector3();
+}
 
 function measure(el) {
   const box = new THREE.Box3().setFromObject(el.object3D);

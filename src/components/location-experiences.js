@@ -281,6 +281,45 @@ AFRAME.registerComponent('location-experiences', {
     return root;
   },
 
+  /**
+   * Ask for a metre-based size. If model-normalize.js failed to load, an
+   * unknown-component setAttribute is a silent no-op and the model renders at
+   * its raw GLB size — which for Athena is 206 m. Fall back to normalizing here
+   * so a missing script tag can't put a skyscraper on the sidewalk.
+   */
+  sizeTo: function (el, spec) {
+    if (AFRAME.components['model-normalize']) {
+      el.setAttribute('model-normalize', spec);
+      return;
+    }
+    if (!this._warnedNoNormalize) {
+      this._warnedNoNormalize = true;
+      console.warn('[location-experiences] model-normalize not registered — ' +
+        'check the <script> for src/components/model-normalize.js. Using inline fallback.');
+    }
+    const parsed = {};
+    String(spec).split(';').forEach((part) => {
+      const [k, v] = part.split(':').map((s) => s && s.trim());
+      if (k && v !== undefined) parsed[k] = v;
+    });
+    el.addEventListener('model-loaded', () => {
+      const mesh = el.getObject3D('mesh');
+      if (!mesh) return;
+      const size = new THREE.Box3().setFromObject(mesh).getSize(new THREE.Vector3());
+      const h = Number(parsed.height);
+      const m = Number(parsed.maxDim);
+      let f = 1;
+      if (h > 0) f = h / Math.max(size.y, 0.001);
+      else if (m > 0) f = m / Math.max(size.x, size.y, size.z, 0.001);
+      mesh.scale.multiplyScalar(f);
+      if (parsed.ground !== 'false') {
+        mesh.updateMatrixWorld(true);
+        mesh.position.y -= new THREE.Box3().setFromObject(mesh).min.y /
+          (el.object3D.getWorldScale(new THREE.Vector3()).y || 1);
+      }
+    }, { once: true });
+  },
+
   place: function (el, key, defaults) {
     if (window.PlacementOverrides) return window.PlacementOverrides.apply(el, key, defaults);
     if (defaults.position) el.setAttribute('position', defaults.position);
@@ -335,7 +374,7 @@ AFRAME.registerComponent('location-experiences', {
 
     // Raw GLBs are 1 m (Augustus) and 206 m (Athena) tall — normalize both to a
     // consistent street-statue height rather than per-asset scale guesses.
-    ent.setAttribute('model-normalize', `height: ${STATUE_HEIGHT_M}`);
+    this.sizeTo(ent, `height: ${STATUE_HEIGHT_M}`);
 
     // Face across the street (pointing roughly west / toward SAP per redline).
     this.place(ent, `little-italy/pin-${pin.id}`, {
@@ -373,7 +412,7 @@ AFRAME.registerComponent('location-experiences', {
     tower.setAttribute('shadow', 'cast: true');
 
     // Raw GLB is 47.5 m tall; the redline calls for an 8 m landmark replica.
-    tower.setAttribute('model-normalize', `height: ${h}`);
+    this.sizeTo(tower, `height: ${h}`);
     this.place(tower, 'leaning-tower', {
       position: { x: 0, y: 0, z: -12 },
       rotation: { x: 0, y: 0, z: 0 },
@@ -484,7 +523,7 @@ AFRAME.registerComponent('location-experiences', {
 
     const ent = document.createElement('a-entity');
     ent.setAttribute('gltf-model', '#diving-shark');
-    ent.setAttribute('model-normalize', `maxDim: ${SHARK_MAX_DIM_M}; ground: false`);
+    this.sizeTo(ent, `maxDim: ${SHARK_MAX_DIM_M}; ground: false`);
     ent.setAttribute('position', `${start.x} ${start.y} ${start.z}`);
     ent.setAttribute('animation-mixer', 'loop: repeat; timeScale: 1.1');
     ent.setAttribute('shadow', 'cast: true');
@@ -565,7 +604,7 @@ AFRAME.registerComponent('location-experiences', {
       const rad = s.angleDeg * Math.PI / 180;
       const ent = document.createElement('a-entity');
       ent.setAttribute('gltf-model', s.model);
-      ent.setAttribute('model-normalize', `maxDim: ${SHARK_MAX_DIM_M}; ground: false`);
+      this.sizeTo(ent, `maxDim: ${SHARK_MAX_DIM_M}; ground: false`);
       ent.setAttribute('animation-mixer', 'loop: repeat; timeScale: 1.0');
       ent.setAttribute('shadow', 'cast: true');
       // Face tangent to the circle (travel direction).
@@ -604,7 +643,7 @@ AFRAME.registerComponent('location-experiences', {
       const ent = document.createElement('a-entity');
       ent.setAttribute('gltf-model', d.model);
       // Both mascot GLBs float above their origin and differ in height — normalize.
-      ent.setAttribute('model-normalize', `height: ${MASCOT_HEIGHT_M}`);
+      this.sizeTo(ent, `height: ${MASCOT_HEIGHT_M}`);
       // Rotation is the spin animation; position/scale are overridable.
       this.place(ent, `finale/dancer-${d.id}`, {
         position: { x: d.offset, y: 0.02, z: -4 },
