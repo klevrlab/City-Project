@@ -540,12 +540,8 @@ AFRAME.registerComponent('debug-placement', {
       return null;
     }
     const camPos = cam.object3D.getWorldPosition(new THREE.Vector3());
-    const forward = new THREE.Vector3();
-    cam.object3D.getWorldDirection(forward);
-    forward.y = 0;
-    if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
-    forward.normalize();
-    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+    const forward = window.MathUtils.cameraForward(cam);
+    const right = window.MathUtils.cameraRight(cam);
 
     const pos = camPos.clone()
       .add(forward.multiplyScalar(options.distance || 3))
@@ -641,15 +637,11 @@ AFRAME.registerComponent('debug-placement', {
 
   camBasis: function () {
     const cam = document.getElementById('camera');
-    const forward = new THREE.Vector3(0, 0, -1);
-    if (cam && cam.object3D) {
-      cam.object3D.getWorldDirection(forward);
-      forward.y = 0;
-      if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
-      forward.normalize();
-    }
-    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-    return { forward, right, up: new THREE.Vector3(0, 1, 0) };
+    return {
+      forward: window.MathUtils.cameraForward(cam),
+      right: window.MathUtils.cameraRight(cam),
+      up: new THREE.Vector3(0, 1, 0)
+    };
   },
 
   /** Move by `step` along a camera-relative axis, writing back in parent-local space. */

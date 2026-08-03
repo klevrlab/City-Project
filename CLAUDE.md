@@ -116,6 +116,33 @@ city-project/
 - Minis & Trophy at Arena Green West — Mar 26 & 28, 2026 (past)
 - International Football Watch Together — Jun–Jul 2026, San Pedro Square Market
 
+## Desktop Testing (no phone)
+
+8th Wall itself needs a phone — SLAM and the camera feed have no desktop path, and XRExtras
+replaces the page with a QR wall. Everything around it is ordinary A-Frame, so
+`?desktop=1` (`src/utils/desktop-sim.js`) makes the rest testable on a laptop:
+
+- clears the XRExtras QR / "almost there" overlays
+- gives the camera WASD + mouse-look, a reference grid, and a 1 m wireframe cube for scale
+- fakes `navigator.geolocation`, so geofences fire where you say they do
+
+```
+shark-ar-8thwall.html?desktop=1&debug=1&at=littleitaly
+```
+
+`at=` accepts `littleitaly | tower | underpass | river | finale`, or pass `&lat=&lng=`. From the
+console: `SimGps.teleport('finale')`, `SimGps.nudge(northM, eastM)`, `SimGps.where()`.
+
+Not simulated: SLAM drift, real lighting, phone GPU limits, how content sits against an actual
+street. Walk the corridor for those.
+
+**Camera forward:** use `MathUtils.cameraForward(camEl)` — never
+`camEl.object3D.getWorldDirection()`. The latter is `THREE.Object3D`'s method and returns the
+object's **+Z**, i.e. out the *back* of the camera. (`THREE.Camera` overrides it to return −Z, but
+`entity.object3D` is a Group; the camera is `entity.getObject3D('camera')`.) This is why Little
+Italy statues and the tower planted *behind* the visitor. `shark-animator.js` and
+`soccer-game.js` compensate with their own `* -1`.
+
 ## Model Sizing
 
 The GLBs share no unit convention — measured raw heights: Athena **206 m**, Augustus **1.0 m**,

@@ -18,7 +18,41 @@
     return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
+  /**
+   * Ground-plane direction the camera is *looking*, as a normalized vector.
+   *
+   * Do not use `cameraEl.object3D.getWorldDirection()` for this. That method is
+   * THREE.Object3D's, and it returns the object's +Z axis — for a camera, the
+   * direction out of the *back* of its head. (THREE.Camera overrides it to
+   * return −Z, but `entity.object3D` is a Group, not the camera; the camera
+   * itself is `entity.getObject3D('camera')`.) Content placed with the raw
+   * result lands behind the visitor, which is exactly what used to happen to
+   * the Little Italy statues.
+   *
+   * @param {Element} cameraEl - the A-Frame camera entity
+   * @param {THREE.Vector3} [target] - optional vector to write into
+   */
+  function cameraForward(cameraEl, target) {
+    const out = target || new THREE.Vector3();
+    out.set(0, 0, -1);
+    if (cameraEl && cameraEl.object3D) {
+      out.applyQuaternion(cameraEl.object3D.getWorldQuaternion(new THREE.Quaternion()));
+    }
+    out.y = 0;
+    if (out.lengthSq() < 0.0001) out.set(0, 0, -1);
+    return out.normalize();
+  }
+
+  /** Camera-right on the ground plane (forward × up). */
+  function cameraRight(cameraEl, target) {
+    const fwd = cameraForward(cameraEl);
+    const out = target || new THREE.Vector3();
+    return out.crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
+  }
+
   global.MathUtils = {
-    haversineMeters: haversineMeters
+    haversineMeters: haversineMeters,
+    cameraForward: cameraForward,
+    cameraRight: cameraRight
   };
 })(typeof window !== 'undefined' ? window : globalThis);

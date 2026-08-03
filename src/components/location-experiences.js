@@ -271,11 +271,7 @@ AFRAME.registerComponent('location-experiences', {
    */
   makeAnchorRoot: function (id, cam) {
     const camObj = cam.object3D;
-    const forward = new THREE.Vector3();
-    camObj.getWorldDirection(forward);
-    forward.y = 0;
-    if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
-    forward.normalize();
+    const forward = window.MathUtils.cameraForward(cam);
 
     const origin = camObj.getWorldPosition(new THREE.Vector3());
     const root = document.createElement('a-entity');
@@ -471,12 +467,8 @@ AFRAME.registerComponent('location-experiences', {
       return;
     }
 
-    const forward = new THREE.Vector3();
-    cam.object3D.getWorldDirection(forward);
-    forward.y = 0;
-    if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
-    forward.normalize();
-    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+    const forward = window.MathUtils.cameraForward(cam);
+    const right = window.MathUtils.cameraRight(cam);
 
     // Enter from the side matching the redline heading, jump at center, exit.
     const start = cam.object3D.position.clone()

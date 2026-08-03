@@ -1,0 +1,209 @@
+/**
+ * Desktop simulation mode — `?desktop=1`
+ *
+ * 8th Wall needs a phone: SLAM and the camera feed have no desktop equivalent,
+ * and XRExtras covers the page with a "scan this QR code" wall instead. But
+ * everything *around* XR — GLB loading, model sizing, geofence logic, the plant
+ * anchors, placement overrides — is ordinary A-Frame and runs fine on a laptop.
+ *
+ * This module makes that testable:
+ *   - clears the XRExtras desktop QR/loading overlays
+ *   - gives the camera WASD + mouse-look so you can walk the planted layout
+ *   - drops a reference grid and horizon so "on the ground" is legible
+ *   - fakes navigator.geolocation so geofences fire where you say they do
+ *
+ * What it does NOT simulate: SLAM drift, real-world lighting, phone GPU limits,
+ * or how content sits against an actual street. Walk the corridor for those.
+ *
+ * URL params:
+ *   ?desktop=1              enable, standing at the Little Italy corridor
+ *   &at=tower|finale|river|underpass|littleitaly    start at a named pin
+ *   &lat=37.3354&lng=-121.8974                      start at explicit coords
+ *
+ * Console: SimGps.teleport('tower'), SimGps.set(lat, lng), SimGps.where()
+ */
+
+const PINS = {
+  littleitaly: { lat: 37.335397, lng: -121.897650, label: 'Little Italy (statue pin 1)' },
+  tower: { lat: 37.335429, lng: -121.897883, label: 'Leaning Tower' },
+  underpass: { lat: 37.335391, lng: -121.896682, label: 'Underpass Jump' },
+  river: { lat: 37.334664, lng: -121.899474, label: 'River Jump' },
+  finale: { lat: 37.334113, lng: -121.900460, label: 'Grand Finale Jump' }
+};
+
+const params = new URLSearchParams(window.location.search);
+const enabled = params.get('desktop') === '1' || params.get('sim') === '1';
+
+if (enabled) {
+  installFakeGps();
+  document.addEventListener('DOMContentLoaded', () => {
+    setupScene();
+    killXrOverlays();
+  });
+  console.log('[desktop-sim] active — WASD to walk, drag to look, SimGps.teleport(name)');
+}
+
+// ---- fake geolocation -------------------------------------------------------
+
+function installFakeGps() {
+  const start = startPin();
+  const state = { lat: start.lat, lng: start.lng, watchers: new Map(), nextId: 1 };
+
+  const fix = () => ({
+    coords: {
+      latitude: state.lat,
+      longitude: state.lng,
+      accuracy: 5,
+      altitude: null,
+      altitudeAccuracy: null,
+      heading: null,
+      speed: null
+    },
+    timestamp: Date.now()
+  });
+
+  // Replacing the whole object: navigator.geolocation's own methods are
+  // non-configurable in some browsers, so patching in place can throw.
+  const fake = {
+    getCurrentPosition: (ok) => setTimeout(() => ok(fix()), 30),
+    watchPosition: (ok) => {
+      const id = state.nextId++;
+      state.watchers.set(id, ok);
+      setTimeout(() => ok(fix()), 30);
+      return id;
+    },
+    clearWatch: (id) => state.watchers.delete(id)
+  };
+
+  try {
+    Object.defineProperty(navigator, 'geolocation', { value: fake, configurable: true });
+  } catch (e) {
+    console.warn('[desktop-sim] could not replace navigator.geolocation', e);
+    return;
+  }
+
+  const broadcast = () => state.watchers.forEach((cb) => cb(fix()));
+
+  window.SimGps = {
+    pins: PINS,
+    set(lat, lng) {
+      state.lat = lat;
+      state.lng = lng;
+      broadcast();
+      return this.where();
+    },
+    teleport(name) {
+      const pin = PINS[String(name).toLowerCase()];
+      if (!pin) {
+        console.warn('[desktop-sim] unknown pin', name, '— try', Object.keys(PINS).join(', '));
+        return null;
+      }
+      return this.set(pin.lat, pin.lng);
+    },
+    /** Nudge position by metres, to walk in or out of a geofence. */
+    nudge(northM, eastM) {
+      state.lat += (northM || 0) / 111320;
+      state.lng += (eastM || 0) / (111320 * Math.cos(state.lat * Math.PI / 180));
+      broadcast();
+      return this.where();
+    },
+    where: () => ({ lat: state.lat, lng: state.lng })
+  };
+}
+
+function startPin() {
+  const lat = Number(params.get('lat'));
+  const lng = Number(params.get('lng'));
+  if (isFinite(lat) && isFinite(lng) && lat && lng) return { lat, lng };
+  return PINS[String(params.get('at') || 'littleitaly').toLowerCase()] || PINS.littleitaly;
+}
+
+// ---- scene ------------------------------------------------------------------
+
+function setupScene() {
+  const scene = document.querySelector('a-scene');
+  if (!scene) return;
+
+  const apply = () => {
+    const cam = document.getElementById('camera');
+    if (cam) {
+      // xrweb normally drives the camera; with no XR session it never does.
+      cam.setAttribute('look-controls', 'pointerLockEnabled: false; touchEnabled: true');
+      cam.setAttribute('wasd-controls', 'acceleration: 40; fly: false');
+      cam.setAttribute('position', '0 1.6 0');
+    }
+
+    // A shadow-shader ground is invisible without a camera feed behind it, so
+    // give the desktop view something to read scale and motion against.
+    if (!document.getElementById('sim-grid')) {
+      const grid = document.createElement('a-entity');
+      grid.setAttribute('id', 'sim-grid');
+      grid.setAttribute('position', '0 0.01 0');
+      grid.setAttribute('rotation', '-90 0 0');
+      grid.setAttribute('geometry', 'primitive: plane; width: 200; height: 200');
+      grid.setAttribute('material', 'color: #16232b; side: double');
+      scene.appendChild(grid);
+
+      // 1 m reference cube at the origin — every size claim checks against this.
+      const ref = document.createElement('a-box');
+      ref.setAttribute('id', 'sim-ref-cube');
+      ref.setAttribute('width', 1);
+      ref.setAttribute('height', 1);
+      ref.setAttribute('depth', 1);
+      ref.setAttribute('position', '2 0.5 -3');
+      ref.setAttribute('material', 'color: #00e5ff; opacity: 0.55; transparent: true; wireframe: true');
+      scene.appendChild(ref);
+
+      const label = document.createElement('a-text');
+      label.setAttribute('value', '1m reference');
+      label.setAttribute('align', 'center');
+      label.setAttribute('width', 3);
+      label.setAttribute('color', '#00e5ff');
+      label.setAttribute('position', '2 1.25 -3');
+      scene.appendChild(label);
+    }
+
+    if (scene.renderer) scene.renderer.setClearColor(new THREE.Color('#0a1116'), 1);
+    const sky = document.createElement('a-sky');
+    sky.setAttribute('color', '#0a1116');
+    sky.setAttribute('id', 'sim-sky');
+    if (!document.getElementById('sim-sky')) scene.appendChild(sky);
+  };
+
+  if (scene.hasLoaded) apply();
+  else scene.addEventListener('loaded', apply, { once: true });
+
+  // XR content plants on 'realityready', which never fires without a session.
+  setTimeout(() => window.dispatchEvent(new CustomEvent('realityready')), 1200);
+}
+
+/** Strip the XRExtras "open on your phone" QR wall and loading screens. */
+function killXrOverlays() {
+  const sweep = () => {
+    // The desktop QR wall is #loadingContainer; #almostthereContainer is the
+    // "unsupported browser" screen. Both are XRExtras, both cover the scene.
+    document.querySelectorAll(
+      '#loadingContainer, #almostthereContainer, .xrextras-loading-container,' +
+      '#loadBackground, #requestingCameraPermissions, #cameraPermissionsErrorApple,' +
+      '#cameraPermissionsError, #motionPermissionsErrorApple, #deviceMotionErrorApple'
+    ).forEach((el) => el.remove());
+
+    // Ids have moved between XRExtras versions — also sweep any of our own
+    // top-level siblings that blanket the viewport and hold no canvas.
+    document.querySelectorAll('body > div').forEach((el) => {
+      if (el.id === 'dbg-root' || el.id === 'topbar' || el.id === 'tap-instruction') return;
+      if (el.id === 'location-status') return;
+      const cs = window.getComputedStyle(el);
+      const floating = cs.position === 'fixed' || cs.position === 'absolute';
+      const coversPage = floating &&
+        el.offsetWidth >= window.innerWidth * 0.9 &&
+        el.offsetHeight >= window.innerHeight * 0.9;
+      if (coversPage && !el.querySelector('canvas')) el.remove();
+    });
+  };
+  sweep();
+  const t = setInterval(sweep, 500);
+  setTimeout(() => clearInterval(t), 12000);
+}
+
+export default { PINS, enabled };
