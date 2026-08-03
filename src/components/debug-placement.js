@@ -361,6 +361,8 @@ AFRAME.registerComponent('debug-placement', {
         <div><b>GPS</b><span>${this.gps.state}${this.gps.acc ? ' ±' + Math.round(this.gps.acc) + 'm' : ''}</span></div>
         <div><b>Coords</b><span>${this.gps.lat != null ? this.gps.lat.toFixed(6) + ', ' + this.gps.lng.toFixed(6) : '—'}</span></div>
       </div>
+      <h4>Geo anchoring</h4>
+      <div class="dbg-list">${this.geoLines()}</div>
       <h4>Sizing self-check</h4>
       <div class="dbg-list">${checks.join('')}</div>
       <h4>Geofences</h4>
@@ -369,6 +371,61 @@ AFRAME.registerComponent('debug-placement', {
       <table class="dbg-table"><tr><th>id</th><th>state</th><th>http</th><th>size</th></tr>${assets}</table>
       <h4>Recent warnings / errors</h4>
       ${logs}
+    `;
+  },
+
+  /**
+   * Heading state and the two controls that matter on site: grant the compass
+   * (iOS needs the tap) and calibrate it against the known corridor bearing.
+   */
+  geoLines: function () {
+    const G = window.GeoAnchor;
+    if (!G) return '<div class="dbg-dim">geo-anchor.js not loaded</div>';
+    const lx = this.el.sceneEl.components['location-experiences'];
+    const mode = lx && lx.geoPlaced ? 'GPS coordinates' : 'camera-relative (fallback)';
+    const heading = G.ready ? `${G.heading.toFixed(0)}° (${G.headingSource}${G.accuracy != null ? ' ±' + Math.round(G.accuracy) + '°' : ''})` : 'none yet';
+
+    setTimeout(() => {
+      const grant = document.getElementById('dbg-compass');
+      if (grant) {
+        grant.onclick = async () => {
+          const ok = await G.requestPermission();
+          this.toast(ok ? 'Compass enabled — now RE-ANCHOR' : 'Compass permission denied');
+          this.render();
+        };
+      }
+      const cal = document.getElementById('dbg-calibrate');
+      if (cal) {
+        cal.onclick = () => {
+          const b = G.calibrate();
+          this.toast(`Heading pinned to ${b.toFixed(0)}° — re-anchoring`);
+          if (window.reanchorLocations) window.reanchorLocations();
+          this.render();
+        };
+      }
+      const re = document.getElementById('dbg-reanchor');
+      if (re) {
+        re.onclick = () => {
+          if (window.reanchorLocations) window.reanchorLocations();
+          this.toast('Re-planted at current fix + heading');
+          this.render();
+        };
+      }
+    }, 0);
+
+    return `
+      <div class="dbg-row"><span class="dbg-name">Placement mode</span>
+        <span class="${lx && lx.geoPlaced ? 'dbg-good' : 'dbg-bad'}">${mode}</span></div>
+      <div class="dbg-row"><span class="dbg-name">Heading</span><span>${heading}</span></div>
+      <div class="dbg-row"><span class="dbg-name">Corridor → SAP</span>
+        <span>${G.CORRIDOR_BEARING_TO_SAP.toFixed(0)}°</span></div>
+      <div class="dbg-actions">
+        <button class="dbg-mini" id="dbg-compass">enable compass</button>
+        <button class="dbg-mini" id="dbg-calibrate">calibrate: facing SAP</button>
+        <button class="dbg-mini" id="dbg-reanchor">re-anchor now</button>
+      </div>
+      <div class="dbg-dim">Stand on the corridor facing SAP Center, then tap calibrate — that
+      replaces magnetometer error with a bearing that's right by construction.</div>
     `;
   },
 

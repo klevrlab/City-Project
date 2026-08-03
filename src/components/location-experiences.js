@@ -90,6 +90,9 @@ AFRAME.registerComponent('location-experiences', {
     // ?demoLocations=1 forces statues + tower in front of camera (no GPS needed).
     const params = new URLSearchParams(window.location.search);
     this.demoLocations = params.get('demoLocations') === '1' || params.get('demo') === 'locations';
+    // ?geo=0 pins everything to the old camera-relative layout.
+    this.forceCameraRelative = params.get('geo') === '0' || this.demoLocations;
+    this.geoPlaced = false;
 
     if (this.el.sceneEl.hasLoaded) this.start();
     else this.el.sceneEl.addEventListener('loaded', () => this.start(), { once: true });
@@ -108,6 +111,33 @@ AFRAME.registerComponent('location-experiences', {
       this.setStatus('Forced: Leaning Tower');
     };
     window.forceJumpDemo = (id) => this.playJump(id || 'underpass');
+
+    /** Re-run the plant with the current fix + heading (after calibrating). */
+    window.reanchorLocations = () => {
+      this.clearStatues();
+      this.clearTower();
+      const ok = this.plantStatuesAroundCamera();
+      this.plantTowerInFront();
+      this.setStatus(this.geoPlaced ? 'Re-anchored to GPS coordinates' : 'Re-anchored (camera-relative)');
+      return ok;
+    };
+
+    if (window.GeoAnchor) {
+      // Android reports absolute orientation without asking; iOS needs a tap,
+      // which the debug panel's ENABLE COMPASS button provides.
+      window.GeoAnchor.listen();
+
+      // The compass usually settles after the first plant. Upgrade the
+      // camera-relative fallback to real coordinates once, when it does.
+      this._geoUpgradeTimer = setInterval(() => {
+        if (this.forceCameraRelative || this.geoPlaced || this._geoUpgraded) return;
+        if (!this.statueRoot && !this.towerEl) return;
+        if (!window.GeoAnchor.stable || this.userLat == null) return;
+        this._geoUpgraded = true;
+        console.log('[location-experiences] compass settled — re-anchoring to GPS coordinates');
+        window.reanchorLocations();
+      }, 1500);
+    }
 
     // GPS does not need XR — start immediately, and also on realityready as backup.
     this.startGps();
@@ -337,9 +367,41 @@ AFRAME.registerComponent('location-experiences', {
 
     this.clearStatues();
 
+    // Preferred: put each statue at its actual pin coordinate.
+    const geoRoot = this.makeGeoRoot('little-italy-statues', cam);
+    if (geoRoot) {
+      this.el.appendChild(geoRoot);
+      this.statueRoot = geoRoot;
+      this.statuePins.forEach((pin) => {
+        const off = window.GeoAnchor.localOffset(pin.lat, pin.lng, this.userLat, this.userLng);
+        // Face across the street: north-side statues look south and vice versa,
+        // both angled toward SAP, per the June 10 redline. Inside a north-aligned
+        // root, a child's scene yaw is the negated compass bearing.
+        const facingBearing = pin.side === 'north'
+          ? window.GeoAnchor.CORRIDOR_BEARING_TO_SAP + 90
+          : window.GeoAnchor.CORRIDOR_BEARING_TO_SAP - 90;
+        const yaw = -facingBearing;
+
+        // Each pin gets its own anchor at the true coordinate, so a saved
+        // placement override is an offset from the pin — still meaningful next
+        // visit, when the user is standing somewhere else entirely.
+        const pinAnchor = document.createElement('a-entity');
+        pinAnchor.setAttribute('position', `${off.x} 0 ${off.z}`);
+        pinAnchor.setAttribute('rotation', `0 ${yaw} 0`);
+        pinAnchor.setAttribute('data-geo-pin', String(pin.id));
+        geoRoot.appendChild(pinAnchor);
+
+        this.spawnStatue(pinAnchor, pin, { x: 0, y: 0, z: 0 }, 0, off.distance);
+      });
+      this.geoPlaced = true;
+      return true;
+    }
+
+    // Fallback: no compass or no fix — lay the corridor out ahead of the user.
     const root = this.makeAnchorRoot('little-italy-statues', cam);
     this.el.appendChild(root);
     this.statueRoot = root;
+    this.geoPlaced = false;
 
     // Two rows parallel to "street" (local −Z = toward SAP / west-ish).
     // North side = +X local, South side = −X local; spaced along Z.
@@ -360,10 +422,32 @@ AFRAME.registerComponent('location-experiences', {
     return true;
   },
 
-  spawnStatue: function (root, pin, localPos, yaw) {
+  /**
+   * Root at the user's position whose −Z points true north, so children can be
+   * addressed in east/north metres. Null when there's no fix or no heading yet,
+   * which is the signal to fall back to camera-relative layout.
+   */
+  makeGeoRoot: function (id, cam) {
+    if (this.forceCameraRelative) return null;
+    if (this.userLat == null || !window.GeoAnchor) return null;
+    if (!window.GeoAnchor.stable) return null;
+    const northYaw = window.GeoAnchor.northYawDeg(cam);
+    if (northYaw == null) return null;
+
+    const origin = cam.object3D.getWorldPosition(new THREE.Vector3());
+    const root = document.createElement('a-entity');
+    root.setAttribute('id', id);
+    root.setAttribute('data-geo-root', '1');
+    root.setAttribute('position', `${origin.x} 0 ${origin.z}`);
+    root.setAttribute('rotation', `0 ${northYaw} 0`);
+    return root;
+  },
+
+  spawnStatue: function (root, pin, localPos, yaw, distance) {
     const ent = document.createElement('a-entity');
     ent.setAttribute('shadow', 'cast: true');
     ent.setAttribute('data-statue-pin', String(pin.id));
+    if (typeof distance === 'number') ent.setAttribute('data-geo-distance', distance.toFixed(1));
 
     if (pin.odd) {
       // Spec: odd pins = Augustus of Prima Porta.
@@ -404,7 +488,24 @@ AFRAME.registerComponent('location-experiences', {
 
     this.clearTower();
 
-    const root = this.makeAnchorRoot('leaning-tower-anchor', cam);
+    // Geo when we can: the tower belongs on its corner, not 12 m ahead of you.
+    let root = this.makeGeoRoot('leaning-tower-anchor', cam);
+    let parent = root;
+    const towerLocal = { x: 0, y: 0, z: root ? 0 : -12 };
+    if (root) {
+      // Sub-anchor at the true coordinate keeps a saved override meaningful as
+      // an offset from the pin rather than from wherever the user stood.
+      const off = window.GeoAnchor.localOffset(
+        this.towerPin.lat, this.towerPin.lng, this.userLat, this.userLng);
+      parent = document.createElement('a-entity');
+      parent.setAttribute('position', `${off.x} 0 ${off.z}`);
+      parent.setAttribute('data-geo-pin', 'tower');
+      root.appendChild(parent);
+    } else {
+      root = this.makeAnchorRoot('leaning-tower-anchor', cam);
+      parent = root;
+    }
+
     const h = this.towerPin.heightM;
     const tower = document.createElement('a-entity');
     tower.setAttribute('id', 'leaning-tower');
@@ -414,7 +515,7 @@ AFRAME.registerComponent('location-experiences', {
     // Raw GLB is 47.5 m tall; the redline calls for an 8 m landmark replica.
     this.sizeTo(tower, `height: ${h}`);
     this.place(tower, 'leaning-tower', {
-      position: { x: 0, y: 0, z: -12 },
+      position: towerLocal,
       rotation: { x: 0, y: 0, z: 0 },
       scale: '1 1 1'
     });
@@ -424,7 +525,7 @@ AFRAME.registerComponent('location-experiences', {
       this.setStatus('Tower model failed to load');
     }, { once: true });
 
-    root.appendChild(tower);
+    parent.appendChild(tower);
     this.el.appendChild(root);
     this.towerEl = root;
     this.setHint('Leaning Tower of Pisa — 8 m · walk around it');
@@ -676,6 +777,7 @@ AFRAME.registerComponent('location-experiences', {
     if (this.watchId != null) {
       try { navigator.geolocation.clearWatch(this.watchId); } catch (e) { /* ignore */ }
     }
+    clearInterval(this._geoUpgradeTimer);
     this.clearStatues();
     this.clearTower();
   }

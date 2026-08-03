@@ -36,6 +36,7 @@ const enabled = params.get('desktop') === '1' || params.get('sim') === '1';
 
 if (enabled) {
   installFakeGps();
+  installFakeCompass();
   document.addEventListener('DOMContentLoaded', () => {
     setupScene();
     killXrOverlays();
@@ -108,6 +109,39 @@ function installFakeGps() {
       return this.where();
     },
     where: () => ({ lat: state.lat, lng: state.lng })
+  };
+}
+
+/**
+ * A laptop has no magnetometer, so geo placement would always fall back to
+ * camera-relative and never get exercised. Emit a synthetic absolute heading;
+ * SimCompass.set() moves it to test misalignment.
+ */
+function installFakeCompass() {
+  // Default to the corridor bearing toward SAP. Note params.get returns null
+  // when absent and Number(null) is 0, which is a perfectly finite wrong answer.
+  let heading = params.has('heading') ? Number(params.get('heading')) : NaN;
+  if (!isFinite(heading)) heading = 87;
+
+  const emit = () => {
+    const e = new Event('deviceorientationabsolute');
+    e.absolute = true;
+    e.alpha = (360 - heading) % 360;
+    e.beta = 0;
+    e.gamma = 0;
+    window.dispatchEvent(e);
+  };
+
+  setInterval(emit, 500);
+  setTimeout(emit, 200);
+
+  window.SimCompass = {
+    set(deg) {
+      heading = ((deg % 360) + 360) % 360;
+      emit();
+      return heading;
+    },
+    get: () => heading
   };
 }
 

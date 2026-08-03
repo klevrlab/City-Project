@@ -116,6 +116,31 @@ city-project/
 - Minis & Trophy at Arena Green West — Mar 26 & 28, 2026 (past)
 - International Football Watch Together — Jun–Jul 2026, San Pedro Square Market
 
+## Geo Anchoring
+
+Little Italy statues and the tower are placed at their **real coordinates** (`src/utils/geo-anchor.js`).
+GPS alone can't do this — it gives position but not facing — so the anchor needs a heading:
+
+```
+scene yaw of north = camera's scene yaw + compass bearing the camera faces
+```
+
+Sources, in order of trust: a manual `calibrate()` (debug panel → "calibrate: facing SAP", which
+substitutes the known corridor bearing of **87°**), iOS `webkitCompassHeading`, Android
+`deviceorientationabsolute`. Compass samples are low-passed and only used once `GeoAnchor.stable`
+(≥6 samples), because the first readings are junk and would plant the corridor at a random angle.
+
+Fallback is the old camera-relative layout, used when there's no fix or no heading yet — and since
+the compass usually settles *after* the first plant, `location-experiences` re-anchors itself once
+automatically when it does. `?geo=0` forces camera-relative.
+
+Error budget: downtown GPS ±5–15 m with multipath, magnetometer ±10–20°. At 30 m, 15° of heading
+error is ~8 m sideways. So geo placement is right for fixed landmarks and wrong for "3 m in front
+of you" — the wayfinding swim-throughs stay camera-relative on purpose.
+
+Each pin gets its own sub-anchor at its true coordinate, so a saved placement override is an offset
+**from the pin** and stays valid on the next visit, when the visitor stands somewhere else.
+
 ## Desktop Testing (no phone)
 
 8th Wall itself needs a phone — SLAM and the camera feed have no desktop path, and XRExtras
@@ -132,6 +157,10 @@ shark-ar-8thwall.html?desktop=1&debug=1&at=littleitaly
 
 `at=` accepts `littleitaly | tower | underpass | river | finale`, or pass `&lat=&lng=`. From the
 console: `SimGps.teleport('finale')`, `SimGps.nudge(northM, eastM)`, `SimGps.where()`.
+
+A laptop has no magnetometer, so the sim also fakes an absolute compass (default 87°, the corridor
+bearing). `&heading=200` starts it wrong on purpose; `SimCompass.set(deg)` moves it — that's how to
+exercise geo placement and calibration without walking anywhere.
 
 Not simulated: SLAM drift, real lighting, phone GPU limits, how content sits against an actual
 street. Walk the corridor for those.
