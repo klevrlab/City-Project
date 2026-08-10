@@ -24,6 +24,20 @@ const STATUE_HEIGHT_M = 2.5;   // marble statues — taller than a person, well 
 const MASCOT_HEIGHT_M = 1.9;   // Sharkie / Sammy — person-scale for photos
 const SHARK_MAX_DIM_M = 3.0;   // sharks are long and low, so pin the longest axis
 
+/**
+ * The Pisa GLB is handed the wrong way round for us, so it gets mirrored on X.
+ * Flip this to false, or hit MIRROR X in the debug panel and SAVE, to undo.
+ */
+const TOWER_MIRROR_X = true;
+
+/**
+ * Measured lean of the GLB: its top sits 6.2 m off its base, toward local +X,
+ * which reads as bearing 92° when the entity's yaw is 0. Mirroring on X flips
+ * that to 268°. Knowing this lets the tower be aimed at a real bearing instead
+ * of hand-turned until it looks right.
+ */
+const TOWER_LEAN_LOCAL_DEG = TOWER_MIRROR_X ? 267.6 : 92.4;
+
 AFRAME.registerComponent('location-experiences', {
   schema: {
     statueRadiusM: { type: 'number', default: 55 },
@@ -374,12 +388,13 @@ AFRAME.registerComponent('location-experiences', {
       this.statueRoot = geoRoot;
       this.statuePins.forEach((pin) => {
         const off = window.GeoAnchor.localOffset(pin.lat, pin.lng, this.userLat, this.userLng);
-        // Face across the street: north-side statues look south and vice versa,
-        // both angled toward SAP, per the June 10 redline. Inside a north-aligned
-        // root, a child's scene yaw is the negated compass bearing.
+        // Face across the street: north-side statues look south, south-side
+        // look north. CORRIDOR_AXIS_DEG runs east (87°), so +90 is south and
+        // −90 is north. Inside a north-aligned root, a child's scene yaw is the
+        // negated compass bearing.
         const facingBearing = pin.side === 'north'
-          ? window.GeoAnchor.CORRIDOR_BEARING_TO_SAP + 90
-          : window.GeoAnchor.CORRIDOR_BEARING_TO_SAP - 90;
+          ? window.GeoAnchor.CORRIDOR_AXIS_DEG + 90   // 177° — looks south
+          : window.GeoAnchor.CORRIDOR_AXIS_DEG - 90;  // 357° — looks north
         const yaw = -facingBearing;
 
         // Each pin gets its own anchor at the true coordinate, so a saved
@@ -514,11 +529,37 @@ AFRAME.registerComponent('location-experiences', {
 
     // Raw GLB is 47.5 m tall; the redline calls for an 8 m landmark replica.
     this.sizeTo(tower, `height: ${h}`);
+
+    // Aim the lean down the corridor toward SAP, so it leans the way visitors
+    // are walking rather than at a random compass point. Inside a north-aligned
+    // root a child's yaw is the negated bearing, and rotating the model rotates
+    // its lean with it — hence lean-bearing minus target-bearing.
+    const towardSap = root && this.userLat != null
+      ? window.GeoAnchor.bearingToSap(this.towerPin.lat, this.towerPin.lng)
+      : null;
+    const yaw = towardSap == null ? 0 : (TOWER_LEAN_LOCAL_DEG - towardSap);
+
     this.place(tower, 'leaning-tower', {
       position: towerLocal,
-      rotation: { x: 0, y: 0, z: 0 },
-      scale: '1 1 1'
+      rotation: { x: 0, y: yaw, z: 0 },
+      // Negative X mirrors the model; see TOWER_MIRROR_X.
+      scale: TOWER_MIRROR_X ? '-1 1 1' : '1 1 1'
     });
+
+    // A mirrored transform inverts winding, so the tower would light and cull
+    // inside-out without this.
+    if (TOWER_MIRROR_X) {
+      tower.addEventListener('model-loaded', () => {
+        tower.object3D.traverse((o) => {
+          if (o.isMesh && o.material) {
+            (Array.isArray(o.material) ? o.material : [o.material]).forEach((mat) => {
+              mat.side = THREE.DoubleSide;
+              mat.needsUpdate = true;
+            });
+          }
+        });
+      }, { once: true });
+    }
 
     tower.addEventListener('model-error', () => {
       console.warn('[location-experiences] Failed to load Leaning_Tower_of_Pisa.glb');

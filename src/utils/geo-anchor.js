@@ -35,8 +35,21 @@ const state = {
   samples: 0
 };
 
-/** Bearing along Sharks Way from the statue pin line, pin 1 → pin 4 (toward SAP). */
-export const CORRIDOR_BEARING_TO_SAP = bearingDeg(37.335397, -121.897650, 37.335430, -121.896874);
+/**
+ * SAP Center (525 W Santa Clara St). Everything "toward SAP" is measured from
+ * the visitor's actual position to here — from Little Italy that is ~227°,
+ * i.e. south-west and 444 m away.
+ */
+export const SAP_CENTER = { lat: 37.332665, lng: -121.901308 };
+
+/**
+ * The corridor's axis through the statue pins, pin 1 → pin 4: 87°, running
+ * *east*. Note this is the direction away from SAP — the walk toward SAP is the
+ * reciprocal, 267°. Only use this for cross-street geometry (± 90° gives the
+ * two facings across the street); for anything that should point at the arena,
+ * use bearingToSap().
+ */
+export const CORRIDOR_AXIS_DEG = bearingDeg(37.335397, -121.897650, 37.335430, -121.896874);
 
 function bearingDeg(lat1, lng1, lat2, lng2) {
   const φ1 = lat1 * DEG;
@@ -89,9 +102,15 @@ function onOrientation(e) {
 }
 
 const GeoAnchor = {
-  CORRIDOR_BEARING_TO_SAP,
+  CORRIDOR_AXIS_DEG,
+  SAP_CENTER,
   enu,
   bearingDeg,
+
+  /** Compass bearing from a position to SAP Center. */
+  bearingToSap(lat, lng) {
+    return bearingDeg(lat, lng, SAP_CENTER.lat, SAP_CENTER.lng);
+  },
 
   get heading() { return state.heading; },
   get headingSource() { return state.headingSource; },
@@ -132,11 +151,16 @@ const GeoAnchor = {
   },
 
   /**
-   * Pin the heading by hand: the user is facing `bearing` (default: down the
-   * corridor toward SAP) right now. Removes magnetometer error entirely.
+   * Pin the heading by hand: the user is facing `bearing` right now. Removes
+   * magnetometer error entirely. With no argument the caller is presumed to be
+   * facing SAP Center, which needs their position — pass it, or the corridor
+   * axis is used as a last resort and will be wrong by ~40° in Little Italy.
    */
-  calibrate(bearing) {
-    state.heading = typeof bearing === 'number' ? bearing : CORRIDOR_BEARING_TO_SAP;
+  calibrate(bearing, atLat, atLng) {
+    if (typeof bearing !== 'number' && typeof atLat === 'number') {
+      bearing = this.bearingToSap(atLat, atLng);
+    }
+    state.heading = typeof bearing === 'number' ? bearing : CORRIDOR_AXIS_DEG;
     state.smoothed = state.heading;
     state.samples = 99;
     state.headingSource = 'calibrated';

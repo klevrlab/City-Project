@@ -397,8 +397,9 @@ AFRAME.registerComponent('debug-placement', {
       const cal = document.getElementById('dbg-calibrate');
       if (cal) {
         cal.onclick = () => {
-          const b = G.calibrate();
-          this.toast(`Heading pinned to ${b.toFixed(0)}° — re-anchoring`);
+          if (this.gps.lat == null) return this.toast('Need a GPS fix to calibrate');
+          const b = G.calibrate(undefined, this.gps.lat, this.gps.lng);
+          this.toast(`Heading pinned to ${b.toFixed(0)}° (SAP) — re-anchoring`);
           if (window.reanchorLocations) window.reanchorLocations();
           this.render();
         };
@@ -417,8 +418,10 @@ AFRAME.registerComponent('debug-placement', {
       <div class="dbg-row"><span class="dbg-name">Placement mode</span>
         <span class="${lx && lx.geoPlaced ? 'dbg-good' : 'dbg-bad'}">${mode}</span></div>
       <div class="dbg-row"><span class="dbg-name">Heading</span><span>${heading}</span></div>
-      <div class="dbg-row"><span class="dbg-name">Corridor → SAP</span>
-        <span>${G.CORRIDOR_BEARING_TO_SAP.toFixed(0)}°</span></div>
+      <div class="dbg-row"><span class="dbg-name">Bearing to SAP</span>
+        <span>${this.gps.lat != null ? G.bearingToSap(this.gps.lat, this.gps.lng).toFixed(0) + '°' : 'needs fix'}</span></div>
+      <div class="dbg-row"><span class="dbg-name">Corridor axis (east)</span>
+        <span>${G.CORRIDOR_AXIS_DEG.toFixed(0)}° · toward SAP ${((G.CORRIDOR_AXIS_DEG + 180) % 360).toFixed(0)}°</span></div>
       <div class="dbg-actions">
         <button class="dbg-mini" id="dbg-compass">enable compass</button>
         <button class="dbg-mini" id="dbg-calibrate">calibrate: facing SAP</button>
@@ -580,6 +583,11 @@ AFRAME.registerComponent('debug-placement', {
         <button class="dbg-mini" data-scale="1.25">+25%</button>
       </div>
       <div class="dbg-actions">
+        mirror: <button class="dbg-mini" data-mirror="x">flip X</button>
+        <button class="dbg-mini" data-mirror="z">flip Z</button>
+        <span class="dbg-dim">${o.scale.x < 0 || o.scale.z < 0 ? 'mirrored' : 'not mirrored'}</span>
+      </div>
+      <div class="dbg-actions">
         <button class="dbg-mini ${this.dragMode ? 'dbg-on' : ''}" id="dbg-drag">drag on ground: ${this.dragMode ? 'ON' : 'off'}</button>
         <button class="dbg-mini" id="dbg-ground">drop to ground</button>
         <button class="dbg-mini" id="dbg-front">bring in front</button>
@@ -603,6 +611,9 @@ AFRAME.registerComponent('debug-placement', {
     });
     pane.querySelectorAll('[data-scale]').forEach((b) => {
       b.onclick = () => this.scaleBy(Number(b.getAttribute('data-scale')));
+    });
+    pane.querySelectorAll('[data-mirror]').forEach((b) => {
+      b.onclick = () => this.mirror(b.getAttribute('data-mirror'));
     });
     pane.querySelector('#dbg-drag').onclick = () => {
       this.dragMode = !this.dragMode;
@@ -768,6 +779,26 @@ AFRAME.registerComponent('debug-placement', {
     if (!el) return;
     el.object3D.scale.multiplyScalar(factor);
     this.syncAttrs();
+  },
+
+  /**
+   * Mirror on an axis via negative scale. That inverts triangle winding, so the
+   * model would light and cull inside-out; force DoubleSide to compensate.
+   */
+  mirror: function (axis) {
+    const el = this.selected;
+    if (!el) return;
+    el.object3D.scale[axis] *= -1;
+    el.object3D.traverse((o) => {
+      if (o.isMesh && o.material) {
+        (Array.isArray(o.material) ? o.material : [o.material]).forEach((mat) => {
+          mat.side = THREE.DoubleSide;
+          mat.needsUpdate = true;
+        });
+      }
+    });
+    this.syncAttrs();
+    this.toast(`mirrored on ${axis.toUpperCase()} — SAVE to keep it`);
   },
 
   bringInFront: function () {
