@@ -71,6 +71,12 @@ function installFakeGps() {
       const id = state.nextId++;
       state.watchers.set(id, ok);
       setTimeout(() => ok(fix()), 30);
+      // A real watchPosition keeps streaming; code that retries on each fix
+      // would otherwise stall here and look like a bug that only exists in sim.
+      const iv = setInterval(() => {
+        if (!state.watchers.has(id)) return clearInterval(iv);
+        ok(fix());
+      }, 1000);
       return id;
     },
     clearWatch: (id) => state.watchers.delete(id)

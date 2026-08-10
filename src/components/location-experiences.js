@@ -53,6 +53,9 @@ const JUMP_BEARINGS = { west: 270, north: 0, east: 90, south: 180 };
 const FINALE_CIRCLE_RADIUS_M = 30;
 const FINALE_CIRCLE_PERIOD_MS = 60000;  // ~3 m/s at 30 m — an unhurried cruise
 
+/** 'pod' = all three sharks travelling together; 'spread' = evenly spaced. */
+const FINALE_CIRCLE_FORMATION = 'pod';
+
 AFRAME.registerComponent('location-experiences', {
   schema: {
     statueRadiusM: { type: 'number', default: 55 },
@@ -158,13 +161,17 @@ AFRAME.registerComponent('location-experiences', {
 
       // The compass usually settles after the first plant. Upgrade the
       // camera-relative fallback to real coordinates once, when it does.
+      // Landmarks refuse to plant until there's a heading, and a device can
+      // sit inside the geofence with no further GPS callback, so poll: once
+      // the compass settles, drop anything camera-relative and re-run the
+      // geofence with real coordinates.
       this._geoUpgradeTimer = setInterval(() => {
-        if (this.forceCameraRelative || this.geoPlaced || this._geoUpgraded) return;
-        if (!this.statueRoot && !this.towerEl) return;
+        if (this.forceCameraRelative || this.geoPlaced) return;
         if (!window.GeoAnchor.stable || this.userLat == null) return;
-        this._geoUpgraded = true;
-        console.log('[location-experiences] compass settled — re-anchoring to GPS coordinates');
-        window.reanchorLocations();
+        console.log('[location-experiences] compass settled — anchoring to GPS coordinates');
+        this.clearStatues();
+        this.clearTower();
+        this.onGps(this.userLat, this.userLng);
       }, 1500);
     }
 
@@ -427,7 +434,17 @@ AFRAME.registerComponent('location-experiences', {
       return true;
     }
 
-    // Fallback: no compass or no fix — lay the corridor out ahead of the user.
+    // No fix or no heading yet. These statues belong to specific street
+    // corners, so putting them in front of whoever is holding the phone is
+    // worse than showing nothing — it looks placed-at-you and moves when you
+    // turn. Wait for the compass instead; the upgrade timer replants.
+    if (!this.forceCameraRelative) {
+      this.setStatus('Little Italy — waiting for compass to place statues…');
+      this.setHint('Hold the phone up and turn slowly, or tap calibrate in debug');
+      return false;
+    }
+
+    // ?geo=0 / demo mode only: lay the corridor out ahead of the user.
     const root = this.makeAnchorRoot('little-italy-statues', cam);
     this.el.appendChild(root);
     this.statueRoot = root;
@@ -532,6 +549,12 @@ AFRAME.registerComponent('location-experiences', {
       parent.setAttribute('data-geo-pin', 'tower');
       root.appendChild(parent);
     } else {
+      // Same rule as the statues: the tower has a real corner. Don't drop an
+      // 8 m landmark 12 m in front of whoever happens to be standing here.
+      if (!this.forceCameraRelative) {
+        this.setStatus('Leaning Tower — waiting for compass…');
+        return false;
+      }
       root = this.makeAnchorRoot('leaning-tower-anchor', cam);
       parent = root;
     }
@@ -762,6 +785,8 @@ AFRAME.registerComponent('location-experiences', {
    * change if the intent was a 60 m radius or a tighter AR-scaled ring.
    */
   plantFinaleCircle: function (cam) {
+    // The geofence can re-fire after its cooldown; one ring is enough.
+    document.querySelectorAll('#finale-circle-anchor').forEach((el) => el.remove());
     const finale = this.jumpPins.find((p) => p.id === 'finale');
     let anchor = this.makeGeoRoot('finale-circle-anchor', cam);
     let centerLocal = { x: 0, y: 0, z: -10 };
@@ -778,12 +803,14 @@ AFRAME.registerComponent('location-experiences', {
     pivot.setAttribute('id', 'finale-circle');
     this.place(pivot, 'finale/circle-center', { position: centerLocal });
 
-    // Doc names these two for the circle — "Swimming in Circle: Stella Cai
-    // Shark.glb" and "sharkanimated-maria-shaun.glb". Stella is retired from
-    // the wayfinding cycle but is still spec'd here, so she stays.
+    // All three swim the circle together as a pod, not spread around it.
+    // (The notes' "offset the frames" trick would space them evenly — that's
+    // FINALE_CIRCLE_FORMATION = 'spread' if the pod reads wrong on site.)
+    const spread = FINALE_CIRCLE_FORMATION === 'spread';
     const sharks = [
-      { id: 'maria', model: '#circle-maria', phase: 0 },
-      { id: 'stella', model: '#circle-stella', phase: 180 }
+      { id: 'maria', model: '#circle-maria', phase: spread ? 0 : 0, lane: 0 },
+      { id: 'stella', model: '#circle-stella', phase: spread ? 120 : 7, lane: -2.5 },
+      { id: 'jimmy', model: '#circle-jimmy', phase: spread ? 240 : 13, lane: 2.5 }
     ];
 
     sharks.forEach((s) => {
@@ -793,11 +820,12 @@ AFRAME.registerComponent('location-experiences', {
       ent.setAttribute('animation-mixer', 'loop: repeat; timeScale: 1.0');
       ent.setAttribute('shadow', 'cast: true');
       // Path is evaluated per frame — see shark-motion.js.
+      // Staggered lanes and heights so a pod doesn't read as one shark.
       ent.setAttribute('shark-circle-swim', {
-        radius: FINALE_CIRCLE_RADIUS_M,
+        radius: FINALE_CIRCLE_RADIUS_M + s.lane,
         period: FINALE_CIRCLE_PERIOD_MS,
         phaseDeg: s.phase,
-        height: 1.4
+        height: 1.4 + s.lane * 0.12
       });
       ent.setAttribute('data-placement-key', `finale/circle-${s.id}`);
       pivot.appendChild(ent);
