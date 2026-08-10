@@ -88,7 +88,17 @@ AFRAME.registerComponent('location-experiences', {
       { id: 8, lat: 37.335275, lng: -121.896868, side: 'south', odd: false }
     ];
 
-    this.towerPin = { lat: 37.335429, lng: -121.897883, heightM: 8 };
+    /**
+     * Corner of Little Italy Way & Sharks Way — the spot Chris pointed at in
+     * Street View, which is the Street View camera position from that link.
+     * The notes say "placed on ground when near 37.335429, -121.897883" and "at
+     * western corner"; that is 12 m north-northeast of here, i.e. the same
+     * corner within GPS error. Height is the notes' 8 m / 26 ft.
+     *
+     * Lean direction is deliberately not corrected — Chris: "you can ignore
+     * where it leans".
+     */
+    this.towerPin = { lat: 37.335323, lng: -121.897912, heightM: 8 };
 
     this.jumpPins = [
       {
