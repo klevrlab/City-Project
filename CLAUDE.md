@@ -116,6 +116,28 @@ city-project/
 - Minis & Trophy at Arena Green West — Mar 26 & 28, 2026 (past)
 - International Football Watch Together — Jun–Jul 2026, San Pedro Square Market
 
+## Shark Motion (hand-coded paths)
+
+The GLBs carry only a swim cycle — no path animation — so travel is evaluated per frame in
+`src/components/shark-motion.js`. The notes ask for a Blender follow-path constraint with offset
+frames; this is the same idea in code, which keeps radius, speed and phase tunable on site.
+
+- `shark-circle-swim` — orbits its parent's origin. `radius`, `period`, `phaseDeg` (the "offset the
+  frames" trick), `height`, bob and bank. Finale uses 30 m radius / 60 s laps, two sharks 180° apart.
+- `shark-arc-jump` — one breach: swims in along a **compass bearing** at water level, arcs up,
+  lands, keeps going. Emits `shark-breach-exit` / `shark-breach-entry` for the splash (Rhonda's
+  splash model is still TBD, so those fire the existing placeholder).
+
+Both drive the entity's local transform, so the parent is the frame of reference — under a geo root
+(−Z north, +X east) the bearings are real. Spec bearings: underpass east→west, river south→north,
+finale east→west toward SAP.
+
+**These models face +Z**, matching the existing `atan2(dx, dz)` yaw math. A model whose nose is not
++Z needs `yawOffset`.
+
+Numbers worth knowing when they look wrong: `FINALE_CIRCLE_RADIUS_M` (30 — the notes say "60 meter
+circle", read as diameter) and `FINALE_CIRCLE_PERIOD_MS` in `location-experiences.js`.
+
 ## Geo Anchoring
 
 Little Italy statues and the tower are placed at their **real coordinates** (`src/utils/geo-anchor.js`).

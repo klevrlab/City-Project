@@ -38,6 +38,21 @@ const TOWER_MIRROR_X = true;
  */
 const TOWER_LEAN_LOCAL_DEG = TOWER_MIRROR_X ? 267.6 : 92.4;
 
+/**
+ * Jump travel bearings, from the per-location descriptions in the notes:
+ * underpass "from the east heading west", river "from the south heading north",
+ * finale "from the east heading west toward SAP" (that one is recomputed from
+ * the pin's real bearing to the arena).
+ */
+const JUMP_BEARINGS = { west: 270, north: 0, east: 90, south: 180 };
+
+/**
+ * "Maria & sharks swim in a 60 meter circle around the intersection" — read as
+ * 60 m across, so a 30 m radius. Change this one number if it meant radius.
+ */
+const FINALE_CIRCLE_RADIUS_M = 30;
+const FINALE_CIRCLE_PERIOD_MS = 60000;  // ~3 m/s at 30 m — an unhurried cruise
+
 AFRAME.registerComponent('location-experiences', {
   schema: {
     statueRadiusM: { type: 'number', default: 55 },
@@ -633,6 +648,12 @@ AFRAME.registerComponent('location-experiences', {
     }, 1400);
   },
 
+  /**
+   * Spec, per location: the shark "swims into frame" from a compass direction,
+   * "jumps up like it's jumping out of water", and "comes back down with a
+   * splash" continuing the same way. Bearings are real when geo anchoring is
+   * up; otherwise they degrade to the camera's own frame.
+   */
   playJump: function (jumpId) {
     const pin = this.jumpPins.find((p) => p.id === jumpId) || this.jumpPins[0];
     if (!pin || this.jumpBusy) return;
@@ -648,63 +669,66 @@ AFRAME.registerComponent('location-experiences', {
       return;
     }
 
-    const forward = window.MathUtils.cameraForward(cam);
-    const right = window.MathUtils.cameraRight(cam);
+    // Travel bearing: underpass and finale head west (finale specifically
+    // toward SAP), the river jump heads north.
+    let bearing = JUMP_BEARINGS[pin.heading] != null ? JUMP_BEARINGS[pin.heading] : 270;
+    let root = this.makeGeoRoot(`jump-${pin.id}-anchor`, cam);
+    if (root && pin.id === 'finale') {
+      bearing = window.GeoAnchor.bearingToSap(pin.lat, pin.lng);
+    }
+    if (!root) {
+      // No heading available — put the arc across the camera's view instead, so
+      // the visitor still sees a breach rather than a shark leaving sideways.
+      root = this.makeAnchorRoot(`jump-${pin.id}-anchor`, cam);
+      bearing = 270;
+    }
 
-    // Enter from the side matching the redline heading, jump at center, exit.
-    const start = cam.object3D.position.clone()
-      .add(forward.clone().multiplyScalar(8))
-      .add(right.clone().multiplyScalar(pin.heading === 'north' ? 0 : 4));
-    start.y = 0.4;
-    const mid = cam.object3D.position.clone().add(forward.clone().multiplyScalar(5));
-    mid.y = 3.2;
-    const end = cam.object3D.position.clone()
-      .add(forward.clone().multiplyScalar(14))
-      .add(right.clone().multiplyScalar(pin.heading === 'north' ? 0 : -1));
-    end.y = 0.35;
+    // The apex should land in front of the visitor rather than on top of them.
+    const apexAhead = 9;
+    const b = bearing * Math.PI / 180;
+    const dir = new THREE.Vector3(Math.sin(b), 0, -Math.cos(b));
+    const across = new THREE.Vector3(-dir.z, 0, dir.x);
+    const arcLength = 14;
+    const origin = dir.clone().multiplyScalar(apexAhead - arcLength / 2)
+      .add(across.multiplyScalar(2));
 
     const ent = document.createElement('a-entity');
     ent.setAttribute('gltf-model', '#diving-shark');
     this.sizeTo(ent, `maxDim: ${SHARK_MAX_DIM_M}; ground: false`);
-    ent.setAttribute('position', `${start.x} ${start.y} ${start.z}`);
     ent.setAttribute('animation-mixer', 'loop: repeat; timeScale: 1.1');
     ent.setAttribute('shadow', 'cast: true');
+    ent.setAttribute('position', `${origin.x} 0 ${origin.z}`);
 
-    const yaw = Math.atan2(end.x - start.x, end.z - start.z) * (180 / Math.PI);
-    ent.setAttribute('rotation', `0 ${yaw} 0`);
-
-    this.el.appendChild(ent);
-
-    // Approach
-    ent.setAttribute('animation__approach', {
-      property: 'position',
-      to: `${mid.x} 0.9 ${mid.z}`,
-      dur: 1800,
-      easing: 'easeInOutSine'
+    // The breach itself, evaluated per frame — see shark-motion.js.
+    const carrier = document.createElement('a-entity');
+    carrier.setAttribute('shark-arc-jump', {
+      bearing: bearing,
+      approachM: 16,
+      arcLengthM: arcLength,
+      departM: 20,
+      apexHeight: 3.4,
+      speed: 6.5
     });
+    carrier.appendChild(ent);
+    // Position/rotation of the shark live on the carrier; keep the model clean.
+    ent.removeAttribute('position');
 
-    // Jump arc peak + splash placeholder
-    setTimeout(() => {
-      if (!ent.parentNode) return;
-      ent.setAttribute('animation__jump', {
-        property: 'position',
-        to: `${mid.x} ${mid.y} ${mid.z}`,
-        dur: 700,
-        easing: 'easeOutQuad'
-      });
-      this.spawnSplashPlaceholder(mid.x, mid.z);
-    }, 1800);
+    const anchor = document.createElement('a-entity');
+    anchor.setAttribute('position', `${origin.x} 0 ${origin.z}`);
+    anchor.appendChild(carrier);
+    root.appendChild(anchor);
+    this.el.appendChild(root);
 
-    // Come down + continue
-    setTimeout(() => {
-      if (!ent.parentNode) return;
-      ent.setAttribute('animation__down', {
-        property: 'position',
-        to: `${end.x} ${end.y} ${end.z}`,
-        dur: 1600,
-        easing: 'easeInQuad'
-      });
-    }, 2500);
+    // Splash placeholder where it leaves and re-enters the water.
+    const splashAt = (evt) => {
+      const p = evt.detail && evt.detail.position;
+      if (!p) return;
+      const world = new THREE.Vector3(p.x, 0, p.z);
+      anchor.object3D.localToWorld(world);
+      this.spawnSplashPlaceholder(world.x, world.z);
+    };
+    carrier.addEventListener('shark-breach-exit', splashAt);
+    carrier.addEventListener('shark-breach-entry', splashAt);
 
     // Finale: circle sharks + dancing mascots (placeholders until art lands).
     if (pin.id === 'finale') {
@@ -714,63 +738,76 @@ AFRAME.registerComponent('location-experiences', {
       }, 800);
     }
 
-    setTimeout(() => {
-      if (ent.parentNode) ent.parentNode.removeChild(ent);
+    carrier.addEventListener('shark-arc-complete', () => {
+      if (root.parentNode) root.parentNode.removeChild(root);
       this.jumpBusy = false;
-    }, 4800);
+    }, { once: true });
+
+    // Belt and braces: never strand the geofence in a busy state.
+    setTimeout(() => {
+      if (root.parentNode) root.parentNode.removeChild(root);
+      this.jumpBusy = false;
+    }, 12000);
   },
 
-  // Spec asks for a 60 m circle — AR scale uses ~10 m radius so it stays in view.
+  /**
+   * Spec: "Maria & sharks swim in a 60 meter circle around the intersection",
+   * with sharks spread around the circle by offsetting their frames, and
+   * "always have the sharks swimming West toward SAP" — which a circle can only
+   * honour on one side, so the phases are chosen to put a shark on the
+   * SAP-facing arc when the loop starts.
+   *
+   * 60 m is read as the circle's width, hence a 30 m radius. Sharks are that
+   * far out, so they read small; FINALE_CIRCLE_RADIUS_M is the one number to
+   * change if the intent was a 60 m radius or a tighter AR-scaled ring.
+   */
   plantFinaleCircle: function (cam) {
-    const anchor = this.makeAnchorRoot('finale-circle-anchor', cam);
+    const finale = this.jumpPins.find((p) => p.id === 'finale');
+    let anchor = this.makeGeoRoot('finale-circle-anchor', cam);
+    let centerLocal = { x: 0, y: 0, z: -10 };
+
+    if (anchor && finale && this.userLat != null) {
+      // Centre the ring on the intersection itself, not on the visitor.
+      const off = window.GeoAnchor.localOffset(finale.lat, finale.lng, this.userLat, this.userLng);
+      centerLocal = { x: off.x, y: 0, z: off.z };
+    } else {
+      anchor = this.makeAnchorRoot('finale-circle-anchor', cam);
+    }
 
     const pivot = document.createElement('a-entity');
     pivot.setAttribute('id', 'finale-circle');
-    // Rotation is driven by the orbit animation, so only position is overridable.
-    this.place(pivot, 'finale/circle-center', { position: { x: 0, y: 0.5, z: -10 } });
-    pivot.setAttribute('animation__orbit', {
-      property: 'rotation',
-      to: '0 360 0',
-      loop: true,
-      dur: 32000,
-      easing: 'linear'
-    });
+    this.place(pivot, 'finale/circle-center', { position: centerLocal });
 
-    const radius = 10; // AR stand-in for the 60 m corridor circle
+    // Doc names these two for the circle — "Swimming in Circle: Stella Cai
+    // Shark.glb" and "sharkanimated-maria-shaun.glb". Stella is retired from
+    // the wayfinding cycle but is still spec'd here, so she stays.
     const sharks = [
-      { id: 'maria', model: '#circle-maria', angleDeg: 0 },
-      { id: 'stella', model: '#circle-stella', angleDeg: 180 }
+      { id: 'maria', model: '#circle-maria', phase: 0 },
+      { id: 'stella', model: '#circle-stella', phase: 180 }
     ];
 
     sharks.forEach((s) => {
-      const rad = s.angleDeg * Math.PI / 180;
       const ent = document.createElement('a-entity');
       ent.setAttribute('gltf-model', s.model);
       this.sizeTo(ent, `maxDim: ${SHARK_MAX_DIM_M}; ground: false`);
       ent.setAttribute('animation-mixer', 'loop: repeat; timeScale: 1.0');
       ent.setAttribute('shadow', 'cast: true');
-      // Face tangent to the circle (travel direction).
-      this.place(ent, `finale/circle-${s.id}`, {
-        position: { x: Math.cos(rad) * radius, y: 0, z: Math.sin(rad) * radius },
-        rotation: { x: 0, y: s.angleDeg + 90, z: 0 },
-        scale: '1 1 1'
+      // Path is evaluated per frame — see shark-motion.js.
+      ent.setAttribute('shark-circle-swim', {
+        radius: FINALE_CIRCLE_RADIUS_M,
+        period: FINALE_CIRCLE_PERIOD_MS,
+        phaseDeg: s.phase,
+        height: 1.4
       });
+      ent.setAttribute('data-placement-key', `finale/circle-${s.id}`);
       pivot.appendChild(ent);
     });
-
-    const label = document.createElement('a-text');
-    label.setAttribute('value', '60m circle\n(AR-scaled)');
-    label.setAttribute('align', 'center');
-    label.setAttribute('width', 6);
-    label.setAttribute('color', '#ffffff');
-    label.setAttribute('position', '0 2.2 0');
-    pivot.appendChild(label);
 
     anchor.appendChild(pivot);
     this.el.appendChild(anchor);
     setTimeout(() => {
       if (anchor.parentNode) anchor.parentNode.removeChild(anchor);
-    }, 16000);
+    }, 40000);
   },
 
   plantFinaleDancers: function (cam) {
