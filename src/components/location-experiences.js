@@ -121,6 +121,14 @@ AFRAME.registerComponent('location-experiences', {
         lng: -121.900460,
         label: 'Grand Finale Jump',
         heading: 'west',
+        /**
+         * "Swims into frame from the east heading west toward SAP" — but due
+         * west (270°) and the arena's true bearing from here (205°) disagree.
+         * West Saint John Street, the same street the statues are on, runs
+         * 239°/59° through this intersection, so this follows the street
+         * toward SAP rather than flying the shark over the buildings.
+         */
+        bearingDeg: 239,
         danceCorner: { lat: 37.334118, lng: -121.900262 }
       }
     ];
@@ -176,8 +184,12 @@ AFRAME.registerComponent('location-experiences', {
       // the compass settles, drop anything camera-relative and re-run the
       // geofence with real coordinates.
       this._geoUpgradeTimer = setInterval(() => {
-        if (this.forceCameraRelative || this.geoPlaced) return;
+        if (this.forceCameraRelative) return clearInterval(this._geoUpgradeTimer);
         if (!window.GeoAnchor.stable || this.userLat == null) return;
+        // One re-run is enough: from here a streaming watchPosition retries any
+        // plant that is still missing. Without stopping, standing outside every
+        // geofence would clear and re-run forever.
+        clearInterval(this._geoUpgradeTimer);
         console.log('[location-experiences] compass settled — anchoring to GPS coordinates');
         this.clearStatues();
         this.clearTower();
@@ -492,6 +504,9 @@ AFRAME.registerComponent('location-experiences', {
     if (northYaw == null) return null;
 
     const origin = cam.object3D.getWorldPosition(new THREE.Vector3());
+    // Anything built on a geo root is at real coordinates — the debug panel
+    // reports this, so set it here rather than in each caller.
+    this.geoPlaced = true;
     const root = document.createElement('a-entity');
     root.setAttribute('id', id);
     root.setAttribute('data-geo-root', '1');
@@ -704,11 +719,10 @@ AFRAME.registerComponent('location-experiences', {
 
     // Travel bearing: underpass and finale head west (finale specifically
     // toward SAP), the river jump heads north.
-    let bearing = JUMP_BEARINGS[pin.heading] != null ? JUMP_BEARINGS[pin.heading] : 270;
+    let bearing = pin.bearingDeg != null
+      ? pin.bearingDeg
+      : (JUMP_BEARINGS[pin.heading] != null ? JUMP_BEARINGS[pin.heading] : 270);
     let root = this.makeGeoRoot(`jump-${pin.id}-anchor`, cam);
-    if (root && pin.id === 'finale') {
-      bearing = window.GeoAnchor.bearingToSap(pin.lat, pin.lng);
-    }
     if (!root) {
       // No heading available — put the arc across the camera's view instead, so
       // the visitor still sees a breach rather than a shark leaving sideways.
