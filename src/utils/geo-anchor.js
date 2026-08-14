@@ -31,6 +31,7 @@ const state = {
   headingAt: 0,
   accuracy: null,
   listening: false,
+  autoArmed: false,
   smoothed: null,
   samples: 0
 };
@@ -148,6 +149,34 @@ const GeoAnchor = {
     state.listening = true;
     window.addEventListener('deviceorientationabsolute', onOrientation, true);
     window.addEventListener('deviceorientation', onOrientation, true);
+  },
+
+  /** True on iOS before the orientation prompt has been accepted. */
+  get needsPermission() {
+    const DOE = window.DeviceOrientationEvent;
+    return !!(DOE && typeof DOE.requestPermission === 'function') && state.heading == null;
+  },
+
+  /**
+   * iOS only hands over orientation from inside a user gesture, and the visitor
+   * taps the screen constantly anyway (drop-a-shark, mode buttons). Piggyback on
+   * the first of those taps so most people never see a permission prompt from
+   * us. Harmless elsewhere: requestPermission simply doesn't exist.
+   */
+  armAutoRequest() {
+    if (state.autoArmed) return;
+    state.autoArmed = true;
+    const attempt = () => {
+      this.requestPermission().then((ok) => {
+        if (ok) release();
+      });
+    };
+    const release = () => {
+      document.removeEventListener('pointerdown', attempt, true);
+      document.removeEventListener('touchend', attempt, true);
+    };
+    document.addEventListener('pointerdown', attempt, true);
+    document.addEventListener('touchend', attempt, true);
   },
 
   /**

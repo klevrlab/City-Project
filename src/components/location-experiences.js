@@ -56,6 +56,14 @@ const FINALE_CIRCLE_PERIOD_MS = 60000;  // ~3 m/s at 30 m — an unhurried cruis
 /** 'pod' = all three sharks travelling together; 'spread' = evenly spaced. */
 const FINALE_CIRCLE_FORMATION = 'pod';
 
+/**
+ * How long to hold out for a compass before placing landmarks the old
+ * camera-relative way. Geo placement is much better, but a visitor standing in
+ * Little Italy seeing an empty street is worse than seeing content that is
+ * oriented off. Long enough that a working magnetometer always wins the race.
+ */
+const COMPASS_TIMEOUT_MS = 20000;
+
 AFRAME.registerComponent('location-experiences', {
   schema: {
     statueRadiusM: { type: 'number', default: 55 },
@@ -173,27 +181,48 @@ AFRAME.registerComponent('location-experiences', {
     };
 
     if (window.GeoAnchor) {
-      // Android reports absolute orientation without asking; iOS needs a tap,
-      // which the debug panel's ENABLE COMPASS button provides.
+      // Android reports absolute orientation unasked; iOS needs a user gesture,
+      // so ride the visitor's first tap and keep a visible button as backup.
       window.GeoAnchor.listen();
+      window.GeoAnchor.armAutoRequest();
+      this.ensureCompassPrompt();
 
-      // The compass usually settles after the first plant. Upgrade the
-      // camera-relative fallback to real coordinates once, when it does.
-      // Landmarks refuse to plant until there's a heading, and a device can
-      // sit inside the geofence with no further GPS callback, so poll: once
-      // the compass settles, drop anything camera-relative and re-run the
-      // geofence with real coordinates.
+      // Landmarks refuse to plant until there's a heading, and a device can sit
+      // inside the geofence with no further GPS callback, so poll: once the
+      // compass settles, drop anything camera-relative and re-run the geofence
+      // with real coordinates.
       this._geoUpgradeTimer = setInterval(() => {
         if (this.forceCameraRelative) return clearInterval(this._geoUpgradeTimer);
-        if (!window.GeoAnchor.stable || this.userLat == null) return;
-        // One re-run is enough: from here a streaming watchPosition retries any
-        // plant that is still missing. Without stopping, standing outside every
-        // geofence would clear and re-run forever.
-        clearInterval(this._geoUpgradeTimer);
-        console.log('[location-experiences] compass settled — anchoring to GPS coordinates');
-        this.clearStatues();
-        this.clearTower();
-        this.onGps(this.userLat, this.userLng);
+        if (this.userLat == null) return;
+
+        if (window.GeoAnchor.stable) {
+          // One re-run is enough: from here a streaming watchPosition retries
+          // any plant that is still missing. Without stopping, standing outside
+          // every geofence would clear and re-run forever.
+          clearInterval(this._geoUpgradeTimer);
+          this.showCompassPrompt(false);
+          console.log('[location-experiences] compass settled — anchoring to GPS coordinates');
+          this.clearStatues();
+          this.clearTower();
+          this.onGps(this.userLat, this.userLng);
+          return;
+        }
+
+        // Still no heading. Ask for it if iOS is holding it back, and if the
+        // wait runs long, show the content anyway — a visitor standing in
+        // Little Italy seeing nothing at all is the worse failure.
+        if (this._waitingForCompassSince) {
+          if (window.GeoAnchor.needsPermission) this.showCompassPrompt(true);
+          const waited = performance.now() - this._waitingForCompassSince;
+          if (waited > COMPASS_TIMEOUT_MS && !this.compassUnavailable) {
+            clearInterval(this._geoUpgradeTimer);
+            this.compassUnavailable = true;
+            console.warn('[location-experiences] no compass after ' +
+              Math.round(waited / 1000) + 's — falling back to camera-relative layout');
+            this.setStatus('No compass — showing approximate placement');
+            this.onGps(this.userLat, this.userLng);
+          }
+        }
       }, 1500);
     }
 
@@ -240,9 +269,38 @@ AFRAME.registerComponent('location-experiences', {
     this.statusEl = el;
   },
 
+  /**
+   * Backup for the auto-request: a real button, because iOS will only prompt
+   * from a gesture and the auto-arm can be beaten by a tap that lands on the
+   * A-Frame canvas first.
+   */
+  ensureCompassPrompt: function () {
+    if (document.getElementById('compass-prompt')) return;
+    const btn = document.createElement('button');
+    btn.id = 'compass-prompt';
+    btn.type = 'button';
+    btn.textContent = 'Tap to enable compass';
+    btn.addEventListener('click', async () => {
+      const ok = await window.GeoAnchor.requestPermission();
+      this.setStatus(ok ? 'Compass enabled — placing…' : 'Compass blocked in Settings');
+      if (ok) this.showCompassPrompt(false);
+    });
+    document.body.appendChild(btn);
+    this.compassPromptEl = btn;
+  },
+
+  showCompassPrompt: function (show) {
+    const el = this.compassPromptEl || document.getElementById('compass-prompt');
+    if (el) el.classList.toggle('visible', !!show);
+  },
+
   setStatus: function (text) {
     if (!this.statusEl) this.ensureStatusUi();
-    if (this.statusEl) this.statusEl.textContent = text;
+    // Once we've given up on the compass, say so on every line — the regular
+    // GPS status would otherwise overwrite the one warning and the placement
+    // would look authoritative when it isn't.
+    const suffix = this.compassUnavailable ? ' · approx (no compass)' : '';
+    if (this.statusEl) this.statusEl.textContent = text + suffix;
   },
 
   startGps: function () {
@@ -460,9 +518,11 @@ AFRAME.registerComponent('location-experiences', {
     // corners, so putting them in front of whoever is holding the phone is
     // worse than showing nothing — it looks placed-at-you and moves when you
     // turn. Wait for the compass instead; the upgrade timer replants.
-    if (!this.forceCameraRelative) {
-      this.setStatus('Little Italy — waiting for compass to place statues…');
-      this.setHint('Hold the phone up and turn slowly, or tap calibrate in debug');
+    if (!this.forceCameraRelative && !this.compassUnavailable) {
+      this._waitingForCompassSince = this._waitingForCompassSince || performance.now();
+      this.setStatus('Little Italy — getting your bearings…');
+      this.setHint('Hold the phone up and turn slowly');
+      if (window.GeoAnchor && window.GeoAnchor.needsPermission) this.showCompassPrompt(true);
       return false;
     }
 
@@ -497,7 +557,7 @@ AFRAME.registerComponent('location-experiences', {
    * which is the signal to fall back to camera-relative layout.
    */
   makeGeoRoot: function (id, cam) {
-    if (this.forceCameraRelative) return null;
+    if (this.forceCameraRelative || this.compassUnavailable) return null;
     if (this.userLat == null || !window.GeoAnchor) return null;
     if (!window.GeoAnchor.stable) return null;
     const northYaw = window.GeoAnchor.northYawDeg(cam);
@@ -576,8 +636,10 @@ AFRAME.registerComponent('location-experiences', {
     } else {
       // Same rule as the statues: the tower has a real corner. Don't drop an
       // 8 m landmark 12 m in front of whoever happens to be standing here.
-      if (!this.forceCameraRelative) {
-        this.setStatus('Leaning Tower — waiting for compass…');
+      if (!this.forceCameraRelative && !this.compassUnavailable) {
+        this._waitingForCompassSince = this._waitingForCompassSince || performance.now();
+        this.setStatus('Leaning Tower — getting your bearings…');
+        if (window.GeoAnchor && window.GeoAnchor.needsPermission) this.showCompassPrompt(true);
         return false;
       }
       root = this.makeAnchorRoot('leaning-tower-anchor', cam);
@@ -643,9 +705,16 @@ AFRAME.registerComponent('location-experiences', {
     this.towerEl = null;
   },
 
-  // ---- Jump sequences (placeholder splash) ---------------------------------
+  // ---- Jump sequences -------------------------------------------------------
 
-  spawnSplashPlaceholder: function (x, z) {
+  /**
+   * Expanding water ring where the shark breaks or re-enters the surface.
+   *
+   * This is the stand-in until Rhonda's splash model lands — swap the two
+   * primitives below for the GLB and keep the call site. It used to carry a
+   * "splash TBD" caption, which read as unfinished in front of an audience.
+   */
+  spawnSplashRing: function (x, z) {
     const group = document.createElement('a-entity');
     group.setAttribute('position', `${x} 0.02 ${z}`);
 
@@ -661,14 +730,6 @@ AFRAME.registerComponent('location-experiences', {
     ring.setAttribute('rotation', '90 0 0');
     ring.setAttribute('material', 'color: #b8e8f8; opacity: 0.7; transparent: true');
     group.appendChild(ring);
-
-    const label = document.createElement('a-text');
-    label.setAttribute('value', 'splash TBD');
-    label.setAttribute('align', 'center');
-    label.setAttribute('width', 4);
-    label.setAttribute('color', '#0a3a4a');
-    label.setAttribute('position', '0 0.35 0');
-    group.appendChild(label);
 
     this.el.appendChild(group);
     disc.setAttribute('animation__grow', {
@@ -709,7 +770,7 @@ AFRAME.registerComponent('location-experiences', {
 
     this.jumpBusy = true;
     this.lastJumpAt[pin.id] = performance.now();
-    this.setHint(`${pin.label} — diving shark (splash TBD)`);
+    this.setHint(`${pin.label} — watch for the shark`);
 
     const cam = document.getElementById('camera');
     if (!cam) {
@@ -772,7 +833,7 @@ AFRAME.registerComponent('location-experiences', {
       if (!p) return;
       const world = new THREE.Vector3(p.x, 0, p.z);
       anchor.object3D.localToWorld(world);
-      this.spawnSplashPlaceholder(world.x, world.z);
+      this.spawnSplashRing(world.x, world.z);
     };
     carrier.addEventListener('shark-breach-exit', splashAt);
     carrier.addEventListener('shark-breach-entry', splashAt);
@@ -866,8 +927,8 @@ AFRAME.registerComponent('location-experiences', {
     const anchor = this.makeAnchorRoot('finale-dancers-anchor', cam);
 
     const dancers = [
-      { id: 'sharkie', model: '#photo-sharkie', offset: -0.8, label: 'Sharkie\n(dance TBD)' },
-      { id: 'sammy', model: '#photo-sammy', offset: 0.8, label: 'Sammy\n(dance TBD)' }
+      { id: 'sharkie', model: '#photo-sharkie', offset: -0.8 },
+      { id: 'sammy', model: '#photo-sammy', offset: 0.8 }
     ];
 
     dancers.forEach((d) => {

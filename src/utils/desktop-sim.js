@@ -124,6 +124,14 @@ function installFakeGps() {
  * SimCompass.set() moves it to test misalignment.
  */
 function installFakeCompass() {
+  // &nocompass=1 simulates a phone that never yields a heading — permission
+  // denied, or a magnetometer that won't settle. Exercises the fallback.
+  if (params.get('nocompass') === '1') {
+    console.log('[desktop-sim] compass suppressed (&nocompass=1)');
+    window.SimCompass = { set: () => null, get: () => null, suppressed: true };
+    return;
+  }
+
   // Default to the corridor bearing toward SAP. Note params.get returns null
   // when absent and Number(null) is 0, which is a perfectly finite wrong answer.
   let heading = params.has('heading') ? Number(params.get('heading')) : NaN;
