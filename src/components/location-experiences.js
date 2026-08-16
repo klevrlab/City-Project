@@ -77,6 +77,14 @@ const STATUE_MAX_TEXTURE_PX = 1024;
 const STATUE_CULL_DISTANCE_M = 45;
 
 /**
+ * The Athena GLB filenames describe the pointing arm from the viewer's side,
+ * not the statue's, so using them literally aimed every arm east — away from
+ * SAP. True swaps the two files between the north and south rows. Flip to false
+ * if the assets are ever re-exported with the other convention.
+ */
+const ATHENA_POINT_SWAP = true;
+
+/**
  * Breach height above the water line. 3.4 m over a 3 m shark read as a mortar
  * launch; this clears the body with room to spare and still looks like a jump.
  */
@@ -606,9 +614,18 @@ AFRAME.registerComponent('location-experiences', {
 
     // shared-gltf, not gltf-model: one parse per file, cloned per pin, with the
     // textures downsampled once on the shared master. See shared-gltf.js.
+    //
+    // Which Athena goes on which side: the notes say "pointing Right/West on
+    // North side of the street and Left/West on the South side", and the intent
+    // of both halves is the same — the arm points west, toward SAP. Taking the
+    // filenames at face value pointed them east on site, because the names read
+    // from the viewer's side rather than the statue's: facing south, the arm a
+    // viewer calls "left" is the statue's right. Hence the swap.
+    const athenaNorth = ATHENA_POINT_SWAP ? '#athena-point-left' : '#athena-point-right';
+    const athenaSouth = ATHENA_POINT_SWAP ? '#athena-point-right' : '#athena-point-left';
     const src = pin.odd
       ? '#augustus-statue'
-      : (pin.side === 'north' ? '#athena-point-right' : '#athena-point-left');
+      : (pin.side === 'north' ? athenaNorth : athenaSouth);
     ent.setAttribute('shared-gltf', `src: ${src}; maxTexture: ${STATUE_MAX_TEXTURE_PX}`);
 
     // Raw GLBs are 1 m (Augustus) and 206 m (Athena) tall — normalize both to a
