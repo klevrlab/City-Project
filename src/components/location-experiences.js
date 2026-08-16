@@ -64,6 +64,24 @@ const FINALE_CIRCLE_FORMATION = 'pod';
  */
 const COMPASS_TIMEOUT_MS = 20000;
 
+/**
+ * Little Italy performance budget. Measured before these existed: 8 statues =
+ * 2.3M triangles, 36 unique textures, 264 megapixels ≈ 1.34 GB of texture
+ * memory, and no geometry shared between instances. That crashed older phones
+ * and dragged new ones.
+ *
+ * 1024 px is generous for a 2.5 m statue on a handset, and 45 m keeps roughly
+ * the near half of the 70 m row rendering at any time.
+ */
+const STATUE_MAX_TEXTURE_PX = 1024;
+const STATUE_CULL_DISTANCE_M = 45;
+
+/**
+ * Breach height above the water line. 3.4 m over a 3 m shark read as a mortar
+ * launch; this clears the body with room to spare and still looks like a jump.
+ */
+const JUMP_APEX_HEIGHT_M = 1.8;
+
 AFRAME.registerComponent('location-experiences', {
   schema: {
     statueRadiusM: { type: 'number', default: 55 },
@@ -577,16 +595,21 @@ AFRAME.registerComponent('location-experiences', {
 
   spawnStatue: function (root, pin, localPos, yaw, distance) {
     const ent = document.createElement('a-entity');
-    ent.setAttribute('shadow', 'cast: true');
     ent.setAttribute('data-statue-pin', String(pin.id));
     if (typeof distance === 'number') ent.setAttribute('data-geo-distance', distance.toFixed(1));
 
-    if (pin.odd) {
-      // Spec: odd pins = Augustus of Prima Porta.
-      ent.setAttribute('gltf-model', '#augustus-statue');
-    } else {
-      ent.setAttribute('gltf-model', pin.side === 'north' ? '#athena-point-right' : '#athena-point-left');
-    }
+    // No shadow casting here: the statues are the heaviest meshes in the scene
+    // and a cast shadow re-renders all of that geometry a second time.
+
+    // Only the far half of a 70 m row is ever off-screen-small, so drop it.
+    ent.setAttribute('cull-distance', `max: ${STATUE_CULL_DISTANCE_M}`);
+
+    // shared-gltf, not gltf-model: one parse per file, cloned per pin, with the
+    // textures downsampled once on the shared master. See shared-gltf.js.
+    const src = pin.odd
+      ? '#augustus-statue'
+      : (pin.side === 'north' ? '#athena-point-right' : '#athena-point-left');
+    ent.setAttribute('shared-gltf', `src: ${src}; maxTexture: ${STATUE_MAX_TEXTURE_PX}`);
 
     // Raw GLBs are 1 m (Augustus) and 206 m (Athena) tall — normalize both to a
     // consistent street-statue height rather than per-asset scale guesses.
@@ -791,14 +814,24 @@ AFRAME.registerComponent('location-experiences', {
       bearing = 270;
     }
 
-    // The apex should land in front of the visitor rather than on top of them.
-    const apexAhead = 9;
     const b = bearing * Math.PI / 180;
     const dir = new THREE.Vector3(Math.sin(b), 0, -Math.cos(b));
     const across = new THREE.Vector3(-dir.z, 0, dir.x);
     const arcLength = 14;
-    const origin = dir.clone().multiplyScalar(apexAhead - arcLength / 2)
-      .add(across.multiplyScalar(2));
+
+    // The finale breaches in the middle of the shark circle: anchor on the
+    // intersection and let the arc peak right there. Everywhere else the apex
+    // should land in front of the visitor rather than on top of them.
+    const apexAtOrigin = pin.id === 'finale' && !!root.getAttribute('data-geo-root');
+    let origin;
+    if (apexAtOrigin) {
+      const off = window.GeoAnchor.localOffset(pin.lat, pin.lng, this.userLat, this.userLng);
+      origin = new THREE.Vector3(off.x, 0, off.z);
+    } else {
+      const apexAhead = 9;
+      origin = dir.clone().multiplyScalar(apexAhead - arcLength / 2)
+        .add(across.multiplyScalar(2));
+    }
 
     const ent = document.createElement('a-entity');
     ent.setAttribute('gltf-model', '#diving-shark');
@@ -814,8 +847,9 @@ AFRAME.registerComponent('location-experiences', {
       approachM: 16,
       arcLengthM: arcLength,
       departM: 20,
-      apexHeight: 3.4,
-      speed: 6.5
+      apexHeight: JUMP_APEX_HEIGHT_M,
+      speed: 6.5,
+      apexAtOrigin: apexAtOrigin
     });
     carrier.appendChild(ent);
     // Position/rotation of the shark live on the carrier; keep the model clean.
@@ -924,11 +958,13 @@ AFRAME.registerComponent('location-experiences', {
   },
 
   plantFinaleDancers: function (cam) {
+    // Same as the circle: a re-fired geofence must not stack a second pair.
+    document.querySelectorAll('#finale-dancers-anchor').forEach((el) => el.remove());
     const anchor = this.makeAnchorRoot('finale-dancers-anchor', cam);
 
     const dancers = [
-      { id: 'sharkie', model: '#photo-sharkie', offset: -0.8 },
-      { id: 'sammy', model: '#photo-sammy', offset: 0.8 }
+      { id: 'sharkie', model: '#photo-sharkie', offset: -1.7 },
+      { id: 'sammy', model: '#photo-sammy', offset: 1.7 }
     ];
 
     dancers.forEach((d) => {

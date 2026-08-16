@@ -95,7 +95,11 @@ AFRAME.registerComponent('shark-arc-jump', {
     swimY: { type: 'number', default: 0.35 },     // cruise height ("in the water")
     speed: { type: 'number', default: 6 },        // m/s
     yawOffset: { type: 'number', default: 0 },
-    loop: { type: 'boolean', default: false }
+    loop: { type: 'boolean', default: false },
+    // Put the top of the arc exactly on the parent's origin, instead of
+    // starting there. The finale wants the breach in the middle of the shark
+    // circle, so the anchor is the circle centre and the shark peaks over it.
+    apexAtOrigin: { type: 'boolean', default: false }
   },
 
   init: function () {
@@ -108,7 +112,11 @@ AFRAME.registerComponent('shark-arc-jump', {
     // +X east) a compass bearing b is (sin b, 0, −cos b).
     const b = this.data.bearing * DEG;
     this.dir = new THREE.Vector3(Math.sin(b), 0, -Math.cos(b));
-    this.startOffset = this.dir.clone().multiplyScalar(-this.data.approachM);
+
+    // Distance travelled when the arc peaks.
+    const apexAt = this.data.approachM + this.data.arcLengthM / 2;
+    const back = this.data.apexAtOrigin ? apexAt : this.data.approachM;
+    this.startOffset = this.dir.clone().multiplyScalar(-back);
   },
 
   tick: function (time, delta) {
