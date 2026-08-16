@@ -77,12 +77,21 @@ const STATUE_MAX_TEXTURE_PX = 1024;
 const STATUE_CULL_DISTANCE_M = 45;
 
 /**
- * The Athena GLB filenames describe the pointing arm from the viewer's side,
- * not the statue's, so using them literally aimed every arm east — away from
- * SAP. True swaps the two files between the north and south rows. Flip to false
- * if the assets are ever re-exported with the other convention.
+ * Whether to swap the two Athena files between rows. The filenames are correct
+ * as they stand: measured in the geo root's own frame (+X east, −Z north), the
+ * point-right GLB carries its arm on local +X and point-left on local −X. The
+ * north row faces 177° so +X is west; the south row faces 357° so −X is west.
+ * North=right, south=left therefore points both arms toward SAP, exactly as the
+ * notes say. Swapping aims both rows east — measured, not guessed.
  */
-const ATHENA_POINT_SWAP = true;
+const ATHENA_POINT_SWAP = false;
+
+/**
+ * Which row's Augustus gets mirrored. He ships as a single model, so his arm
+ * sits on local −X for both rows: west on the south row (faces 357°) but east
+ * on the north row (faces 177°). Mirroring the north row puts both arms west.
+ */
+const AUGUSTUS_MIRROR_SIDE = 'north';
 
 /**
  * Breach height above the water line. 3.4 m over a 3 m shark read as a mortar
@@ -626,7 +635,13 @@ AFRAME.registerComponent('location-experiences', {
     const src = pin.odd
       ? '#augustus-statue'
       : (pin.side === 'north' ? athenaNorth : athenaSouth);
-    ent.setAttribute('shared-gltf', `src: ${src}; maxTexture: ${STATUE_MAX_TEXTURE_PX}`);
+
+    // Athena ships as a mirrored pair so each row can point west. Augustus is a
+    // single model, so the row that faces the other way needs mirroring or its
+    // arm points east. Measured in-scene: north Augustus reads 246° (west),
+    // south read 66° (east) until flipped.
+    const mirrorX = pin.odd && pin.side === AUGUSTUS_MIRROR_SIDE;
+    ent.setAttribute('shared-gltf', `src: ${src}; maxTexture: ${STATUE_MAX_TEXTURE_PX}; mirrorX: ${mirrorX}`);
 
     // Raw GLBs are 1 m (Augustus) and 206 m (Athena) tall — normalize both to a
     // consistent street-statue height rather than per-asset scale guesses.

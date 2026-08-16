@@ -22,7 +22,33 @@
  * skeleton, so animated sharks keep using `gltf-model`.
  */
 
-const cache = new Map();   // src -> Promise<THREE.Object3D>
+const cache = new Map();          // key -> Promise<THREE.Object3D>
+const mirrorCache = new Map();    // key -> THREE.Object3D (double-sided master)
+
+/**
+ * A master whose materials are double-sided, for instances that get a negative
+ * scale. Mirroring reverses triangle winding, so with normal back-face culling
+ * you end up looking at the inside of the model. Materials are cloned (which
+ * still shares the textures) so the un-mirrored instances keep culling.
+ */
+function mirroredMaster(master, key) {
+  if (mirrorCache.has(key)) return mirrorCache.get(key);
+  const copy = master.clone(true);
+  const swapped = new Map();
+  const swap = (mat) => {
+    if (swapped.has(mat.uuid)) return swapped.get(mat.uuid);
+    const clone = mat.clone();
+    clone.side = THREE.DoubleSide;
+    swapped.set(mat.uuid, clone);
+    return clone;
+  };
+  copy.traverse((o) => {
+    if (!o.isMesh || !o.material) return;
+    o.material = Array.isArray(o.material) ? o.material.map(swap) : swap(o.material);
+  });
+  mirrorCache.set(key, copy);
+  return copy;
+}
 
 function loadOnce(src, maxTexture) {
   const key = `${src}|${maxTexture}`;
@@ -85,7 +111,11 @@ function shrinkTextures(root, maxSize) {
 AFRAME.registerComponent('shared-gltf', {
   schema: {
     src: { type: 'string' },
-    maxTexture: { type: 'number', default: 1024 }
+    maxTexture: { type: 'number', default: 1024 },
+    // Flip on local X. A statue with only one variant points its arm the same
+    // way on both sides of a street, so one row needs mirroring to point the
+    // same real-world direction as the other.
+    mirrorX: { type: 'boolean', default: false }
   },
 
   init: function () {
@@ -101,7 +131,11 @@ AFRAME.registerComponent('shared-gltf', {
 
     loadOnce(src, this.data.maxTexture).then((master) => {
       if (!this.el.parentNode) return;   // removed while loading
-      const instance = master.clone(true);
+      const source = this.data.mirrorX
+        ? mirroredMaster(master, `${src}|${this.data.maxTexture}`)
+        : master;
+      const instance = source.clone(true);
+      if (this.data.mirrorX) instance.scale.x *= -1;
       this.el.setObject3D('mesh', instance);
       // Same event gltf-model fires, so model-normalize and the debug panel
       // keep working unchanged.
