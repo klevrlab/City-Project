@@ -83,14 +83,31 @@ AFRAME.registerComponent('tour-ui', {
     if (this.sharkLabel) this.sharkLabel.classList.add('visible');
   },
 
+  /**
+   * Fill the event card. Not every page that fires `sharkFound` carries this
+   * markup — shark-ar-8thwall.html has none of these ids — and an unguarded
+   * write threw a TypeError out of the detection callback on every single
+   * detection there, vision or GPS.
+   */
   showEvent: function (event) {
-    document.getElementById('event-title').textContent = event.title;
-    document.getElementById('event-date').innerHTML = `<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>${event.date} &bull; ${event.time}`;
-    document.getElementById('event-location').innerHTML = `<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${event.location}`;
-    document.getElementById('event-description').textContent = event.description;
-    document.getElementById('sharkey-message').textContent = event.sharkeyMessage;
-    document.getElementById('event-icon').src = event.icon;
-    
+    if (!event) return;
+    const setText = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    };
+    const setHtml = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = value;
+    };
+
+    setText('event-title', event.title);
+    setHtml('event-date', `<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>${event.date} &bull; ${event.time}`);
+    setHtml('event-location', `<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${event.location}`);
+    setText('event-description', event.description);
+    setText('sharkey-message', event.sharkeyMessage);
+    const icon = document.getElementById('event-icon');
+    if (icon) icon.src = event.icon;
+
     if (this.eventInfo) this.eventInfo.classList.add('visible');
   },
 

@@ -361,6 +361,8 @@ AFRAME.registerComponent('debug-placement', {
         <div><b>GPS</b><span>${this.gps.state}${this.gps.acc ? ' ±' + Math.round(this.gps.acc) + 'm' : ''}</span></div>
         <div><b>Coords</b><span>${this.gps.lat != null ? this.gps.lat.toFixed(6) + ', ' + this.gps.lng.toFixed(6) : '—'}</span></div>
       </div>
+      <h4>Shark recognition</h4>
+      <div class="dbg-list">${this.visionLines()}</div>
       <h4>Geo anchoring</h4>
       <div class="dbg-list">${this.geoLines()}</div>
       <h4>Sizing self-check</h4>
@@ -378,6 +380,33 @@ AFRAME.registerComponent('debug-placement', {
    * Heading state and the two controls that matter on site: grant the compass
    * (iOS needs the tap) and calibrate it against the known corridor bearing.
    */
+  /**
+   * Live read-out of the painted-shark matcher. The score is the useful number
+   * on site: point the camera at a painting and see how close it gets to the
+   * threshold before deciding whether the threshold is wrong.
+   */
+  visionLines: function () {
+    const sd = this.el.sceneEl.components['shark-detector'];
+    if (!sd) return '<div class="dbg-dim">shark-detector not attached</div>';
+    if (!sd.vision) return '<div class="dbg-dim">no vision state</div>';
+    const v = sd.vision;
+    const thr = sd.data.visionThreshold;
+    const score = v.lastScore || 0;
+    const close = score >= thr;
+    return `
+      <div class="dbg-row"><span class="dbg-name">Status</span>
+        <span class="${v.enabled ? 'dbg-good' : 'dbg-bad'}">${v.status}</span></div>
+      <div class="dbg-row"><span class="dbg-name">Best match</span>
+        <span>${v.lastName || '—'}</span></div>
+      <div class="dbg-row"><span class="dbg-name">Score / threshold</span>
+        <span class="${close ? 'dbg-good' : ''}">${score.toFixed(3)} / ${thr}</span></div>
+      <div class="dbg-row"><span class="dbg-name">Confidence</span>
+        <span>${(v.lastConfidence || 0).toFixed(2)} (need ${sd.data.visionConfidence})</span></div>
+      <div class="dbg-row"><span class="dbg-name">Matches so far</span>
+        <span>${v.matches}</span></div>
+    `;
+  },
+
   geoLines: function () {
     const G = window.GeoAnchor;
     if (!G) return '<div class="dbg-dim">geo-anchor.js not loaded</div>';

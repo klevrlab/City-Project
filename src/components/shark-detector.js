@@ -1,5 +1,23 @@
 /**
- * A-Frame component to handle shark detection using GPS only.
+ * Shark detection: GPS proximity plus camera recognition of Jimmy's painted
+ * sharks on the pavement.
+ *
+ * The vision half matches the live camera frame against pre-computed MobileNet
+ * v2 embeddings of the street paintings (data/shark-embeddings-browser.json,
+ * 180 crops) by cosine similarity — see src/utils/shark-embedding-detector.js.
+ *
+ * Two things keep it off the phones we just spent a release rescuing:
+ *
+ * - The model is loaded lazily, on the first tick that could actually produce a
+ *   match. Walking the Little Italy block never pays the ~14 MB MobileNet cost,
+ *   because the statues own that stretch and the shark cycle is suppressed there.
+ * - Inference runs on an interval, not per frame, and every guard is checked
+ *   before the frame is even grabbed. The legacy page inferred in a
+ *   requestAnimationFrame loop; that is far too hot next to SLAM.
+ *
+ * The enrolled embeddings were computed with MobileNet v2 alpha 1.0. Changing
+ * the model or alpha changes the feature space and silently invalidates every
+ * stored embedding, so loadModel() pins both.
  */
 AFRAME.registerComponent('shark-detector', {
   schema: {
@@ -7,6 +25,12 @@ AFRAME.registerComponent('shark-detector', {
     gpsTargetLng: { type: 'number', default: -121.8978303846544 },
     gpsRadius: { type: 'number', default: 250 },
     useGps: { type: 'boolean', default: true },
+    // Camera recognition of the painted sharks. ?vision=0 disables at runtime.
+    useVision: { type: 'boolean', default: true },
+    visionIntervalMs: { type: 'number', default: 600 },
+    visionThreshold: { type: 'number', default: 0.55 },
+    visionConfidence: { type: 'number', default: 0.4 },
+    visionCooldownMs: { type: 'number', default: 3000 },
     // Little Italy "always-on" bounding box (West / East corners from the task spec).
     littleItalyWestLat: { type: 'number', default: 37.334778 },
     littleItalyWestLng: { type: 'number', default: -121.899222 },
@@ -24,6 +48,21 @@ AFRAME.registerComponent('shark-detector', {
       gpsPingCount: 0,
       alwaysOn: false,
       inLittleItaly: false
+    };
+
+    this.vision = {
+      enabled: false,
+      status: 'idle',
+      model: null,
+      embeddings: null,
+      video: null,
+      canvas: null,
+      busy: false,
+      loading: false,
+      lastScore: 0,
+      lastName: null,
+      lastConfidence: 0,
+      matches: 0
     };
 
     // Expose for debugging/manual trigger
@@ -46,10 +85,18 @@ AFRAME.registerComponent('shark-detector', {
   },
 
   waitForReality: function() {
-      // Wait for realityready to ensure AR is fully active
-      window.addEventListener('realityready', () => {
-          this.startDetection();
-      }, {once: true});
+      // Prefer realityready — it means the AR camera is actually live. But it
+      // can be missed: it has already fired on some iOS/WebView paths by the
+      // time this listener attaches, and the desktop sim synthesises it on a
+      // timer. Detection must not depend on catching a single event, so run
+      // whichever arrives first and only once.
+      const startOnce = () => {
+        if (this.detectionStarted) return;
+        this.detectionStarted = true;
+        this.startDetection();
+      };
+      window.addEventListener('realityready', startOnce, { once: true });
+      setTimeout(startOnce, 4000);
   },
 
   startDetection: function () {
@@ -62,6 +109,135 @@ AFRAME.registerComponent('shark-detector', {
     if (this.data.useGps) {
         this.startGpsWatch();
     }
+    if (this.data.useVision) {
+        this.startVision();
+    }
+  },
+
+  // ---- Camera recognition of the painted sharks ---------------------------
+
+  startVision: function () {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('vision') === '0') {
+      this.vision.status = 'off (?vision=0)';
+      return;
+    }
+    if (!window.SharkEmbeddingDetector || !window.tf || !window.mobilenet) {
+      this.vision.status = 'unavailable (tf/mobilenet not loaded)';
+      console.warn('[shark-detector] vision libraries missing — skipping');
+      return;
+    }
+
+    this.vision.enabled = true;
+    this.vision.status = 'waiting for camera';
+    this.vision.canvas = document.createElement('canvas');
+    this.vision.canvas.width = 224;
+    this.vision.canvas.height = 224;
+
+    // The 8th Wall camera feed is not a plain <video> we can query for; the
+    // bridge finds it via the pipeline module or by polling.
+    if (window.SharkXR8VideoBridge) {
+      window.SharkXR8VideoBridge.whenVideoReady({
+        delayMs: 500,
+        onVideo: (video) => {
+          this.vision.video = video;
+          this.vision.status = 'camera ready';
+          console.log('[shark-detector] vision has the camera feed');
+        }
+      });
+    } else {
+      this.vision.status = 'unavailable (no video bridge)';
+      return;
+    }
+
+    this.visionTimer = setInterval(() => this.visionTick(), this.data.visionIntervalMs);
+
+    window.SharkVision = {
+      status: () => this.vision.status,
+      last: () => ({
+        name: this.vision.lastName,
+        score: +this.vision.lastScore.toFixed(3),
+        confidence: +this.vision.lastConfidence.toFixed(2),
+        matches: this.vision.matches
+      }),
+      threshold: () => this.data.visionThreshold
+    };
+  },
+
+  /** Everything that would make an inference pointless, checked before we pay for one. */
+  visionShouldRun: function () {
+    if (!this.vision.enabled || !this.vision.video) return false;
+    if (document.hidden) return false;
+    if (this.state.sharkVisible) return false;
+    // Little Italy runs always-on statues instead of the shark cycle.
+    if (this.state.inLittleItaly) return false;
+    if (window.SharksWayMode && !window.SharksWayMode.isWayfinding()) return false;
+    if (performance.now() - this.state.dismissedAt < this.data.visionCooldownMs) return false;
+    return true;
+  },
+
+  visionTick: function () {
+    if (this.vision.busy) return;
+    if (!this.visionShouldRun()) return;
+
+    const SED = window.SharkEmbeddingDetector;
+
+    // Lazy load: nothing above needed the model, so nothing loaded it.
+    if (!this.vision.model || !this.vision.embeddings) {
+      if (this.vision.loading) return;
+      this.vision.loading = true;
+      this.vision.status = 'loading model';
+      SED.loadModel((s) => { this.vision.status = s; })
+        .then((model) => {
+          this.vision.model = model;
+          const state = SED.createEmbeddingState();
+          return SED.loadEmbeddings(state, model, {}).then(() => {
+            this.vision.embeddings = state;
+            this.vision.status = 'watching';
+            console.log('[shark-detector] vision ready — watching for painted sharks');
+          });
+        })
+        .catch((err) => {
+          this.vision.status = 'load failed';
+          console.warn('[shark-detector] vision load failed', err);
+        })
+        .then(() => { this.vision.loading = false; });
+      return;
+    }
+
+    this.vision.busy = true;
+    SED.getFrameEmbedding(this.vision.model, this.vision.video, this.vision.canvas)
+      .then((embedding) => {
+        if (!embedding) return;
+        const raw = SED.bestMatch(this.vision.embeddings, embedding);
+        const smoothed = SED.rollingScore(this.vision.embeddings, raw);
+        this.vision.lastName = smoothed.name;
+        this.vision.lastScore = smoothed.score || 0;
+        this.vision.lastConfidence = smoothed.confidence || 0;
+
+        // Same test the original page used: a confident match, sustained over
+        // the rolling window, so one lucky frame of pavement cannot fire it.
+        const hit = smoothed.name &&
+          smoothed.score >= this.data.visionThreshold &&
+          smoothed.confidence >= this.data.visionConfidence;
+
+        if (hit && this.visionShouldRun()) {
+          this.vision.matches++;
+          this.vision.status = 'match: ' + smoothed.name;
+          console.log('[shark-detector] painted shark recognised:', smoothed.name,
+            smoothed.score.toFixed(3));
+          this.onSharkFound({
+            trigger: 'vision',
+            name: smoothed.name,
+            score: smoothed.score,
+            confidence: smoothed.confidence
+          });
+        } else if (this.vision.status.indexOf('match') !== 0) {
+          this.vision.status = 'watching';
+        }
+      })
+      .catch((err) => console.warn('[shark-detector] vision frame failed', err))
+      .then(() => { this.vision.busy = false; });
   },
 
   startGpsWatch: function () {
@@ -141,7 +317,7 @@ AFRAME.registerComponent('shark-detector', {
     if (this.state.sharkVisible) return;
     this.state.sharkVisible = true;
     
-    console.log("🦈 Shark Spawned via GPS!");
+    console.log('🦈 Shark spawned via ' + ((detail && detail.trigger) || 'manual'));
     
     const root = document.getElementById('shark-root');
     if (root) {
@@ -181,5 +357,6 @@ AFRAME.registerComponent('shark-detector', {
     if (this.state.gpsWatchId != null) {
       navigator.geolocation.clearWatch(this.state.gpsWatchId);
     }
+    if (this.visionTimer) clearInterval(this.visionTimer);
   }
 });
