@@ -21,7 +21,7 @@
  * exception, spec'd at 8 m in the June 10 redline.
  */
 const STATUE_HEIGHT_M = 2.5;   // marble statues — taller than a person, well under a storey
-const MASCOT_HEIGHT_M = 1.9;   // Sharkie / Sammy — person-scale for photos
+const MASCOT_HEIGHT_M = 1.425; // Sharkie / Sammy — 25% under person-scale, on site request
 const SHARK_MAX_DIM_M = 3.0;   // sharks are long and low, so pin the longest axis
 
 /**
@@ -1016,13 +1016,6 @@ AFRAME.registerComponent('location-experiences', {
         dur: 4000,
         easing: 'linear'
       });
-      const label = document.createElement('a-text');
-      label.setAttribute('value', d.label);
-      label.setAttribute('align', 'center');
-      label.setAttribute('width', 2.5);
-      label.setAttribute('color', '#fff');
-      label.setAttribute('position', '0 2.1 0');
-      ent.appendChild(label);
       anchor.appendChild(ent);
     });
 

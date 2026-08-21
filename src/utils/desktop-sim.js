@@ -184,12 +184,15 @@ function setupScene() {
     // A shadow-shader ground is invisible without a camera feed behind it, so
     // give the desktop view something to read scale and motion against.
     if (!document.getElementById('sim-grid')) {
+      // Lines, not a filled plane. An opaque 200 m plane at ground level drew
+      // over the lower half of anything standing on it, which read as "the
+      // model is sunk into the floor" when the model was in fact sitting
+      // exactly on y=0. A GridHelper writes no fill, so it cannot hide content.
       const grid = document.createElement('a-entity');
       grid.setAttribute('id', 'sim-grid');
-      grid.setAttribute('position', '0 0.01 0');
-      grid.setAttribute('rotation', '-90 0 0');
-      grid.setAttribute('geometry', 'primitive: plane; width: 200; height: 200');
-      grid.setAttribute('material', 'color: #16232b; side: double');
+      const helper = new THREE.GridHelper(200, 100, 0x2f5063, 0x1d3542);
+      helper.position.y = 0.005;
+      grid.setObject3D('grid', helper);
       scene.appendChild(grid);
 
       // 1 m reference cube at the origin — every size claim checks against this.
