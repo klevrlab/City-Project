@@ -28,7 +28,10 @@ AFRAME.registerComponent('shark-detector', {
     // Camera recognition of the painted sharks. ?vision=0 disables at runtime.
     useVision: { type: 'boolean', default: true },
     visionIntervalMs: { type: 'number', default: 600 },
-    visionThreshold: { type: 'number', default: 0.55 },
+    // 0.55 was the legacy page's gate. On site the pavement murals score around
+    // 0.54 and miss, while a frame of nothing scored 0.31 in testing, so 0.45
+    // buys real headroom without reaching down to arbitrary street content.
+    visionThreshold: { type: 'number', default: 0.45 },
     visionConfidence: { type: 'number', default: 0.4 },
     visionCooldownMs: { type: 'number', default: 3000 },
     // Little Italy "always-on" bounding box (West / East corners from the task spec).

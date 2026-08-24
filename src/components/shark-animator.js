@@ -460,7 +460,6 @@ AFRAME.registerComponent('shark-animator', {
     if (this.data.preferWestSwim) {
       // Bias ~35° toward the camera's local −X (often corridor-ish on Sharks Way).
       const camRight = new THREE.Vector3();
-      cam.object3D.getWorldDirection(new THREE.Vector3());
       camRight.set(1, 0, 0).applyQuaternion(cam.object3D.quaternion);
       camRight.y = 0;
       if (camRight.lengthSq() > 0.01) {
@@ -469,8 +468,21 @@ AFRAME.registerComponent('shark-animator', {
         outDir.add(camRight.multiplyScalar(-0.7)).normalize();
       }
     }
-    const endPos = new THREE.Vector3().copy(targetPoint).add(outDir.multiplyScalar(10.5));
+    const endPos = new THREE.Vector3().copy(targetPoint).add(outDir.clone().multiplyScalar(10.5));
     endPos.y = y;
+
+    // Face the way it actually leaves. facingYaw is the *approach* bearing, but
+    // preferWestSwim bends the exit ~35 deg off that, so a shark that keeps its
+    // entry yaw swims visibly sideways down the whole out-leg — reported on site
+    // as "swims diagonal to its swim path". Turning into the exit fixes it and
+    // reads as the shark banking away.
+    const outYaw = Math.atan2(outDir.x, outDir.z) * (180 / Math.PI) +
+      (experience.rotationOffsetY || 0);
+    // Take the short way round: animating 170 -> -170 numerically spins 340 deg.
+    let turnDelta = (outYaw - facingYaw) % 360;
+    if (turnDelta > 180) turnDelta -= 360;
+    if (turnDelta < -180) turnDelta += 360;
+    const exitYaw = facingYaw + turnDelta;
 
     ent.setAttribute('position', `${startPos.x} ${startPos.y} ${startPos.z}`);
     ent.setAttribute('rotation', `0 ${facingYaw} 0`);
@@ -498,6 +510,17 @@ AFRAME.registerComponent('shark-animator', {
     this.queue(() => {
       if (!this.isRunning || this.activeEntity !== ent) return;
       ent.removeAttribute('animation__hover');
+      // Turn first and quickly, so the shark is pointing where it is going for
+      // most of the leg rather than arriving at the right heading as it leaves.
+      if (Math.abs(turnDelta) > 1) {
+        ent.setAttribute('animation__turnOut', {
+          property: 'rotation',
+          from: `0 ${facingYaw.toFixed(3)} 0`,
+          to: `0 ${exitYaw.toFixed(3)} 0`,
+          dur: Math.min(700, swimOutDur / 3),
+          easing: 'easeInOutSine'
+        });
+      }
       ent.setAttribute('animation__swimOut', {
         property: 'position',
         from: `${centerPos.x} ${centerPos.y} ${centerPos.z}`,
